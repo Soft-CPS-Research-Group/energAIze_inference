@@ -41,6 +41,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: calof/energAIze_inference:latest
-          cache-from: type=registry,ref=calof/energAIze_inference:buildcache
-          cache-to: type=registry,ref=calof/energAIze_inference:buildcache,mode=max
+          tags: calof/energaize_inference:latest
+          cache-from: type=registry,ref=calof/energaize_inference:buildcache
+          cache-to: type=registry,ref=calof/energaize_inference:buildcache,mode=max
