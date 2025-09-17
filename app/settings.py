@@ -27,6 +27,11 @@ class Settings(BaseSettings):
         env="LOG_LEVEL",
         description="Log level for the inference service",
     )
+    alias_mapping_path: Path | None = Field(
+        default=None,
+        env="FEATURE_ALIAS_PATH",
+        description="Optional path to JSON file with feature alias overrides",
+    )
 
     class Config:
         env_file = ".env"
@@ -40,6 +45,11 @@ class Settings(BaseSettings):
 
     @validator("artifacts_dir", pre=True)
     def _expand_artifacts_dir(cls, value: str | Path | None) -> Path | None:
+        if value is None:
+            return None
+        return Path(value).expanduser()
+    @validator("alias_mapping_path", pre=True)
+    def _expand_alias_path(cls, value: str | Path | None) -> Path | None:
         if value is None:
             return None
         return Path(value).expanduser()

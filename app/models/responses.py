@@ -23,3 +23,4 @@ class InfoResponse(BaseModel):
     action_names: List[str] | None = None
     uptime_seconds: float
     loaded_at: str | None = None
+    alias_mapping_path: str | None = None

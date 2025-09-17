@@ -15,9 +15,11 @@ async def admin_load(
     manifest_path: Path = Body(..., embed=True),
     agent_index: int = Body(..., embed=True, ge=0),
     artifacts_dir: Path | None = Body(default=None, embed=True),
+    alias_mapping_path: Path | None = Body(default=None, embed=True),
 ):
+    """Load a model pipeline from disk, replacing any currently active pipeline."""
     try:
-        record = store.load(manifest_path, artifacts_dir, agent_index)
+        record = store.load(manifest_path, artifacts_dir, agent_index, alias_mapping_path)
     except FileNotFoundError as exc:
         logger.warning("Failed to load pipeline: %s", exc)
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -35,6 +37,7 @@ async def admin_load(
 
 @router.post("/unload")
 async def admin_unload():
+    """Unload the active pipeline, returning the service to an unconfigured state."""
     if not store.is_configured():
         raise HTTPException(status_code=409, detail="No model configured")
     store.unload()

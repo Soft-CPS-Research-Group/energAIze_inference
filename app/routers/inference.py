@@ -20,6 +20,7 @@ def get_runtime_pipeline():
 
 @router.post("", response_model=InferenceResponse)
 async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtime_pipeline)):
+    """Run inference for the configured agent using the supplied feature dict."""
     try:
         actions = pipeline.inference(payload.features)
     except KeyError as exc:

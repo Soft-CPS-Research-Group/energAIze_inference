@@ -26,7 +26,12 @@ async def on_startup() -> None:
     if settings.manifest_path is not None:
         if settings.agent_index is None:
             raise RuntimeError("MODEL_AGENT_INDEX must be set when MODEL_MANIFEST_PATH is provided")
-        store.load(settings.manifest_path, settings.artifacts_dir, settings.agent_index)
+        store.load(
+            settings.manifest_path,
+            settings.artifacts_dir,
+            settings.agent_index,
+            settings.alias_mapping_path,
+        )
     else:
         logger.info("Service started without configured model. Awaiting /admin/load to configure.")
 

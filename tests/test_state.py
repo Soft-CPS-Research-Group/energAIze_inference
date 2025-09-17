@@ -49,7 +49,9 @@ def test_store_load_unload(tmp_path):
     if store.is_configured():
         store.unload()
     manifest_path = build_manifest(tmp_path)
-    record = store.load(manifest_path, None, 0)
+    alias_file = tmp_path / "aliases.json"
+    alias_file.write_text('{"0": {"feature_aliases": {"alias_feat": "feat"}}}')
+    record = store.load(manifest_path, None, 0, alias_file)
     assert record.pipeline is not None
     assert store.is_configured()
     store.unload()

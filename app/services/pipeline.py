@@ -1,3 +1,5 @@
+"""Inference pipeline that reconstructs preprocessing and runtime execution."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +14,7 @@ from app.utils.manifest import Manifest
 
 
 def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[str, float]:
+    """Apply feature alias mapping to the incoming payload."""
     if not aliases:
         return payload
     transformed = dict(payload)
@@ -22,6 +25,8 @@ def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[s
 
 
 class OnnxAgentRuntime:
+    """Runtime wrapper around an ONNX model for a single agent."""
+
     def __init__(
         self,
         index: int,
@@ -50,6 +55,8 @@ class OnnxAgentRuntime:
 
 
 class RuleBasedRuntime:
+    """Runtime for simple rule-based policies described in JSON."""
+
     def __init__(
         self,
         index: int,
@@ -88,10 +95,19 @@ class RuleBasedRuntime:
 
 
 class InferencePipeline:
-    def __init__(self, manifest: Manifest, artifacts_root: Path, agent_index: int):
+    """End-to-end pipeline that handles preprocessing, runtime, and postprocessing."""
+
+    def __init__(
+        self,
+        manifest: Manifest,
+        artifacts_root: Path,
+        agent_index: int,
+        alias_overrides: Optional[Dict[int, Dict[str, str]]] = None,
+    ):
         self.manifest = manifest
         self.artifacts_root = artifacts_root
         self.agent_index = agent_index
+        self.alias_overrides = alias_overrides or {}
         self._agent = self._build_agent()
 
     def _build_agent(self):
@@ -102,7 +118,6 @@ class InferencePipeline:
             (art for art in self.manifest.agent.artifacts if art.agent_index == self.agent_index),
             None,
         )
-
         if artifact is None:
             raise ValueError(f"Agent index {self.agent_index} not found in manifest")
 
@@ -121,6 +136,7 @@ class InferencePipeline:
 
         artifact_config = dict(artifact.config or {})
         feature_aliases = artifact_config.get("feature_aliases", {})
+        feature_aliases.update(self.alias_overrides.get(self.agent_index, {}))
 
         if artifact.format in (None, "onnx"):
             session = ort.InferenceSession(
@@ -158,6 +174,7 @@ class InferencePipeline:
         raise NotImplementedError(f"Unsupported artifact format '{artifact.format}'")
 
     def inference(self, payload: Dict[str, float]) -> Dict[str, Dict[str, float]]:
+        """Run inference and map outputs back to named actions."""
         actions = self._agent.infer(payload)
         return {str(self._agent.index): actions}
 

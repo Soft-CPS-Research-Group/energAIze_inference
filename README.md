@@ -61,6 +61,8 @@ Clients (edge/fog) ---> FastAPI Routers (info/inference/reward/admin)
      in this container. Required when `MODEL_MANIFEST_PATH` is provided.
    - `LOG_LEVEL` (optional, default `INFO`): controls log verbosity (handled by
      Loguru).
+   - `FEATURE_ALIAS_PATH` (optional): path to a JSON file with feature alias
+     overrides per agent.
 
 3. **Run the service**
    ```bash
@@ -116,7 +118,8 @@ The inference service instantiates an appropriate runtime automatically based on
 ### Feature Aliases
 
 If real-world feature names differ from the training manifest, add a
-`feature_aliases` mapping under `artifact.config`. Example:
+`feature_aliases` mapping under `artifact.config` or provide an override file
+referenced by `FEATURE_ALIAS_PATH`. Manifest example:
 
 ```json
 "artifacts": [
@@ -132,8 +135,20 @@ If real-world feature names differ from the training manifest, add a
 ]
 ```
 
-Incoming payloads can now use `temperature`, which will be converted to
-`indoor_temperature` before preprocessing.
+Alias override file example (`FEATURE_ALIAS_PATH` -> JSON):
+
+```json
+{
+  "0": {
+    "feature_aliases": {
+      "temperature": "indoor_temperature"
+    }
+  }
+}
+```
+
+Incoming payloads can use the alias names, which are converted to the manifest
+feature names before preprocessing.
 
 ## Configuration
 

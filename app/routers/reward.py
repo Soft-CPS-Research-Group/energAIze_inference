@@ -21,6 +21,7 @@ def get_reward_calculator():
 
 @router.post("", response_model=RewardResponse)
 async def compute_reward(payload: RewardRequest, calculator = Depends(get_reward_calculator)):
+    """Compute reward values using the configured reward function."""
     try:
         rewards = calculator.calculate(payload.observations)
     except NotImplementedError as exc:

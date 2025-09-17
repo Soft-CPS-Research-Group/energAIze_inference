@@ -20,6 +20,7 @@ def get_record():
 
 @router.get("", response_model=InfoResponse)
 async def get_info(record = Depends(get_record)):
+    """Return metadata about the currently loaded pipeline."""
     manifest = record.pipeline.manifest
     uptime_seconds = (datetime.utcnow() - store.get_startup_time()).total_seconds()
     return InfoResponse(
@@ -32,4 +33,5 @@ async def get_info(record = Depends(get_record)):
         action_names=manifest.environment.action_names,
         uptime_seconds=uptime_seconds,
         loaded_at=record.loaded_at.isoformat() + "Z",
+        alias_mapping_path=str(record.alias_mapping_path) if record.alias_mapping_path else None,
     )
