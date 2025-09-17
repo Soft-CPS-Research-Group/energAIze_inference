@@ -57,7 +57,7 @@ class PipelineStore:
             root,
             agent_index,
         )
-        alias_overrides = _load_alias_overrides(alias_mapping_path)
+        alias_overrides = _load_alias_overrides(alias_mapping_path, agent_index)
         manifest = load_manifest(manifest_path)
         pipeline = InferencePipeline(
             manifest=manifest,
@@ -90,8 +90,13 @@ class PipelineStore:
 store = PipelineStore()
 
 
-def _load_alias_overrides(path: Optional[Path]) -> Dict[int, Dict[str, str]]:
-    """Load per-agent feature alias overrides from a JSON file if provided."""
+def _load_alias_overrides(path: Optional[Path], agent_index: int) -> Dict[str, str]:
+    """Load flat feature alias overrides from JSON sidecar files.
+
+    The file must contain a single dictionary mapping alias keys to canonical
+    feature names. Keys prefixed with an underscore are ignored so files can
+    hold short comments (e.g. `_comment`).
+    """
 
     if path is None:
         return {}
@@ -104,21 +109,21 @@ def _load_alias_overrides(path: Optional[Path]) -> Dict[int, Dict[str, str]]:
     with path.open("r", encoding="utf-8") as handle:
         raw = json.load(handle)
 
-    overrides: Dict[int, Dict[str, str]] = {}
+    if not isinstance(raw, dict):
+        raise ValueError("Alias mapping must be a JSON object mapping aliases to features")
+
+    aliases: Dict[str, str] = {}
     for key, value in raw.items():
-        try:
-            agent_idx = int(key)
-        except ValueError as exc:
-            raise ValueError(f"Alias mapping keys must be integers (got {key!r})") from exc
+        if isinstance(key, str) and key.startswith("_"):
+            continue
+        if not isinstance(value, (str, int, float, bool)):
+            raise ValueError(f"Alias mapping value for {key!r} must be scalar")
+        aliases[str(key)] = str(value)
 
-        if isinstance(value, dict) and "feature_aliases" in value:
-            alias_map = value.get("feature_aliases", {})
-        elif isinstance(value, dict):
-            alias_map = value
-        else:
-            raise ValueError(f"Alias mapping for agent {agent_idx} must be a dictionary")
-
-        overrides[agent_idx] = {str(k): str(v) for k, v in alias_map.items()}
-
-    logger.debug("Loaded alias overrides for agents: %s", list(overrides.keys()))
-    return overrides
+    logger.debug(
+        "Loaded %s alias overrides from %s for agent %s",
+        len(aliases),
+        path,
+        agent_index,
+    )
+    return aliases

@@ -117,33 +117,15 @@ The inference service instantiates an appropriate runtime automatically based on
 
 ### Feature Aliases
 
-If real-world feature names differ from the training manifest, add a
-`feature_aliases` mapping under `artifact.config` or provide an override file
-referenced by `FEATURE_ALIAS_PATH`. Manifest example:
-
-```json
-"artifacts": [
-  {
-    "agent_index": 0,
-    "path": "onnx_models/agent_0.onnx",
-    "config": {
-      "feature_aliases": {
-        "temperature": "indoor_temperature"
-      }
-    }
-  }
-]
-```
-
-Alias override file example (`FEATURE_ALIAS_PATH` -> JSON):
+If real-world feature names differ from the training manifest, provide a JSON
+sidecar file referenced by `FEATURE_ALIAS_PATH`. The file must be a flat
+mapping of `alias -> canonical` feature names (keys starting with `_` are
+ignored so you can drop short comments). Example:
 
 ```json
 {
-  "0": {
-    "feature_aliases": {
-      "temperature": "indoor_temperature"
-    }
-  }
+  "temperature": "indoor_temperature",
+  "hvac_kw": "hvac_power_kw"
 }
 ```
 

@@ -1,15 +1,15 @@
+import json
 from pathlib import Path
 
 import pytest
 
 from app.state import store
-from app.services.pipeline import InferencePipeline
-from app.utils.manifest import Manifest
 
 
 def build_manifest(tmp_path: Path) -> Path:
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
+
     manifest = {
         "manifest_version": 1,
         "metadata": {},
@@ -25,23 +25,30 @@ def build_manifest(tmp_path: Path) -> Path:
             "reward_function": {"name": "RewardFunction", "params": {}},
         },
         "agent": {
-            "format": "rule_based",
+            "format": "onnx",
             "artifacts": [
                 {
                     "agent_index": 0,
-                    "path": "policy.json",
-                    "format": "rule_based",
-                    "config": {"default_actions": {"action": 1.0}},
+                    "path": "onnx_models/agent_0.onnx",
                 }
             ],
         },
     }
-    (bundle_dir / "policy.json").write_text('{"default_actions": {"action": 1.0}}')
+
+    import onnx
+    from onnx import helper, TensorProto
+
+    input_tensor = helper.make_tensor_value_info("input", TensorProto.FLOAT, [1, 1])
+    output_tensor = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 1])
+    node = helper.make_node("Identity", inputs=["input"], outputs=["output"])
+    graph = helper.make_graph([node], "IdentityGraph", [input_tensor], [output_tensor])
+    model = helper.make_model(graph)
+
+    (bundle_dir / "onnx_models").mkdir()
+    onnx.save(model, bundle_dir / "onnx_models" / "agent_0.onnx")
+
     manifest_path = bundle_dir / "artifact_manifest.json"
-    manifest_path.write_text(
-        __import__("json").dumps(manifest),
-        encoding="utf-8",
-    )
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     return manifest_path
 
 
@@ -50,7 +57,7 @@ def test_store_load_unload(tmp_path):
         store.unload()
     manifest_path = build_manifest(tmp_path)
     alias_file = tmp_path / "aliases.json"
-    alias_file.write_text('{"0": {"feature_aliases": {"alias_feat": "feat"}}}')
+    alias_file.write_text('{"alias_feat": "feat"}', encoding="utf-8")
     record = store.load(manifest_path, None, 0, alias_file)
     assert record.pipeline is not None
     assert store.is_configured()

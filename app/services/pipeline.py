@@ -102,7 +102,7 @@ class InferencePipeline:
         manifest: Manifest,
         artifacts_root: Path,
         agent_index: int,
-        alias_overrides: Optional[Dict[int, Dict[str, str]]] = None,
+        alias_overrides: Optional[Dict[str, str]] = None,
     ):
         self.manifest = manifest
         self.artifacts_root = artifacts_root
@@ -135,8 +135,7 @@ class InferencePipeline:
             raise FileNotFoundError(f"Artifact not found: {artifact_path}")
 
         artifact_config = dict(artifact.config or {})
-        feature_aliases = artifact_config.get("feature_aliases", {})
-        feature_aliases.update(self.alias_overrides.get(self.agent_index, {}))
+        feature_aliases = dict(self.alias_overrides)
 
         if artifact.format in (None, "onnx"):
             session = ort.InferenceSession(

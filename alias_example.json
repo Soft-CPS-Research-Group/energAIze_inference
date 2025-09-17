@@ -1,13 +1,5 @@
 {
-  "0": {
-    "feature_aliases": {
-      "temperature": "indoor_temperature",
-      "humidity": "relative_humidity"
-    }
-  },
-  "1": {
-    "feature_aliases": {
-      "grid_power": "net_electricity_consumption"
-    }
-  }
+  "temperature": "indoor_temperature",
+  "humidity": "relative_humidity",
+  "grid_power": "net_electricity_consumption"
 }
