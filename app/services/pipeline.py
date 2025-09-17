@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import onnxruntime as ort
@@ -11,34 +11,58 @@ from app.services.preprocessor import AgentPreprocessor, build_encoder
 from app.utils.manifest import Manifest
 
 
+def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[str, float]:
+    if not aliases:
+        return payload
+    transformed = dict(payload)
+    for alias, target in aliases.items():
+        if alias in transformed and target not in transformed:
+            transformed[target] = transformed.pop(alias)
+    return transformed
+
+
 class OnnxAgentRuntime:
-    def __init__(self, index: int, session: ort.InferenceSession, preprocessor: AgentPreprocessor, action_names: List[str]):
+    def __init__(
+        self,
+        index: int,
+        session: ort.InferenceSession,
+        preprocessor: AgentPreprocessor,
+        action_names: List[str],
+        feature_aliases: Dict[str, str] | None = None,
+    ):
         self.index = index
         self.session = session
         self.preprocessor = preprocessor
         self.action_names = action_names
+        self.feature_aliases = feature_aliases or {}
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
+        payload = _apply_aliases(payload, self.feature_aliases)
         features = self.preprocessor.transform(payload)
         logger.debug("Running ONNX inference for agent %s", self.index)
         outputs = self.session.run(None, {self.session.get_inputs()[0].name: features.reshape(1, -1)})
         actions = outputs[0].squeeze(0)
         mapping: Dict[str, float] = {}
         for i, value in enumerate(actions.tolist()):
-            if i < len(self.action_names):
-                key = self.action_names[i]
-            else:
-                key = f"action_{i}"
+            key = self.action_names[i] if i < len(self.action_names) else f"action_{i}"
             mapping[key] = value
         return mapping
 
 
 class RuleBasedRuntime:
-    def __init__(self, index: int, config: Dict[str, Any], action_names: List[str], preprocessor: AgentPreprocessor | None = None):
+    def __init__(
+        self,
+        index: int,
+        config: Dict[str, Any],
+        action_names: List[str],
+        preprocessor: Optional[AgentPreprocessor] = None,
+        feature_aliases: Dict[str, str] | None = None,
+    ):
         self.index = index
         self.config = config
         self.action_names = action_names
         self.preprocessor = preprocessor if config.get("use_preprocessor") else None
+        self.feature_aliases = feature_aliases or {}
         self.rules = config.get("rules", [])
         default_actions = config.get("default_actions", {})
         if not default_actions and action_names:
@@ -46,6 +70,7 @@ class RuleBasedRuntime:
         self.default_actions = default_actions
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
+        payload = _apply_aliases(payload, self.feature_aliases)
         raw_payload = payload
         if self.preprocessor:
             features = self.preprocessor.transform(payload)
@@ -82,7 +107,7 @@ class InferencePipeline:
             raise ValueError(f"Agent index {self.agent_index} not found in manifest")
 
         logger.info(
-            "Loading agent index {} (format={})", artifact.agent_index, artifact.format or "onnx"
+            "Loading agent index %s (format=%s)", artifact.agent_index, artifact.format or "onnx"
         )
 
         encoder_specs = env.encoders[artifact.agent_index]
@@ -94,6 +119,9 @@ class InferencePipeline:
         if not artifact_path.exists():
             raise FileNotFoundError(f"Artifact not found: {artifact_path}")
 
+        artifact_config = dict(artifact.config or {})
+        feature_aliases = artifact_config.get("feature_aliases", {})
+
         if artifact.format in (None, "onnx"):
             session = ort.InferenceSession(
                 path_or_bytes=artifact_path.as_posix(),
@@ -104,12 +132,13 @@ class InferencePipeline:
                 session=session,
                 preprocessor=preprocessor,
                 action_names=action_names,
+                feature_aliases=feature_aliases,
             )
 
         if artifact.format == "rule_based":
             import json
 
-            config = dict(artifact.config)
+            config = dict(artifact_config)
             if "config_path" in config:
                 config_path = self.artifacts_root / config["config_path"]
                 with config_path.open("r", encoding="utf-8") as handle:
@@ -123,6 +152,7 @@ class InferencePipeline:
                 config=config,
                 action_names=action_names,
                 preprocessor=preprocessor,
+                feature_aliases=feature_aliases,
             )
 
         raise NotImplementedError(f"Unsupported artifact format '{artifact.format}'")

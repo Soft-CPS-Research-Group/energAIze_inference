@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from datetime import datetime
 
 from fastapi import FastAPI, HTTPException
 from loguru import logger
@@ -11,12 +10,10 @@ from app.settings import settings
 from app.state import store
 from app.version import __version__
 
-
 logger.remove()
 logger.add(sys.stderr, level=settings.log_level.upper())
 
 app = FastAPI(title="Energy Flexibility Inference API", version=__version__)
-startup_time = datetime.utcnow()
 
 app.include_router(info.router)
 app.include_router(inference.router)
@@ -42,7 +39,3 @@ async def health_check():
         "configured": record is not None,
         "agent_index": record.agent_index if record else None,
     }
-
-
-def get_startup_time() -> datetime:
-    return startup_time

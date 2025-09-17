@@ -23,6 +23,7 @@ class PipelineRecord:
 class PipelineStore:
     def __init__(self) -> None:
         self._record: Optional[PipelineRecord] = None
+        self._startup_time = datetime.utcnow()
 
     def is_configured(self) -> bool:
         return self._record is not None
@@ -63,6 +64,9 @@ class PipelineStore:
                 self._record.agent_index,
             )
         self._record = None
+
+    def get_startup_time(self) -> datetime:
+        return self._startup_time
 
 
 store = PipelineStore()

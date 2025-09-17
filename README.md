@@ -18,6 +18,31 @@ model bundle.
   (supports the baseline `RewardFunction` and `V2GPenaltyReward`).
 - Health and information endpoints for deployment observability.
 
+## Architecture
+
+```
+Clients (edge/fog) ---> FastAPI Routers (info/inference/reward/admin)
+                                 |
+                                 v
+                       Pipeline Store (OTA load/unload)
+                                 |
+                                 v
+                       InferencePipeline (preprocess + runtime)
+                                 |
+                                 v
+                   Artefact Bundle (manifest + model per agent)
+```
+
+- **FastAPI routers** expose public endpoints as well as `/admin/*` for
+  on-the-fly model management.
+- **Pipeline store** keeps the currently active agent (if any) and metadata
+  about when it was loaded.
+- **InferencePipeline** reconstructs encoders, invokes the appropriate runtime
+  (ONNX or rule-based), and maps outputs back to named actions.
+- **Artefact bundles** are produced by the training platform and mounted or
+  downloaded at runtime. One container is expected to host exactly one agent
+  from the bundle.
+
 ## Getting Started
 
 1. **Install dependencies**
@@ -88,6 +113,28 @@ Optional configuration can be provided via `artifact.config` (e.g.,
 The inference service instantiates an appropriate runtime automatically based on
 `format`.
 
+### Feature Aliases
+
+If real-world feature names differ from the training manifest, add a
+`feature_aliases` mapping under `artifact.config`. Example:
+
+```json
+"artifacts": [
+  {
+    "agent_index": 0,
+    "path": "onnx_models/agent_0.onnx",
+    "config": {
+      "feature_aliases": {
+        "temperature": "indoor_temperature"
+      }
+    }
+  }
+]
+```
+
+Incoming payloads can now use `temperature`, which will be converted to
+`indoor_temperature` before preprocessing.
+
 ## Configuration
 
 See `app/settings.py` for configurable environment variables.
@@ -122,6 +169,15 @@ Reward payload:
 ```
 
 `GET /health` returns `{"status": "ok", "configured": true/false, "agent_index": idx}`.
+
+## Tests & CI
+
+Run the unit tests locally with `pytest`. The repository includes a GitHub
+Actions workflow (`.github/workflows/ci.yml`) that executes
+`python -m compileall` and `pytest` on pushes and pull requests—push your branch
+to GitHub to trigger the pipeline. On pushes to `main` the workflow also builds
+and pushes a Docker image (requires the `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN` secrets).
 
 ## Roadmap
 

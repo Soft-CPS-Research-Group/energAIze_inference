@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.models.responses import InfoResponse
 from app.state import store
 from app.version import __version__
-from app.main import get_startup_time
 
 router = APIRouter(prefix="/info", tags=["info"])
 
@@ -22,7 +21,7 @@ def get_record():
 @router.get("", response_model=InfoResponse)
 async def get_info(record = Depends(get_record)):
     manifest = record.pipeline.manifest
-    uptime_seconds = (datetime.utcnow() - get_startup_time()).total_seconds()
+    uptime_seconds = (datetime.utcnow() - store.get_startup_time()).total_seconds()
     return InfoResponse(
         algorithm=manifest.algorithm.get("name", "unknown"),
         manifest_version=manifest.manifest_version,

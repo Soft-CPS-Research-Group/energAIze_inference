@@ -46,6 +46,8 @@ def build_manifest(tmp_path: Path) -> Path:
 
 
 def test_store_load_unload(tmp_path):
+    if store.is_configured():
+        store.unload()
     manifest_path = build_manifest(tmp_path)
     record = store.load(manifest_path, None, 0)
     assert record.pipeline is not None
