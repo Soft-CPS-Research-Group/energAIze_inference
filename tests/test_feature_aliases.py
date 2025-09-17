@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from app.services.pipeline import InferencePipeline
 from app.utils.manifest import Manifest
 
@@ -41,7 +43,11 @@ def test_feature_alias_overrides(tmp_path: Path) -> None:
     output_tensor = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 1])
     node = helper.make_node("Identity", inputs=["input"], outputs=["output"])
     graph = helper.make_graph([node], "IdentityGraph", [input_tensor], [output_tensor])
-    model = helper.make_model(graph)
+    model = helper.make_model(
+        graph,
+        producer_name="unit-test",
+        opset_imports=[helper.make_operatorsetid("", 13)],
+    )
 
     (bundle_dir / "onnx_models").mkdir()
     onnx.save(model, bundle_dir / "onnx_models" / "agent_0.onnx")
@@ -57,4 +63,4 @@ def test_feature_alias_overrides(tmp_path: Path) -> None:
         alias_overrides={"alias_feat1": "feat1"},
     )
     result = pipeline.inference({"alias_feat1": 0.8})
-    assert result["0"]["action"] == 0.8
+    assert result["0"]["action"] == pytest.approx(0.8, rel=1e-6)

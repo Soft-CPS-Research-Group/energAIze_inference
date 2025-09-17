@@ -42,7 +42,11 @@ def build_manifest(tmp_path: Path) -> Path:
     output_tensor = helper.make_tensor_value_info("output", TensorProto.FLOAT, [1, 1])
     node = helper.make_node("Identity", inputs=["input"], outputs=["output"])
     graph = helper.make_graph([node], "IdentityGraph", [input_tensor], [output_tensor])
-    model = helper.make_model(graph)
+    model = helper.make_model(
+        graph,
+        producer_name="unit-test",
+        opset_imports=[helper.make_operatorsetid("", 13)],
+    )
 
     (bundle_dir / "onnx_models").mkdir()
     onnx.save(model, bundle_dir / "onnx_models" / "agent_0.onnx")
