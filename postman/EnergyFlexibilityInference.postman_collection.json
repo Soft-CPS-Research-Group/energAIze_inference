@@ -1,0 +1,521 @@
+{
+  "info": {
+    "name": "Energy Flexibility Inference API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Health responds 200', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Health payload includes status flag', function () {",
+              "  const body = pm.response.json();",
+              "  pm.expect(body).to.have.property('status');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Admin Load (RBC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{rbcManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "load"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC pipeline loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('loaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Info (RBC)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/info",
+          "host": ["{{baseUrl}}"],
+          "path": ["info"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC info is available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.algorithm).to.eql('RuleBasedPolicy');",
+              "  pm.expect(body.action_names).to.include('hvac');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Inference (RBC: mode=standby)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"mode\": \"standby\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": ["{{baseUrl}}"],
+          "path": ["inference"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Standby rule outputs hvac 0', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.actions['0'].hvac).to.eql(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Inference (RBC: mode=cooling)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"mode\": \"cooling\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": ["{{baseUrl}}"],
+          "path": ["inference"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Cooling rule outputs hvac 0.5', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.actions['0'].hvac).to.eql(0.5);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Reward (RBC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"observations\": {\n    \"net_electricity_consumption\": 5.0\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reward",
+          "host": ["{{baseUrl}}"],
+          "path": ["reward"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC reward mirrors baseline calculation', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.rewards['0']).to.eql(-5);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Admin Unload (RBC)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "unload"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC pipeline unloaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('unloaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Admin Load (RBC + Aliases)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{rbcManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{aliasMappingPath}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "load"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC pipeline with aliases loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('loaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Inference (RBC alias key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"operating_mode\": \"cooling\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": ["{{baseUrl}}"],
+          "path": ["inference"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Alias key resolved correctly', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.actions['0'].hvac).to.eql(0.5);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Admin Unload (RBC alias)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "unload"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('RBC alias pipeline unloaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('unloaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Admin Load (ONNX)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{onnxManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "load"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ONNX pipeline loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('loaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Info (ONNX)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/info",
+          "host": ["{{baseUrl}}"],
+          "path": ["info"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ONNX info reflects identity bundle', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.algorithm).to.eql('DummyONNX');",
+              "  pm.expect(body.action_names).to.include('action');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Inference (ONNX Identity)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"feat\": 0.42\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": ["{{baseUrl}}"],
+          "path": ["inference"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Identity ONNX echoes feature value', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  const value = body.actions['0'].action;",
+              "  pm.expect(value).to.be.closeTo(0.42, 1e-6);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Reward (ONNX)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"observations\": {\n    \"net_electricity_consumption\": 3.0\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/reward",
+          "host": ["{{baseUrl}}"],
+          "path": ["reward"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ONNX reward still uses baseline function', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.rewards['0']).to.eql(-3);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Admin Unload (ONNX)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": ["{{baseUrl}}"],
+          "path": ["admin", "unload"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ONNX pipeline unloaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('unloaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "rbcManifestPath",
+      "value": "/data/rule_based/artifact_manifest.json"
+    },
+    {
+      "key": "onnxManifestPath",
+      "value": "/data/identity_bundle/artifact_manifest.json"
+    },
+    {
+      "key": "aliasMappingPath",
+      "value": "/data/rule_based/aliases.json"
+    },
+    {
+      "key": "agentIndex",
+      "value": "0"
+    }
+  ]
+}

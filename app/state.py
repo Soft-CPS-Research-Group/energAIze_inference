@@ -5,10 +5,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
-from loguru import logger
-
 from app.services.pipeline import InferencePipeline
 from app.utils.manifest import load_manifest
+from app.logging import get_logger
 
 
 @dataclass
@@ -51,11 +50,11 @@ class PipelineStore:
         manifest_path = manifest_path.expanduser().resolve()
         root = artifacts_dir.expanduser().resolve() if artifacts_dir else manifest_path.parent
 
-        logger.info(
-            "Loading pipeline (manifest=%s, artifacts=%s, agent_index=%s)",
-            manifest_path,
-            root,
-            agent_index,
+        get_logger().info(
+            "Loading pipeline",
+            manifest_path=str(manifest_path),
+            artifacts_dir=str(root),
+            agent_index=agent_index,
         )
         alias_overrides = _load_alias_overrides(alias_mapping_path, agent_index)
         manifest = load_manifest(manifest_path)
@@ -76,10 +75,10 @@ class PipelineStore:
 
     def unload(self) -> None:
         if self._record:
-            logger.info(
-                "Unloading pipeline (manifest=%s, agent_index=%s)",
-                self._record.manifest_path,
-                self._record.agent_index,
+            get_logger().info(
+                "Unloading pipeline",
+                manifest_path=str(self._record.manifest_path),
+                agent_index=self._record.agent_index,
             )
         self._record = None
 
@@ -120,10 +119,10 @@ def _load_alias_overrides(path: Optional[Path], agent_index: int) -> Dict[str, s
             raise ValueError(f"Alias mapping value for {key!r} must be scalar")
         aliases[str(key)] = str(value)
 
-    logger.debug(
-        "Loaded %s alias overrides from %s for agent %s",
-        len(aliases),
-        path,
-        agent_index,
+    get_logger().debug(
+        "Loaded alias overrides",
+        alias_count=len(aliases),
+        alias_path=str(path),
+        agent_index=agent_index,
     )
     return aliases

@@ -7,10 +7,11 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 import onnxruntime as ort
-from loguru import logger
 
 from app.services.preprocessor import AgentPreprocessor, build_encoder
+from app.settings import settings
 from app.utils.manifest import Manifest
+from app.logging import get_logger
 
 
 def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[str, float]:
@@ -44,7 +45,8 @@ class OnnxAgentRuntime:
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)
         features = self.preprocessor.transform(payload)
-        logger.debug("Running ONNX inference for agent %s", self.index)
+        log = get_logger()
+        log.debug("Running ONNX inference", agent_index=self.index)
         outputs = self.session.run(None, {self.session.get_inputs()[0].name: features.reshape(1, -1)})
         actions = outputs[0].squeeze(0)
         mapping: Dict[str, float] = {}
@@ -87,10 +89,12 @@ class RuleBasedRuntime:
             conditions = rule.get("if", {})
             if all(raw_payload.get(k) == v for k, v in conditions.items()):
                 actions = rule.get("actions", {})
-                logger.debug("Rule matched for agent %s: %s", self.index, conditions)
+                get_logger().debug(
+                    "Rule matched", agent_index=self.index, conditions=conditions
+                )
                 return {k: float(v) for k, v in actions.items()}
 
-        logger.debug("No rule matched for agent %s; using default actions", self.index)
+        get_logger().debug("No rule matched", agent_index=self.index)
         return {k: float(v) for k, v in self.default_actions.items()}
 
 
@@ -121,8 +125,11 @@ class InferencePipeline:
         if artifact is None:
             raise ValueError(f"Agent index {self.agent_index} not found in manifest")
 
-        logger.info(
-            "Loading agent index %s (format=%s)", artifact.agent_index, artifact.format or "onnx"
+        get_logger().info(
+            "Loading agent",
+            agent_index=artifact.agent_index,
+            format=artifact.format or "onnx",
+            providers=settings.onnx_execution_providers,
         )
 
         encoder_specs = env.encoders[artifact.agent_index]
@@ -140,7 +147,7 @@ class InferencePipeline:
         if artifact.format in (None, "onnx"):
             session = ort.InferenceSession(
                 path_or_bytes=artifact_path.as_posix(),
-                providers=["CPUExecutionProvider"],
+                providers=settings.onnx_execution_providers,
             )
             return OnnxAgentRuntime(
                 index=artifact.agent_index,

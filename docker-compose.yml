@@ -1,0 +1,24 @@
+services:
+  inference:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: energaize-inference:latest
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    environment:
+      LOG_JSON: "true"
+      MODEL_MANIFEST_PATH: "${MODEL_MANIFEST_PATH:-/data/rule_based/artifact_manifest.json}"
+      MODEL_AGENT_INDEX: "${MODEL_AGENT_INDEX:-0}"
+      ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CUDAExecutionProvider,CPUExecutionProvider}"
+    volumes:
+      - "${BUNDLE_PATH:-./examples}:/data:ro"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    runtime: nvidia

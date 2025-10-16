@@ -138,6 +138,8 @@ See `app/settings.py` for configurable environment variables.
 
 - `MODEL_MANIFEST_PATH` (required): location of manifest.
 - `MODEL_ARTIFACTS_DIR` (optional): base directory for relative paths.
+- `LOG_LEVEL` (optional): log level for structured logs (default `INFO`).
+- `LOG_JSON` (optional): when set to `true`, emit JSON-formatted logs.
 
 ## API Contract
 
@@ -175,6 +177,100 @@ Actions workflow (`.github/workflows/ci.yml`) that executes
 to GitHub to trigger the pipeline. On pushes to `main` the workflow also builds
 and pushes a Docker image (requires the `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN` secrets).
+
+## Example Bundles & Manual Testing
+
+Sample artefacts live under `examples/`:
+
+- `examples/rule_based/`: minimal manifest + rule-based policy that drives the
+  `hvac` action based on a `mode` feature. Use it to validate `/admin/load` and
+  `/inference` without training assets. Includes `aliases.json` to demonstrate
+  runtime feature renaming.
+- `scripts/generate_identity_bundle.py`: helper that emits a one-feature ONNX
+  identity model and companion manifest. Run
+  `python scripts/generate_identity_bundle.py` to create
+  `examples/identity_bundle/artifact_manifest.json`.
+
+To try the API end-to-end:
+
+1. Start the service (`uvicorn app.main:app --reload`).
+2. Import `postman/EnergyFlexibilityInference.postman_collection.json` into
+   Postman (or run with Newman). Update collection variables:
+   - `rbcManifestPath` → rule-based manifest path inside the service (defaults to
+     `/data/rule_based/artifact_manifest.json`).
+   - `aliasMappingPath` → optional feature-alias JSON (defaults to
+     `/data/rule_based/aliases.json`).
+   - `onnxManifestPath` → ONNX manifest path inside the service (defaults to
+     `/data/identity_bundle/artifact_manifest.json`).
+   - `baseUrl` → URL of the running service.
+3. Execute the numbered requests in order: `01 - Health Check` through
+   `07 - Admin Unload`.
+
+The collection walks through loading the rule-based sample, exercising
+inference/reward, validating feature aliases, unloading, then repeating the flow
+with the generated identity ONNX bundle.
+
+### Docker Compose
+
+Run the stack with the provided compose file:
+
+```bash
+docker compose up --build
+```
+
+Environment overrides (set via `export VAR=value` or a `.env` file):
+
+- `BUNDLE_PATH` → host directory containing the manifest bundles (defaults to
+  `./examples`).
+- `MODEL_MANIFEST_PATH` → manifest path as seen inside the container (defaults to
+  `/data/rule_based/artifact_manifest.json`).
+- `MODEL_AGENT_INDEX` → which agent from the bundle to serve (defaults to `0`).
+- `ONNX_EXECUTION_PROVIDERS` → e.g. `CUDAExecutionProvider,CPUExecutionProvider`.
+
+Quick example before calling `docker compose up`:
+
+```bash
+export BUNDLE_PATH="$PWD/examples"
+export MODEL_MANIFEST_PATH="/data/rule_based/artifact_manifest.json"
+export MODEL_AGENT_INDEX=0
+export ONNX_EXECUTION_PROVIDERS="CUDAExecutionProvider,CPUExecutionProvider"
+docker compose --compatibility up --build
+```
+
+To boot straight into the ONNX identity sample instead, set
+`MODEL_MANIFEST_PATH="/data/identity_bundle/artifact_manifest.json"` before
+launching or perform the swap at runtime via the Postman collection.
+
+On GPU hosts install the NVIDIA Container Toolkit and run with compatibility
+mode so Compose honours the device reservation:
+
+```bash
+docker compose --compatibility up --build
+```
+
+If no GPU is present the container continues on CPU without changes.
+
+> **Note:** The Dockerfile uses `nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04`, so
+> the first build downloads the CUDA + cuDNN runtime (large image) and requires
+> the NVIDIA Container Toolkit on the host for GPU access.
+
+### GPU Execution
+
+To execute ONNX models on GPU:
+
+1. Uninstall the CPU-only runtime and install the CUDA build:
+   ```bash
+   pip uninstall onnxruntime
+   pip install onnxruntime-gpu
+   ```
+2. Ensure NVIDIA drivers / CUDA libraries are present on the host or Docker base
+   image.
+3. Set `ONNX_EXECUTION_PROVIDERS="CUDAExecutionProvider,CPUExecutionProvider"`
+   (order defines the fallback sequence). The service reads this variable and
+   passes it directly to ONNX Runtime when instantiating the session.
+
+If GPU is not available, the provider list automatically falls back to
+`CPUExecutionProvider`.
 
 ## Roadmap
 

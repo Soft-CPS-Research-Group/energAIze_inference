@@ -1,19 +1,17 @@
 from __future__ import annotations
 
-import sys
-
 from fastapi import FastAPI, HTTPException
-from loguru import logger
 
 from app.routers import admin, inference, info, reward
+from app.logging import RequestContextMiddleware, get_logger, init_logging
 from app.settings import settings
 from app.state import store
 from app.version import __version__
 
-logger.remove()
-logger.add(sys.stderr, level=settings.log_level.upper())
+init_logging()
 
 app = FastAPI(title="Energy Flexibility Inference API", version=__version__)
+app.add_middleware(RequestContextMiddleware)
 
 app.include_router(info.router)
 app.include_router(inference.router)
@@ -33,7 +31,7 @@ async def on_startup() -> None:
             settings.alias_mapping_path,
         )
     else:
-        logger.info("Service started without configured model. Awaiting /admin/load to configure.")
+        get_logger().info("Service started without configured model. Awaiting /admin/load to configure.")
 
 
 @app.get("/health", tags=["info"])
