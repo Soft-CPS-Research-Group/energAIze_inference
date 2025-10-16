@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 import onnxruntime as ort
 from fastapi import FastAPI, HTTPException
 
@@ -11,17 +13,11 @@ from app.version import __version__
 
 init_logging()
 
-app = FastAPI(title="Energy Flexibility Inference API", version=__version__)
-app.add_middleware(RequestContextMiddleware)
 
-app.include_router(info.router)
-app.include_router(inference.router)
-app.include_router(reward.router)
-app.include_router(admin.router)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage startup and shutdown behaviour for the inference service."""
 
-
-@app.on_event("startup")
-async def on_startup() -> None:
     if settings.manifest_path is not None:
         if settings.agent_index is None:
             raise RuntimeError("MODEL_AGENT_INDEX must be set when MODEL_MANIFEST_PATH is provided")
@@ -33,6 +29,22 @@ async def on_startup() -> None:
         )
     else:
         get_logger().info("Service started without configured model. Awaiting /admin/load to configure.")
+
+    try:
+        yield
+    finally:
+        if store.is_configured():
+            get_logger().info("Lifespan shutdown unloading pipeline")
+            store.unload()
+
+
+app = FastAPI(title="Energy Flexibility Inference API", version=__version__, lifespan=lifespan)
+app.add_middleware(RequestContextMiddleware)
+
+app.include_router(info.router)
+app.include_router(inference.router)
+app.include_router(reward.router)
+app.include_router(admin.router)
 
 
 @app.get("/health", tags=["info"])

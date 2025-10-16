@@ -189,6 +189,9 @@ Sample artefacts live under `examples/`:
   `hvac` action based on a `mode` feature. Use it to validate `/admin/load` and
   `/inference` without training assets. Includes `aliases.json` to demonstrate
   runtime feature renaming after automatic payload flattening.
+- `examples/fleet_rule_based/`: rule-based controller that enforces feeder,
+  board, and charger limits across a fleet of EV chargers and batteries using
+  the `breaker_allocation` strategy.
 - `scripts/generate_identity_bundle.py`: helper that emits a one-feature ONNX
   identity model and companion manifest. Run
   `python scripts/generate_identity_bundle.py` to create
@@ -201,17 +204,21 @@ To try the API end-to-end:
    Postman (or run with Newman). Update collection variables:
    - `rbcManifestPath` → rule-based manifest path inside the service (defaults to
      `/data/rule_based/artifact_manifest.json`).
+   - `fleetManifestPath` → fleet breaker manifest path (defaults to
+     `/data/fleet_rule_based/artifact_manifest.json`).
    - `aliasMappingPath` → optional feature-alias JSON (defaults to
      `/data/rule_based/aliases.json`).
    - `onnxManifestPath` → ONNX manifest path inside the service (defaults to
      `/data/identity_bundle/artifact_manifest.json`).
    - `baseUrl` → URL of the running service.
 3. Execute the numbered requests in order: `01 - Health Check` through
-   `15 - Admin Unload (ONNX)`.
+   `18 - Admin Unload (Fleet RBC)`.
 
 The collection walks through loading the rule-based sample, exercising
 inference/reward, validating feature aliases with nested payload flattening,
-unloading, then repeating the flow with the generated identity ONNX bundle.
+unloading, then repeating the flow with the generated identity ONNX bundle. A
+final section loads the fleet breaker controller and validates board/line limit
+enforcement.
 
 ### Docker Compose
 

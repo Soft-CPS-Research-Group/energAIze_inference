@@ -11,8 +11,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/health",
-          "host": ["{{baseUrl}}"],
-          "path": ["health"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
         }
       },
       "event": [
@@ -49,8 +53,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/admin/load",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "load"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
         }
       },
       "event": [
@@ -76,8 +85,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/info",
-          "host": ["{{baseUrl}}"],
-          "path": ["info"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "info"
+          ]
         }
       },
       "event": [
@@ -113,8 +126,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/inference",
-          "host": ["{{baseUrl}}"],
-          "path": ["inference"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
         }
       },
       "event": [
@@ -149,8 +166,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/inference",
-          "host": ["{{baseUrl}}"],
-          "path": ["inference"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
         }
       },
       "event": [
@@ -185,8 +206,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/reward",
-          "host": ["{{baseUrl}}"],
-          "path": ["reward"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reward"
+          ]
         }
       },
       "event": [
@@ -212,8 +237,13 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/admin/unload",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "unload"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
         }
       },
       "event": [
@@ -248,8 +278,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/admin/load",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "load"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
         }
       },
       "event": [
@@ -284,8 +319,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/inference",
-          "host": ["{{baseUrl}}"],
-          "path": ["inference"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
         }
       },
       "event": [
@@ -311,8 +350,13 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/admin/unload",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "unload"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
         }
       },
       "event": [
@@ -347,8 +391,13 @@
         },
         "url": {
           "raw": "{{baseUrl}}/admin/load",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "load"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
         }
       },
       "event": [
@@ -374,8 +423,12 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/info",
-          "host": ["{{baseUrl}}"],
-          "path": ["info"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "info"
+          ]
         }
       },
       "event": [
@@ -411,8 +464,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/inference",
-          "host": ["{{baseUrl}}"],
-          "path": ["inference"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
         }
       },
       "event": [
@@ -448,8 +505,12 @@
         },
         "url": {
           "raw": "{{baseUrl}}/reward",
-          "host": ["{{baseUrl}}"],
-          "path": ["reward"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "reward"
+          ]
         }
       },
       "event": [
@@ -475,8 +536,13 @@
         "header": [],
         "url": {
           "raw": "{{baseUrl}}/admin/unload",
-          "host": ["{{baseUrl}}"],
-          "path": ["admin", "unload"]
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
         }
       },
       "event": [
@@ -486,6 +552,135 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('ONNX pipeline unloaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('unloaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - Admin Load (Fleet RBC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{fleetManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fleet pipeline loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('loaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Inference (Fleet RBC)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\\n  \\\"features\\\": {\\n    \\\"timestamp\\\": \\\"2025-10-16T09:13:10\\\",\\n    \\\"non_shiftable_load\\\": 30,\\n    \\\"solar_generation\\\": 2,\\n    \\\"electricity_pricing\\\": 0.15,\\n    \\\"charging_sessions\\\": {\\n      \\\"AC000001_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"11823\\\"\\n      },\\n      \\\"AC000002_1\\\": {\\n        \\\"power\\\": 4.0,\\n        \\\"electric_vehicle\\\": \\\"NF-1\\\"\\n      },\\n      \\\"AC000003_1\\\": {\\n        \\\"power\\\": 4.0,\\n        \\\"electric_vehicle\\\": \\\"NF-2\\\"\\n      },\\n      \\\"AC000004_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"11837\\\"\\n      },\\n      \\\"AC000005_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000006_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000007_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000008_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000009_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000010_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000011_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000012_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000013_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"AC000014_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"ACEXT001_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"ACEXT002_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"ACEXT003_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      },\\n      \\\"ACEXT004_1\\\": {\\n        \\\"power\\\": 0,\\n        \\\"electric_vehicle\\\": \\\"\\\"\\n      }\\n    },\\n    \\\"electric_vehicles\\\": {\\n      \\\"11823\\\": {\\n        \\\"SoC\\\": 0.2,\\n        \\\"flexibility\\\": {\\n          \\\"charger_id\\\": \\\"AC000001_1\\\",\\n          \\\"departure_time\\\": \\\"2025-10-16T18:00:00\\\"\\n        }\\n      },\\n      \\\"11837\\\": {\\n        \\\"SoC\\\": 0.3,\\n        \\\"flexibility\\\": {\\n          \\\"charger_id\\\": \\\"AC000004_1\\\",\\n          \\\"departure_time\\\": \\\"2025-10-16T19:00:00\\\"\\n        }\\n      }\\n    },\\n    \\\"batteries\\\": {\\n      \\\"b_1\\\": {\\n        \\\"energy_in\\\": 1,\\n        \\\"last_soc\\\": 0.1\\n      },\\n      \\\"b_2\\\": {\\n        \\\"energy_in\\\": 1,\\n        \\\"last_soc\\\": 0.4\\n      }\\n    },\\n    \\\"pv_panels\\\": {\\n      \\\"pv_1\\\": {\\n        \\\"energy\\\": 0.5\\n      },\\n      \\\"pv_2\\\": {\\n        \\\"energy\\\": 0.5\\n      }\\n    }\\n  }\\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fleet RBC inference within limits', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.actions).to.have.property('0');",
+              "  const actions = body.actions['0'];",
+              "  const baseLoad = 30 - 2;",
+              "  const chargerIds = ['AC000001_1','AC000002_1','AC000003_1','AC000004_1','AC000005_1','AC000006_1','AC000007_1','AC000008_1','AC000009_1','AC000010_1','AC000011_1','AC000012_1','AC000013_1','AC000014_1','ACEXT001_1','ACEXT002_1','ACEXT003_1','ACEXT004_1'];",
+              "  let chargerTotal = 0;",
+              "  chargerIds.forEach(function (cid) { chargerTotal += actions[cid] || 0; });",
+              "  const batteryTotal = (actions['b_1'] || 0) + (actions['b_2'] || 0);",
+              "  pm.expect(baseLoad + chargerTotal + batteryTotal).to.be.below(43 + 1e-6);",
+              "  const lineGroups = {",
+              "    L1: ['ACEXT003_1','ACEXT002_1','AC000014_1','AC000011_1','AC000008_1','AC000005_1','AC000002_1','ACEXT001_1'],",
+              "    L2: ['ACEXT004_1','AC000012_1','AC000009_1','AC000006_1','AC000003_1'],",
+              "    L3: ['AC000013_1','AC000010_1','AC000007_1','AC000004_1','AC000001_1']",
+              "  };",
+              "  Object.entries(lineGroups).forEach(function ([group, chargers]) {",
+              "    const total = chargers.reduce(function (acc, cid) { return acc + (actions[cid] || 0); }, 0);",
+              "    pm.expect(total).to.be.below(11 + 1e-6);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 - Admin Unload (Fleet RBC)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Fleet pipeline unloaded', function () {",
               "  pm.response.to.have.status(200);",
               "  const body = pm.response.json();",
               "  pm.expect(body.status).to.eql('unloaded');",
@@ -504,6 +699,10 @@
     {
       "key": "rbcManifestPath",
       "value": "/data/rule_based/artifact_manifest.json"
+    },
+    {
+      "key": "fleetManifestPath",
+      "value": "/data/fleet_rule_based/artifact_manifest.json"
     },
     {
       "key": "onnxManifestPath",

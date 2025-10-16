@@ -1,0 +1,170 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "fleet_rule_based",
+    "run_name": "breaker_allocation_demo"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {"num_agents": 1},
+  "algorithm": {"name": "RuleBasedBreaker", "hyperparameters": {}},
+  "environment": {
+    "observation_names": [[
+      "non_shiftable_load",
+      "solar_generation",
+      "electricity_pricing",
+      "charging_sessions.AC000001_1.power",
+      "charging_sessions.AC000002_1.power",
+      "charging_sessions.AC000003_1.power",
+      "charging_sessions.AC000004_1.power",
+      "charging_sessions.AC000005_1.power",
+      "charging_sessions.AC000006_1.power",
+      "charging_sessions.AC000007_1.power",
+      "charging_sessions.AC000008_1.power",
+      "charging_sessions.AC000009_1.power",
+      "charging_sessions.AC000010_1.power",
+      "charging_sessions.AC000011_1.power",
+      "charging_sessions.AC000012_1.power",
+      "charging_sessions.AC000013_1.power",
+      "charging_sessions.AC000014_1.power",
+      "charging_sessions.ACEXT001_1.power",
+      "charging_sessions.ACEXT002_1.power",
+      "charging_sessions.ACEXT003_1.power",
+      "charging_sessions.ACEXT004_1.power",
+      "batteries.b_1.last_soc",
+      "batteries.b_2.last_soc"
+    ]],
+    "encoders": [[
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}},
+      {"type": "NoNormalization", "params": {}}
+    ]],
+    "action_bounds": [[{
+      "low": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "high": [4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 3.0, 3.0]
+    }]],
+    "action_names": [
+      "AC000001_1",
+      "AC000002_1",
+      "AC000003_1",
+      "AC000004_1",
+      "AC000005_1",
+      "AC000006_1",
+      "AC000007_1",
+      "AC000008_1",
+      "AC000009_1",
+      "AC000010_1",
+      "AC000011_1",
+      "AC000012_1",
+      "AC000013_1",
+      "AC000014_1",
+      "ACEXT001_1",
+      "ACEXT002_1",
+      "ACEXT003_1",
+      "ACEXT004_1",
+      "b_1",
+      "b_2"
+    ],
+    "reward_function": {"name": "RewardFunction", "params": {}}
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "breaker_allocation",
+          "max_board_kw": 43,
+          "charger_limit_kw": 4.6,
+          "non_shiftable_key": "non_shiftable_load",
+          "solar_generation_key": "solar_generation",
+          "detect_flex_from_ev": true,
+          "chargers": {
+            "AC000001_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000003_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000004_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000005_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000006_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000007_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000008_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000009_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000010_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000011_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000012_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "AC000013_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000014_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": false},
+            "ACEXT001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT003_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT004_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true}
+          },
+          "line_limits": {
+            "L1": {"limit_kw": 11, "chargers": ["ACEXT003_1", "ACEXT002_1", "AC000014_1", "AC000011_1", "AC000008_1", "AC000005_1", "AC000002_1", "ACEXT001_1"]},
+            "L2": {"limit_kw": 11, "chargers": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1"]},
+            "L3": {"limit_kw": 11, "chargers": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1"]}
+          },
+          "batteries": {
+            "b_1": {
+              "soc_key": "batteries.b_1.last_soc",
+              "charge_threshold": 0.25,
+              "charge_power_kw": 3.0,
+              "idle_power_kw": 0.0
+            },
+            "b_2": {
+              "soc_key": "batteries.b_2.last_soc",
+              "charge_threshold": 0.25,
+              "charge_power_kw": 3.0,
+              "idle_power_kw": 0.0
+            }
+          },
+          "action_order": [
+            "AC000001_1",
+            "AC000002_1",
+            "AC000003_1",
+            "AC000004_1",
+            "AC000005_1",
+            "AC000006_1",
+            "AC000007_1",
+            "AC000008_1",
+            "AC000009_1",
+            "AC000010_1",
+            "AC000011_1",
+            "AC000012_1",
+            "AC000013_1",
+            "AC000014_1",
+            "ACEXT001_1",
+            "ACEXT002_1",
+            "ACEXT003_1",
+            "ACEXT004_1",
+            "b_1",
+            "b_2"
+          ]
+        }
+      }
+    ]
+  }
+}
