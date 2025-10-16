@@ -41,6 +41,7 @@ class OnnxAgentRuntime:
         self.preprocessor = preprocessor
         self.action_names = action_names
         self.feature_aliases = feature_aliases or {}
+        self.providers = session.get_providers()
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)
@@ -77,6 +78,7 @@ class RuleBasedRuntime:
         if not default_actions and action_names:
             default_actions = {name: 0.0 for name in action_names}
         self.default_actions = default_actions
+        self.providers = ["rule_based"]
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)

@@ -16,6 +16,9 @@ model bundle.
   model is configured the service stays idle until `/admin/load` is called.
 - Optional reward calculation endpoint mirroring the training reward logic
   (supports the baseline `RewardFunction` and `V2GPenaltyReward`).
+- Automatically flattens nested inference payloads before applying feature
+  aliases, keeping requests ergonomic without deviating from the manifest
+  schema.
 - Health and information endpoints for deployment observability.
 
 ## Architecture
@@ -185,7 +188,7 @@ Sample artefacts live under `examples/`:
 - `examples/rule_based/`: minimal manifest + rule-based policy that drives the
   `hvac` action based on a `mode` feature. Use it to validate `/admin/load` and
   `/inference` without training assets. Includes `aliases.json` to demonstrate
-  runtime feature renaming.
+  runtime feature renaming after automatic payload flattening.
 - `scripts/generate_identity_bundle.py`: helper that emits a one-feature ONNX
   identity model and companion manifest. Run
   `python scripts/generate_identity_bundle.py` to create
@@ -204,11 +207,11 @@ To try the API end-to-end:
      `/data/identity_bundle/artifact_manifest.json`).
    - `baseUrl` → URL of the running service.
 3. Execute the numbered requests in order: `01 - Health Check` through
-   `07 - Admin Unload`.
+   `15 - Admin Unload (ONNX)`.
 
 The collection walks through loading the rule-based sample, exercising
-inference/reward, validating feature aliases, unloading, then repeating the flow
-with the generated identity ONNX bundle.
+inference/reward, validating feature aliases with nested payload flattening,
+unloading, then repeating the flow with the generated identity ONNX bundle.
 
 ### Docker Compose
 
