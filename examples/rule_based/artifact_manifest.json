@@ -1,0 +1,29 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "rule_based_demo",
+    "run_name": "rbc_static_actions"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {"num_agents": 1},
+  "algorithm": {"name": "RuleBasedPolicy", "hyperparameters": {}},
+  "environment": {
+    "observation_names": [["mode"]],
+    "encoders": [[{"type": "NoNormalization", "params": {}}]],
+    "action_bounds": [[{"low": [0], "high": [1]}]],
+    "action_names": ["hvac"],
+    "reward_function": {"name": "RewardFunction", "params": {}}
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {}
+      }
+    ]
+  }
+}

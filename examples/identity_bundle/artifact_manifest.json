@@ -1,0 +1,61 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "onnx_demo",
+    "run_name": "identity"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "DummyONNX",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "feat"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0
+          ],
+          "high": [
+            1
+          ]
+        }
+      ]
+    ],
+    "action_names": [
+      "action"
+    ],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "onnx",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "onnx_models/agent_0.onnx",
+        "observation_dimension": 1,
+        "action_dimension": 1
+      }
+    ]
+  }
+}
