@@ -111,6 +111,12 @@ The manifest can describe rule-based controllers by setting `format` to
 Optional configuration can be provided via `artifact.config` (e.g.,
 `{"use_preprocessor": true}` or `{"config_path": "policies/agent.json"}`).
 
+For the iCharging rule-based controller, the manifest also demonstrates how to:
+
+- Track bundle versions via `metadata.bundle_version` (string values such as `"2024-11-05-v1"`).
+- Configure per-EV default capacities with `vehicle_capacities` and the associated flexibility field templates (`flexibility_fields`).
+- Declare charger metadata (min/max kW, phase memberships) while the runtime dynamically resolves which EV occupies each charger from the request payload.
+
 The inference service instantiates an appropriate runtime automatically based on
 `format`.
 
