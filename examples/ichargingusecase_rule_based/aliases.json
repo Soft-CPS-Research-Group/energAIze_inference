@@ -1,0 +1,4 @@
+{
+  "energy_price": "electricity_pricing",
+  "pv_panels.PV01.energy": "solar_generation"
+}

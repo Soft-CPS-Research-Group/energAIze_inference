@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import onnxruntime as ort
 from fastapi import FastAPI, HTTPException
 
-from app.routers import admin, inference, info, reward
+from app.routers import admin, inference, info
 from app.logging import RequestContextMiddleware, get_logger, init_logging
 from app.settings import settings
 from app.state import store
@@ -43,7 +43,6 @@ app.add_middleware(RequestContextMiddleware)
 
 app.include_router(info.router)
 app.include_router(inference.router)
-app.include_router(reward.router)
 app.include_router(admin.router)
 
 

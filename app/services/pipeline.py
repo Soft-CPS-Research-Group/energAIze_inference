@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
+
+import math
 
 import numpy as np
 import onnxruntime as ort
@@ -109,58 +112,239 @@ class RuleBasedRuntime:
         charger_limit = float(cfg.get("charger_limit_kw", 0.0))
         max_board = float(cfg.get("max_board_kw", float("inf")))
         line_limits: Dict[str, Dict[str, Any]] = cfg.get("line_limits", {})
+        control_minutes = float(cfg.get("control_interval_minutes", 15))
+        control_minutes = max(control_minutes, 1.0)
+        default_capacity = float(cfg.get("default_capacity_kwh", 60.0))
+        default_target_soc = float(cfg.get("default_target_soc", 1.0))
+        default_target_soc = min(max(default_target_soc, 0.0), 1.0)
+        default_current_soc = min(max(float(cfg.get("default_current_soc", 0.0)), 0.0), 1.0)
+        default_departure_buffer = float(cfg.get("default_departure_buffer_minutes", control_minutes))
+        default_departure_buffer = max(default_departure_buffer, control_minutes)
+        flexible_threshold = float(cfg.get("flexible_urgency_threshold", 0.6))
 
-        def _to_float(value: Any) -> float:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return 0.0
+        def _maybe_float(value: Any) -> Optional[float]:
+            if value is None:
+                return None
+            if isinstance(value, (int, float)):
+                numeric = float(value)
+                if math.isnan(numeric):
+                    return None
+                return numeric
+            if isinstance(value, str):
+                raw = value.strip()
+                if not raw or raw.lower() in {"nan", "none"}:
+                    return None
+                try:
+                    numeric = float(raw)
+                except ValueError:
+                    return None
+                if math.isnan(numeric):
+                    return None
+                return numeric
+            return None
 
-        def _to_str(value: Any) -> str:
+        def _safe_float(value: Any, default: float = 0.0) -> float:
+            numeric = _maybe_float(value)
+            if numeric is None:
+                return default
+            return numeric
+
+        def _clamp01(value: float) -> float:
+            return min(max(value, 0.0), 1.0)
+
+
+        def _safe_str(value: Any) -> str:
             if value is None:
                 return ""
+            if isinstance(value, str):
+                return value.strip()
             return str(value).strip()
+
+        def _parse_datetime(raw: Any) -> Optional[datetime]:
+            if isinstance(raw, datetime):
+                return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+            if not isinstance(raw, str):
+                return None
+            text = raw.strip()
+            if not text or text.lower() in {"nan", "none"}:
+                return None
+            if text.endswith("Z"):
+                text = text[:-1] + "+00:00"
+            try:
+                return datetime.fromisoformat(text)
+            except ValueError:
+                return None
+
+        def _current_timestamp(data: Dict[str, Any]) -> datetime:
+            candidates = [
+                data.get("timestamp"),
+                data.get("timestamp.$date"),
+            ]
+            for candidate in candidates:
+                parsed = _parse_datetime(candidate)
+                if parsed:
+                    return parsed.astimezone(timezone.utc)
+            return datetime.now(timezone.utc)
+
+        now = _current_timestamp(payload)
 
         actions: Dict[str, float] = {}
         min_levels: Dict[str, float] = {}
         max_levels: Dict[str, float] = {}
-        allow_flex_map: Dict[str, bool] = {}
-        flexible_ids: List[str] = []
+        charger_priority: Dict[str, float] = {}
+        baseline_levels: Dict[str, float] = {}
+        active_chargers: List[str] = []
+        planned_chargers: Set[str] = set()
+
+        vehicle_capacities_cfg = {
+            str(key): _safe_float(value, default_capacity)
+            for key, value in (cfg.get("vehicle_capacities", {}) or {}).items()
+        }
+        flexible_ev_whitelist = {str(item) for item in cfg.get("flexible_ev_ids", []) if str(item)}
+        allow_departure_fallback = bool(cfg.get("allow_departure_fallback", False))
+        ev_charger_map_cfg: Dict[str, Set[str]] = {
+            str(key): {str(item) for item in value}
+            for key, value in (cfg.get("ev_charger_map", {}) or {}).items()
+        }
+
+        def _vehicle_capacity(ev_identifier: str, charger_meta: Dict[str, Any]) -> float:
+            if ev_identifier in vehicle_capacities_cfg:
+                capacity = vehicle_capacities_cfg[ev_identifier]
+                if capacity > 0:
+                    return capacity
+            capacity_candidates = [
+                payload.get(f"electric_vehicles.{ev_identifier}.flexibility.capacity_kwh"),
+                payload.get(f"electric_vehicles.{ev_identifier}.capacity_kwh"),
+                payload.get(f"electric_vehicles.{ev_identifier}.battery_capacity"),
+                charger_meta.get("battery_capacity_kwh"),
+                cfg.get("default_capacity_kwh", default_capacity),
+            ]
+            for candidate in capacity_candidates:
+                numeric = _safe_float(candidate, -1.0)
+                if numeric > 0:
+                    return numeric
+            return default_capacity
 
         for charger_id, meta in chargers_cfg.items():
             min_kw = float(meta.get("min_kw", 0.0))
             max_kw = float(meta.get("max_kw", charger_limit))
             min_kw = max(min_kw, 0.0)
             max_kw = max(max_kw, min_kw)
+
             min_levels[charger_id] = min_kw
             max_levels[charger_id] = max_kw
-            allow_flex_map[charger_id] = bool(meta.get("allow_flex_when_ev", True))
 
-            session_ev = _to_str(payload.get(f"charging_sessions.{charger_id}.electric_vehicle"))
-            session_power = _to_float(payload.get(f"charging_sessions.{charger_id}.power"))
-            active = bool(meta.get("active_by_default", False)) or bool(session_ev) or session_power > 0
+            ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
+            ev_id = _safe_str(ev_raw)
+            session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"))
+            session_power = max(min(session_power, max_kw), min_kw)
+            active = bool(meta.get("active_by_default", False)) or bool(ev_id) or session_power > 0
 
-            actions[charger_id] = max_kw if active else min_kw
+            baseline_power = session_power if active else min_kw
+            actions[charger_id] = baseline_power
+            baseline_levels[charger_id] = baseline_power
+            priority = baseline_power
 
-            if meta.get("flexible_default", False) and active:
-                flexible_ids.append(charger_id)
+            if active:
+                active_chargers.append(charger_id)
 
-        if cfg.get("detect_flex_from_ev", True):
-            for key, value in payload.items():
-                if not isinstance(value, str):
+            if ev_id:
+                if flexible_ev_whitelist and ev_id not in flexible_ev_whitelist:
+                    charger_priority[charger_id] = baseline_power
                     continue
-                if ".flexibility" not in key:
-                    continue
-                charger_id = value
-                if charger_id in actions and allow_flex_map.get(charger_id, True):
-                    flexible_ids.append(charger_id)
 
-        flexible_set = {cid for cid in flexible_ids if actions.get(cid, 0.0) > min_levels.get(cid, 0.0) + 1e-6}
-        flexible_ids = list(flexible_set)
+                if ev_charger_map_cfg:
+                    allowed_chargers = ev_charger_map_cfg.get(ev_id)
+                    if not allowed_chargers:
+                        charger_priority[charger_id] = baseline_power
+                        continue
+                    if charger_id not in allowed_chargers:
+                        charger_priority[charger_id] = baseline_power
+                        continue
+
+                soc_key = f"electric_vehicles.{ev_id}.SoC"
+                if soc_key not in payload:
+                    charger_priority[charger_id] = baseline_power
+                    continue
+                soc_value = _maybe_float(payload.get(soc_key))
+                if soc_value is None:
+                    charger_priority[charger_id] = baseline_power
+                    continue
+                soc = _clamp01(soc_value)
+
+                target_key = f"electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure"
+                if target_key not in payload:
+                    charger_priority[charger_id] = baseline_power
+                    continue
+                raw_target = _maybe_float(payload.get(target_key))
+                if raw_target is None or not (0.0 < raw_target <= 1.0):
+                    charger_priority[charger_id] = baseline_power
+                    continue
+                target_soc = _clamp01(raw_target)
+                if target_soc <= soc + 1e-6:
+                    charger_priority[charger_id] = baseline_power
+                    continue
+
+                capacity = _vehicle_capacity(ev_id, meta)
+
+                energy_gap = max(target_soc - soc, 0.0) * capacity
+
+                departure_raw = payload.get(
+                    f"electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+                )
+                departure_time = _parse_datetime(departure_raw)
+                if not departure_time:
+                    if not allow_departure_fallback:
+                        charger_priority[charger_id] = baseline_power
+                        continue
+                    departure_time = now + timedelta(minutes=default_departure_buffer)
+                else:
+                    departure_time = departure_time.astimezone(timezone.utc)
+
+                minutes_remaining = (departure_time - now).total_seconds() / 60.0
+                minutes_remaining = max(minutes_remaining, control_minutes)
+
+                required_kw: float
+                if energy_gap <= 1e-6:
+                    required_kw = baseline_power
+                elif minutes_remaining <= control_minutes:
+                    required_kw = max_kw
+                else:
+                    required_kw = energy_gap / (minutes_remaining / 60.0)
+
+                required_kw = max(min(required_kw, max_kw), min_kw)
+                min_levels[charger_id] = max(min_levels[charger_id], required_kw)
+                actions[charger_id] = max(actions[charger_id], required_kw, baseline_power)
+                priority = max(required_kw, baseline_power)
+
+                if energy_gap > 1e-6:
+                    planned_chargers.add(charger_id)
+                    charger_priority[charger_id] = priority
+                else:
+                    charger_priority[charger_id] = baseline_power
+            else:
+                charger_priority[charger_id] = baseline_power
+
+        primary_flex: List[str] = []
+        secondary_flex: List[str] = []
+        for charger_id in active_chargers:
+            max_kw = max_levels.get(charger_id, charger_limit)
+            priority = charger_priority.get(charger_id, 0.0)
+            if charger_id not in planned_chargers:
+                secondary_flex.append(charger_id)
+                continue
+            if max_kw > 0:
+                urgency_ratio = min(priority / max_kw, 1.0)
+            else:
+                urgency_ratio = 0.0
+            if urgency_ratio < flexible_threshold:
+                primary_flex.append(charger_id)
+
+        flexible_ids = primary_flex + secondary_flex
 
         non_shiftable_key = cfg.get("non_shiftable_key", "non_shiftable_load")
         solar_key = cfg.get("solar_generation_key", "solar_generation")
-        base_load = _to_float(payload.get(non_shiftable_key)) - _to_float(payload.get(solar_key))
+        base_load = _safe_float(payload.get(non_shiftable_key)) - _safe_float(payload.get(solar_key))
         base_load = max(base_load, 0.0)
 
         def reduce_load(target_ids: List[str], amount: float) -> None:
@@ -171,6 +355,7 @@ class RuleBasedRuntime:
             if not adjustable:
                 adjustable = [cid for cid in target_ids if cid in actions]
             while remaining > 1e-6 and adjustable:
+                adjustable.sort(key=lambda cid: charger_priority.get(cid, 0.0))
                 share = remaining / len(adjustable)
                 next_adjustable: List[str] = []
                 for cid in adjustable:
@@ -204,7 +389,7 @@ class RuleBasedRuntime:
             line_total = sum(actions.get(cid, 0.0) for cid in chargers)
             overflow = line_total - limit
             if overflow > 1e-6:
-                flex_in_line = [cid for cid in chargers if chargers_cfg.get(cid, {}).get("flexible")]
+                flex_in_line = [cid for cid in chargers if cid in actions]
                 reduce_load(flex_in_line, overflow)
                 line_total = sum(actions.get(cid, 0.0) for cid in chargers)
                 residual = line_total - limit
@@ -218,20 +403,27 @@ class RuleBasedRuntime:
             charger_total = sum(actions.values())
             available_headroom = max(max_board - base_load - charger_total, 0.0)
 
-        battery_actions: Dict[str, float] = {}
+        active_prioritised = sorted(
+            [cid for cid in planned_chargers if cid in actions],
+            key=lambda cid: charger_priority.get(cid, 0.0),
+            reverse=True,
+        )
+
         remaining_headroom = max(available_headroom, 0.0)
+        for cid in active_prioritised:
+            if remaining_headroom <= 1e-6:
+                break
+            current = actions.get(cid, 0.0)
+            max_level = max_levels.get(cid, current)
+            if current >= max_level - 1e-6:
+                continue
+            increment = min(max_level - current, remaining_headroom)
+            actions[cid] = current + increment
+            remaining_headroom -= increment
+
+        battery_actions: Dict[str, float] = {}
         for battery_id, meta in cfg.get("batteries", {}).items():
-            soc_key = meta.get("soc_key")
-            charge_threshold = float(meta.get("charge_threshold", 0.5))
-            charge_power = float(meta.get("charge_power_kw", 0.0))
-            idle_power = float(meta.get("idle_power_kw", 0.0))
-            soc = _to_float(payload.get(soc_key)) if soc_key else 0.0
-            if soc < charge_threshold and remaining_headroom > 1e-6:
-                allocation = min(charge_power, remaining_headroom)
-                battery_actions[battery_id] = allocation
-                remaining_headroom -= allocation
-            else:
-                battery_actions[battery_id] = idle_power
+            battery_actions[battery_id] = 0.0
 
         for cid, value in actions.items():
             min_level = min_levels.get(cid, 0.0)

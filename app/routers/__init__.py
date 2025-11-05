@@ -1,3 +1,3 @@
 """API routers."""
 
-from . import admin, inference, info, reward  # noqa: F401
+from . import admin, inference, info  # noqa: F401

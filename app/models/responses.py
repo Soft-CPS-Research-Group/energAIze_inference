@@ -9,10 +9,6 @@ class InferenceResponse(BaseModel):
     actions: Dict[str, Dict[str, float]]
 
 
-class RewardResponse(BaseModel):
-    rewards: Dict[str, float]
-
-
 class InfoResponse(BaseModel):
     algorithm: str
     manifest_version: int

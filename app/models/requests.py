@@ -10,8 +10,3 @@ class InferenceRequest(BaseModel):
         ..., description="Feature name/value pairs for the agent (supports nested objects)"
     )
 
-
-class RewardRequest(BaseModel):
-    observations: Dict[str, Any] = Field(
-        ..., description="Observation data required for reward calculation"
-    )
