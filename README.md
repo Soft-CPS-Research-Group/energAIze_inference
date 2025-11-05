@@ -2,8 +2,7 @@
 
 FastAPI service for running trained energy flexibility agents exported from the
 training platform (artifact manifests + ONNX models). The service exposes
-endpoints to perform inference, compute rewards, and inspect metadata for a
-model bundle.
+endpoints to perform inference and inspect metadata for a model bundle.
 
 ## Features
 
@@ -14,8 +13,6 @@ model bundle.
 - Serves a single agent per container (selectable via `MODEL_AGENT_INDEX`) to
   support edge deployments—start one container per building/agent. When no
   model is configured the service stays idle until `/admin/load` is called.
-- Optional reward calculation endpoint mirroring the training reward logic
-  (supports the baseline `RewardFunction` and `V2GPenaltyReward`).
 - Automatically flattens nested inference payloads before applying feature
   aliases, keeping requests ergonomic without deviating from the manifest
   schema.
@@ -24,7 +21,7 @@ model bundle.
 ## Architecture
 
 ```
-Clients (edge/fog) ---> FastAPI Routers (info/inference/reward/admin)
+Clients (edge/fog) ---> FastAPI Routers (info/inference/admin)
                                  |
                                  v
                        Pipeline Store (OTA load/unload)
@@ -75,7 +72,6 @@ Clients (edge/fog) ---> FastAPI Routers (info/inference/reward/admin)
 4. **Test endpoints**
    - `GET /info`: model metadata (returns HTTP 503 until a model is configured)
    - `POST /inference`: supply feature dictionary and receive actions
-   - `POST /reward`: optionally compute reward for given observations
    - `GET /health`: readiness probe (always 200; payload includes whether a model
      is configured)
    - `POST /admin/load`: load a manifest dynamically (`{"manifest_path": "...", "agent_index": 0}`)
@@ -159,17 +155,6 @@ the manifest `observation_names` for the configured agent):
 }
 ```
 
-Reward payload:
-
-```json
-{
-  "observations": {
-    "net_electricity_consumption": 5.0,
-    "mode": "idle"
-  }
-}
-```
-
 `GET /health` returns `{"status": "ok", "configured": true/false, "agent_index": idx}`.
 
 ## Tests & CI
@@ -189,8 +174,8 @@ Sample artefacts live under `examples/`:
   `hvac` action based on a `mode` feature. Use it to validate `/admin/load` and
   `/inference` without training assets. Includes `aliases.json` to demonstrate
   runtime feature renaming after automatic payload flattening.
-- `examples/fleet_rule_based/`: rule-based controller that enforces feeder,
-  board, and charger limits across a fleet of EV chargers and batteries using
+- `examples/ichargingusecase_rule_based/`: rule-based controller that enforces feeder,
+  board, and charger limits across the iCharging use case using
   the `breaker_allocation` strategy.
 - `scripts/generate_identity_bundle.py`: helper that emits a one-feature ONNX
   identity model and companion manifest. Run
@@ -202,23 +187,20 @@ To try the API end-to-end:
 1. Start the service (`uvicorn app.main:app --reload`).
 2. Import `postman/EnergyFlexibilityInference.postman_collection.json` into
    Postman (or run with Newman). Update collection variables:
+   - `baseUrl` → URL of the running service.
    - `rbcManifestPath` → rule-based manifest path inside the service (defaults to
      `/data/rule_based/artifact_manifest.json`).
-   - `fleetManifestPath` → fleet breaker manifest path (defaults to
-     `/data/fleet_rule_based/artifact_manifest.json`).
-   - `aliasMappingPath` → optional feature-alias JSON (defaults to
-     `/data/rule_based/aliases.json`).
-   - `onnxManifestPath` → ONNX manifest path inside the service (defaults to
-     `/data/identity_bundle/artifact_manifest.json`).
-   - `baseUrl` → URL of the running service.
+   - `ichargingManifestPath` → iCharging manifest path (defaults to
+     `/data/ichargingusecase_rule_based/artifact_manifest.json`).
+   - `ichargingAliasPath` → iCharging alias JSON (defaults to `/data/ichargingusecase_rule_based/aliases.json`).
+   - `agentIndex` → agent index to serve (defaults to `0`).
 3. Execute the numbered requests in order: `01 - Health Check` through
-   `18 - Admin Unload (Fleet RBC)`.
+   `10 - Admin Unload (iCharging)`.
 
 The collection walks through loading the rule-based sample, exercising
-inference/reward, validating feature aliases with nested payload flattening,
-unloading, then repeating the flow with the generated identity ONNX bundle. A
-final section loads the fleet breaker controller and validates board/line limit
-enforcement.
+inference with nested payload flattening and alias remapping, unloading, then
+loading the iCharging breaker controller to validate constraint handling and EV
+prioritisation.
 
 ### Docker Compose
 
@@ -244,6 +226,14 @@ export BUNDLE_PATH="$PWD/examples"
 export MODEL_MANIFEST_PATH="/data/rule_based/artifact_manifest.json"
 export MODEL_AGENT_INDEX=0
 export ONNX_EXECUTION_PROVIDERS="CUDAExecutionProvider,CPUExecutionProvider"
+docker compose --compatibility up --build
+```
+
+To start the iCharging use case bundle instead:
+
+```bash
+export MODEL_MANIFEST_PATH="/data/ichargingusecase_rule_based/artifact_manifest.json"
+export FEATURE_ALIAS_PATH="/data/ichargingusecase_rule_based/aliases.json"
 docker compose --compatibility up --build
 ```
 
@@ -284,7 +274,6 @@ If GPU is not available, the provider list automatically falls back to
 
 ## Roadmap
 
-- Support additional reward functions beyond the baseline set.
 - Add caching/pooling for ONNXRuntime sessions (GPU execution providers).
 - Provide CLI tooling to fetch bundles from MLflow automatically.
 - Implement hot-reload/admin endpoints for OTA model swaps.
