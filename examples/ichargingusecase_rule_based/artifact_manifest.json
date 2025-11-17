@@ -18,9 +18,10 @@
   "environment": {
     "observation_names": [
       [
+        "timestamp",
         "non_shiftable_load",
         "solar_generation",
-        "electricity_pricing",
+        "energy_price",
         "charging_sessions.AC000001_1.power",
         "charging_sessions.AC000002_1.power",
         "charging_sessions.AC000003_1.power",
@@ -38,137 +39,11 @@
         "charging_sessions.ACEXT001_1.power",
         "charging_sessions.ACEXT002_1.power",
         "charging_sessions.ACEXT003_1.power",
-        "charging_sessions.ACEXT004_1.power",
-        "batteries.b_1.last_soc",
-        "batteries.b_2.last_soc",
-        "electric_vehicles.11821.SoC",
-        "electric_vehicles.11821.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11821.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11822.SoC",
-        "electric_vehicles.11822.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11822.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11823.SoC",
-        "electric_vehicles.11823.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11823.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11824.SoC",
-        "electric_vehicles.11824.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11824.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11825.SoC",
-        "electric_vehicles.11825.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11825.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11832.SoC",
-        "electric_vehicles.11832.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11832.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11833.SoC",
-        "electric_vehicles.11833.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11833.flexibility.estimated_time_at_departure",
-        "electric_vehicles.11838.SoC",
-        "electric_vehicles.11838.flexibility.estimated_soc_at_departure",
-        "electric_vehicles.11838.flexibility.estimated_time_at_departure"
+        "charging_sessions.ACEXT004_1.power"
       ]
     ],
     "encoders": [
       [
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
-        {
-          "type": "NoNormalization",
-          "params": {}
-        },
         {
           "type": "NoNormalization",
           "params": {}
@@ -346,14 +221,15 @@
         "config": {
           "use_preprocessor": false,
           "strategy": "icharging_breaker",
-          "max_board_kw": 43,
+          "max_board_kw": 33,
           "charger_limit_kw": 4.6,
           "control_interval_minutes": 15,
           "default_capacity_kwh": 75,
           "default_departure_buffer_minutes": 60,
           "flexible_urgency_threshold": 0.7,
           "allow_departure_fallback": false,
-          "non_shiftable_key": "non_shiftable_load",
+          "min_connected_kw": 1.6,
+          "inactive_power_threshold_kw": 1.4,
           "solar_generation_key": "solar_generation",
           "vehicle_capacities": {
             "11824": 75,
@@ -477,37 +353,13 @@
           },
           "line_limits": {
             "L1": {
-              "limit_kw": 11,
-              "chargers": [
-                "ACEXT003_1",
-                "ACEXT002_1",
-                "AC000014_1",
-                "AC000011_1",
-                "AC000008_1",
-                "AC000005_1",
-                "AC000002_1",
-                "ACEXT001_1"
-              ]
+              "limit_kw": 11
             },
             "L2": {
-              "limit_kw": 11,
-              "chargers": [
-                "ACEXT004_1",
-                "AC000012_1",
-                "AC000009_1",
-                "AC000006_1",
-                "AC000003_1"
-              ]
+              "limit_kw": 11
             },
             "L3": {
-              "limit_kw": 11,
-              "chargers": [
-                "AC000013_1",
-                "AC000010_1",
-                "AC000007_1",
-                "AC000004_1",
-                "AC000001_1"
-              ]
+              "limit_kw": 11
             }
           },
           "action_order": [
@@ -536,7 +388,9 @@
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
-          }
+          },
+          "non_flex_active_power_kw": 0.05,
+          "drop_inactive_non_flex": true
         }
       }
     ]

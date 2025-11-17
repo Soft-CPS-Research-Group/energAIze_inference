@@ -51,7 +51,7 @@ def _parse_datetime(raw: Any) -> Optional[datetime]:
     if not isinstance(raw, str):
         return None
     text = raw.strip()
-    if not text or text.lower() in {"", "nan", "none"}:
+    if not text or text.lower() in {"nan", "none"}:
         return None
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
@@ -59,6 +59,57 @@ def _parse_datetime(raw: Any) -> Optional[datetime]:
         return datetime.fromisoformat(text)
     except ValueError:
         return None
+
+
+def _current_timestamp(payload: Dict[str, Any]) -> datetime:
+    candidates = [
+        payload.get("timestamp"),
+        payload.get("timestamp.$date"),
+    ]
+    for candidate in candidates:
+        parsed = _parse_datetime(candidate)
+        if parsed:
+            return parsed.astimezone(timezone.utc)
+    return datetime.now(timezone.utc)
+
+
+def _line_chargers(cfg: "IchargingRuntimeConfig | BreakerOnlyConfig", line_name: str) -> List[str]:
+    info = cfg.line_limits.get(line_name, {})
+    preconfigured = info.get("chargers")
+    if preconfigured:
+        return [str(c) for c in preconfigured]
+    derived = []
+    for cid, meta in cfg.chargers.items():
+        if meta.get("line") == line_name:
+            derived.append(str(cid))
+    return derived
+
+
+def _reduce_actions(
+    order: List[str],
+    amount: float,
+    actions: Dict[str, float],
+    min_levels: Dict[str, float],
+) -> None:
+    remaining = amount
+    while remaining > 1e-6:
+        adjustable = [
+            cid for cid in order if actions.get(cid, 0.0) - min_levels.get(cid, 0.0) > 1e-6
+        ]
+        if not adjustable:
+            break
+        share = remaining / len(adjustable)
+        for cid in adjustable:
+            current = actions.get(cid, 0.0)
+            min_level = min_levels.get(cid, 0.0)
+            reducible = max(current - min_level, 0.0)
+            reduction = min(reducible, share, remaining)
+            if reduction <= 0:
+                continue
+            actions[cid] = current - reduction
+            remaining -= reduction
+            if remaining <= 1e-6:
+                break
 
 
 @dataclass
@@ -71,12 +122,13 @@ class IchargingRuntimeConfig:
     default_capacity_kwh: float = 75.0
     default_departure_buffer_minutes: float = 60.0
     flexible_urgency_threshold: float = 0.7
-    non_shiftable_key: str = "non_shiftable_load"
     solar_generation_key: str = "solar_generation"
+    min_connected_kw: float = 1.6
     vehicle_capacities: Dict[str, float] = field(default_factory=dict)
     flexible_ev_ids: Optional[List[str]] = None
     allow_departure_fallback: bool = False
     flexibility_fields: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FLEX_FIELDS))
+    inactive_power_threshold_kw: float = 0.5
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "IchargingRuntimeConfig":
@@ -87,10 +139,11 @@ class IchargingRuntimeConfig:
             if _safe_float(value, 0.0) > 0.0
         }
         flexible_ev_ids_raw = data.pop("flexible_ev_ids", None)
-        flexible_ev_ids = None
-        if flexible_ev_ids_raw is not None:
-            flexible_ev_ids = [str(item) for item in flexible_ev_ids_raw if str(item)]
+        flexible_ev_ids = (
+            [str(item) for item in flexible_ev_ids_raw if str(item)] if flexible_ev_ids_raw else None
+        )
         flexibility_fields = data.pop("flexibility_fields", None)
+        inactive_value = data.pop("inactive_power_threshold_kw", None)
         cfg = cls(
             max_board_kw=_safe_float(data.pop("max_board_kw", 0.0)),
             charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 0.0)),
@@ -102,20 +155,39 @@ class IchargingRuntimeConfig:
                 data.pop("default_departure_buffer_minutes", 60.0)
             ),
             flexible_urgency_threshold=_safe_float(data.pop("flexible_urgency_threshold", 0.7)),
-            non_shiftable_key=data.pop("non_shiftable_key", "non_shiftable_load"),
             solar_generation_key=data.pop("solar_generation_key", "solar_generation"),
-            vehicle_capacities=vehicle_capacities,
+            min_connected_kw=_safe_float(data.pop("min_connected_kw", 1.6)),
+            vehicle_capacities=vehicle_capacities or {},
             flexible_ev_ids=flexible_ev_ids,
             allow_departure_fallback=bool(data.pop("allow_departure_fallback", False)),
             flexibility_fields=dict(flexibility_fields or DEFAULT_FLEX_FIELDS),
+            inactive_power_threshold_kw=_safe_float(inactive_value, 0.0)
+            if inactive_value is not None
+            else 0.0,
         )
+        if inactive_value is None:
+            cfg.inactive_power_threshold_kw = max(cfg.min_connected_kw - 0.2, 0.0)
         return cfg
 
     def resolve_field(self, key: str, ev_id: str) -> str:
         template = self.flexibility_fields.get(key)
-        if not template:
-            return ""
-        return template.replace("{ev_id}", ev_id)
+        return template.replace("{ev_id}", ev_id) if template else ""
+
+
+@dataclass
+class ChargerState:
+    id: str
+    min_kw: float
+    max_kw: float
+    line: Optional[str]
+    ev_id: str
+    connected: bool
+    allow_flex: bool
+    session_power: float
+    flexible: bool = False
+    required_kw: float = 0.0
+    priority: float = 0.0
+    is_active_nonflex: bool = False
 
 
 class IchargingBreakerRuntime:
@@ -126,206 +198,337 @@ class IchargingBreakerRuntime:
         cfg = self.config
         control_minutes = max(cfg.control_interval_minutes, 1.0)
         min_minutes = control_minutes
+        solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
+        effective_board_limit = cfg.max_board_kw
 
-        chargers_cfg = cfg.chargers
-        charger_limit = cfg.charger_limit_kw
-        max_board = cfg.max_board_kw
+        line_map: Dict[str, str] = {}
+        for line_name in cfg.line_limits.keys():
+            for cid in _line_chargers(cfg, line_name):
+                line_map[cid] = line_name
 
         actions: Dict[str, float] = {}
         min_levels: Dict[str, float] = {}
         max_levels: Dict[str, float] = {}
+        states: Dict[str, ChargerState] = {}
+        flexible_chargers: List[str] = []
         charger_priority: Dict[str, float] = {}
-        active_chargers: List[str] = []
-        planned_chargers: Set[str] = set()
+        nonflex_by_line: Dict[str, List[str]] = {}
 
         now = self._current_timestamp(payload)
+        flexible_whitelist = (
+            {str(ev_id) for ev_id in cfg.flexible_ev_ids} if cfg.flexible_ev_ids else None
+        )
 
-        flexible_whitelist: Optional[Set[str]] = None
-        if cfg.flexible_ev_ids is not None:
-            flexible_whitelist = {str(ev_id) for ev_id in cfg.flexible_ev_ids}
-
-        for charger_id, meta in chargers_cfg.items():
-            min_kw = _safe_float(meta.get("min_kw", 0.0), 0.0)
-            max_kw = _safe_float(meta.get("max_kw", charger_limit), charger_limit)
-            min_kw = max(min_kw, 0.0)
-            max_kw = max(max_kw, min_kw)
-
+        for charger_id, meta in cfg.chargers.items():
+            base_min_kw = max(_safe_float(meta.get("min_kw", 0.0), 0.0), 0.0)
+            max_kw = max(
+                _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
+            )
+            line = meta.get("line") or line_map.get(charger_id)
+            ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
+            ev_id = str(ev_raw).strip() if ev_raw is not None else ""
+            session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
+            session_power = _clamp(session_power, 0.0, max_kw)
+            connected = bool(ev_id)
+            if connected and session_power < cfg.inactive_power_threshold_kw:
+                connected = False
+                ev_id = ""
+            min_kw = base_min_kw
+            if connected:
+                min_kw = max(min_kw, cfg.min_connected_kw)
+            state = ChargerState(
+                id=charger_id,
+                min_kw=min_kw,
+                max_kw=max_kw,
+                line=line,
+                ev_id=ev_id,
+                connected=connected,
+                allow_flex=bool(meta.get("allow_flex_when_ev", True)),
+                session_power=session_power,
+            )
+            states[charger_id] = state
             min_levels[charger_id] = min_kw
             max_levels[charger_id] = max_kw
+            actions[charger_id] = min_kw
+            charger_priority[charger_id] = 0.0
 
-            ev_id_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
-            ev_id = str(ev_id_raw).strip() if ev_id_raw is not None else ""
-            session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
-            session_power = _clamp(session_power, min_kw, max_kw)
-            active = bool(meta.get("active_by_default", False)) or bool(ev_id) or session_power > 0
-
-            baseline_power = session_power if active else min_kw
-            actions[charger_id] = baseline_power
-            charger_priority[charger_id] = baseline_power
-
-            if active:
-                active_chargers.append(charger_id)
-
-            if not ev_id:
+            if not state.connected:
                 continue
 
-            if not meta.get("allow_flex_when_ev", True):
-                continue
-
-            if flexible_whitelist is not None and ev_id not in flexible_whitelist:
-                continue
-
-            soc_key = cfg.resolve_field("soc", ev_id)
-            target_soc_key = cfg.resolve_field("target_soc", ev_id)
-            departure_key = cfg.resolve_field("departure_time", ev_id)
-
-            soc = _maybe_float(payload.get(soc_key))
-            if soc is None:
-                continue
-            soc = _clamp(soc, 0.0, 1.0)
-
-            target_soc = _maybe_float(payload.get(target_soc_key))
-            if target_soc is None or target_soc <= 0.0:
-                continue
-            target_soc = _clamp(target_soc, soc, 1.0)
-            if target_soc <= soc + 1e-6:
-                continue
-
-            capacity = cfg.vehicle_capacities.get(ev_id, cfg.default_capacity_kwh)
-            capacity = max(capacity, 0.0)
-
-            energy_gap = max(target_soc - soc, 0.0) * capacity
-            if energy_gap <= 1e-6:
-                continue
-
-            departure_time = _parse_datetime(payload.get(departure_key))
-            if not departure_time:
-                if not cfg.allow_departure_fallback:
+            if state.allow_flex:
+                if self._populate_flexible_state(
+                    cfg,
+                    payload,
+                    state,
+                    now,
+                    control_minutes,
+                    min_minutes,
+                    flexible_whitelist,
+                ):
+                    actions[charger_id] = state.required_kw
+                    min_levels[charger_id] = state.required_kw
+                    charger_priority[charger_id] = state.priority
+                    flexible_chargers.append(charger_id)
                     continue
-                departure_time = now + timedelta(minutes=cfg.default_departure_buffer_minutes)
-            else:
-                departure_time = departure_time.astimezone(timezone.utc)
 
-            minutes_remaining = (departure_time - now).total_seconds() / 60.0
-            minutes_remaining = max(minutes_remaining, min_minutes)
+            state.is_active_nonflex = state.connected
+            if state.line and state.is_active_nonflex:
+                nonflex_by_line.setdefault(state.line, []).append(charger_id)
 
-            if minutes_remaining <= control_minutes:
-                required_kw = max_kw
-            else:
-                required_kw = energy_gap / (minutes_remaining / 60.0)
+        self._distribute_nonflex(cfg, states, nonflex_by_line, actions)
+        self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
+        self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
 
-            required_kw = _clamp(required_kw, min_kw, max_kw)
-            min_levels[charger_id] = max(min_levels[charger_id], required_kw)
-            actions[charger_id] = max(actions[charger_id], required_kw)
-            charger_priority[charger_id] = max(required_kw, charger_priority[charger_id])
-            planned_chargers.add(charger_id)
+        board_total = sum(actions.values())
+        if board_total - effective_board_limit > 1e-6:
+            order = self._ordered_chargers(states, flexible_chargers)
+            _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
+            self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
 
-        primary_flex: List[str] = []
-        secondary_flex: List[str] = []
-        for charger_id in active_chargers:
-            max_kw = max_levels.get(charger_id, charger_limit)
-            priority = charger_priority.get(charger_id, 0.0)
-            if charger_id not in planned_chargers:
-                secondary_flex.append(charger_id)
-                continue
-            urgency_ratio = priority / max_kw if max_kw > 0 else 0.0
-            if urgency_ratio < cfg.flexible_urgency_threshold:
-                primary_flex.append(charger_id)
+        return {cid: float(value) for cid, value in actions.items()}
 
-        flexible_order = primary_flex + secondary_flex
+    def _populate_flexible_state(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+        state: ChargerState,
+        now: datetime,
+        control_minutes: float,
+        min_minutes: float,
+        whitelist: Optional[Set[str]],
+    ) -> bool:
+        if not state.allow_flex or not state.connected:
+            return False
+        if whitelist is not None and state.ev_id not in whitelist:
+            return False
 
-        base_load = _safe_float(payload.get(cfg.non_shiftable_key)) - _safe_float(
-            payload.get(cfg.solar_generation_key)
-        )
-        base_load = max(base_load, 0.0)
+        soc_key = cfg.resolve_field("soc", state.ev_id)
+        target_key = cfg.resolve_field("target_soc", state.ev_id)
+        departure_key = cfg.resolve_field("departure_time", state.ev_id)
+        soc = _maybe_float(payload.get(soc_key))
+        target_soc = _maybe_float(payload.get(target_key))
+        if soc is None or target_soc is None or target_soc <= 0:
+            return False
+        soc = _clamp(soc, 0.0, 1.0)
+        target_soc = _clamp(target_soc, soc, 1.0)
+        if target_soc <= soc + 1e-6:
+            return False
 
-        def reduce_load(target_ids: List[str], amount: float) -> None:
-            remaining = amount
-            if not target_ids:
-                return
-            adjustable = [
-                cid for cid in target_ids if actions.get(cid, 0.0) - min_levels.get(cid, 0.0) > 1e-6
-            ]
-            if not adjustable:
-                adjustable = [cid for cid in target_ids if cid in actions]
-            while remaining > 1e-6 and adjustable:
-                adjustable.sort(key=lambda cid: charger_priority.get(cid, 0.0))
-                share = remaining / len(adjustable)
-                next_adjustable: List[str] = []
-                for cid in adjustable:
-                    current = actions.get(cid, 0.0)
-                    min_level = min_levels.get(cid, 0.0)
-                    available = max(current - min_level, 0.0)
-                    if available <= 1e-9:
-                        continue
-                    reduction = min(available, share, remaining)
-                    actions[cid] = current - reduction
-                    remaining -= reduction
-                    if actions[cid] - min_level > 1e-6:
-                        next_adjustable.append(cid)
-                adjustable = next_adjustable
-                if not next_adjustable:
+        capacity = cfg.vehicle_capacities.get(state.ev_id, cfg.default_capacity_kwh)
+        energy_gap = max(target_soc - soc, 0.0) * capacity
+        if energy_gap <= 1e-6:
+            return False
+
+        departure_time = _parse_datetime(payload.get(departure_key))
+        if not departure_time:
+            if not cfg.allow_departure_fallback:
+                return False
+            departure_time = now + timedelta(minutes=cfg.default_departure_buffer_minutes)
+        else:
+            departure_time = departure_time.astimezone(timezone.utc)
+
+        minutes_remaining = max((departure_time - now).total_seconds() / 60.0, min_minutes)
+        if minutes_remaining <= control_minutes:
+            required_kw = state.max_kw
+        else:
+            required_kw = energy_gap / (minutes_remaining / 60.0)
+
+        required_kw = _clamp(required_kw, state.min_kw, state.max_kw)
+        state.flexible = True
+        state.required_kw = required_kw
+        state.priority = required_kw / state.max_kw if state.max_kw > 0 else 1.0
+        return True
+
+    def _distribute_nonflex(
+        self,
+        cfg: IchargingRuntimeConfig,
+        states: Dict[str, ChargerState],
+        nonflex_by_line: Dict[str, List[str]],
+        actions: Dict[str, float],
+    ) -> None:
+        for line_name, charger_ids in nonflex_by_line.items():
+            line_cfg = cfg.line_limits.get(line_name, {})
+            limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
+            line_chargers = _line_chargers(cfg, line_name)
+            current = sum(actions.get(cid, 0.0) for cid in line_chargers)
+            remaining = max(limit - current, 0.0)
+            alloc_queue = [cid for cid in charger_ids if states[cid].max_kw > 1e-6]
+            assigned = {cid: 0.0 for cid in alloc_queue}
+            while remaining > 1e-6 and alloc_queue:
+                share = remaining / len(alloc_queue)
+                next_queue: List[str] = []
+                for cid in alloc_queue:
+                    state = states[cid]
+                    capacity = state.max_kw
+                    addition = min(share, capacity)
+                    assigned[cid] += addition
+                    remaining -= addition
+                    if addition + 1e-6 < capacity:
+                        next_queue.append(cid)
+                if next_queue == alloc_queue:
                     break
+                alloc_queue = next_queue
+            for cid, value in assigned.items():
+                actions[cid] = max(actions.get(cid, 0.0), value)
 
-        total_demand = base_load + sum(actions.values())
-        board_overflow = total_demand - max_board
-        if board_overflow > 1e-6:
-            reduce_load(flexible_order, board_overflow)
-            total_demand = base_load + sum(actions.values())
-            residual = total_demand - max_board
-            if residual > 1e-6:
-                reduce_load(list(actions.keys()), residual)
-
-        for line_name, line_cfg in cfg.line_limits.items():
-            limit = _safe_float(line_cfg.get("limit_kw"), max_board)
-            chargers = [str(cid) for cid in line_cfg.get("chargers", [])]
-            line_total = sum(actions.get(cid, 0.0) for cid in chargers)
-            overflow = line_total - limit
-            if overflow > 1e-6:
-                reduce_load([cid for cid in chargers if cid in actions], overflow)
-                line_total = sum(actions.get(cid, 0.0) for cid in chargers)
-                residual = line_total - limit
-                if residual > 1e-6:
-                    reduce_load(chargers, residual)
-
-        charger_total = sum(actions.values())
-        available_headroom = max_board - base_load - charger_total
-        if available_headroom < -1e-6:
-            reduce_load(list(actions.keys()), -available_headroom)
-            charger_total = sum(actions.values())
-            available_headroom = max(max_board - base_load - charger_total, 0.0)
-
-        remaining_headroom = max(available_headroom, 0.0)
-        prioritized = sorted(
-            planned_chargers, key=lambda cid: charger_priority.get(cid, 0.0), reverse=True
-        )
-        for cid in prioritized:
-            if remaining_headroom <= 1e-6:
-                break
-            current = actions.get(cid, 0.0)
-            max_level = max_levels.get(cid, current)
-            if current >= max_level - 1e-6:
+    def _apply_solar_bonus(
+        self,
+        states: Dict[str, ChargerState],
+        flexible_chargers: List[str],
+        solar_kw: float,
+        actions: Dict[str, float],
+        max_levels: Dict[str, float],
+    ) -> None:
+        if solar_kw <= 1e-6 or not flexible_chargers:
+            return
+        remaining = solar_kw
+        ordered = sorted(flexible_chargers, key=lambda cid: states[cid].priority)
+        for cid in ordered:
+            headroom = max_levels[cid] - actions.get(cid, 0.0)
+            if headroom <= 1e-6:
                 continue
-            increment = min(max_level - current, remaining_headroom)
-            actions[cid] = current + increment
-            remaining_headroom -= increment
+            addition = min(headroom, remaining)
+            if addition <= 1e-6:
+                break
+            actions[cid] = actions.get(cid, 0.0) + addition
+            remaining -= addition
+            if remaining <= 1e-6:
+                break
 
-        for cid, value in actions.items():
-            min_level = min_levels.get(cid, 0.0)
-            max_level = max_levels.get(cid, value)
-            bounded = _clamp(value, min_level, max_level)
-            if bounded != value:
-                actions[cid] = bounded
+    def _enforce_line_limits(
+        self,
+        cfg: IchargingRuntimeConfig,
+        states: Dict[str, ChargerState],
+        actions: Dict[str, float],
+        min_levels: Dict[str, float],
+        flexible_chargers: List[str],
+    ) -> None:
+        for line_name, info in cfg.line_limits.items():
+            limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
+            chargers = _line_chargers(cfg, line_name)
+            total = sum(actions.get(cid, 0.0) for cid in chargers)
+            overflow = total - limit
+            if overflow > 1e-6:
+                order = self._ordered_chargers(
+                    states,
+                    [cid for cid in flexible_chargers if states[cid].line == line_name],
+                    extra=[cid for cid in chargers if cid in states and not states[cid].flexible],
+                )
+                _reduce_actions(order, overflow, actions, min_levels)
 
-        return actions
+    def _ordered_chargers(
+        self,
+        states: Dict[str, ChargerState],
+        flex_subset: Optional[List[str]] = None,
+        extra: Optional[List[str]] = None,
+    ) -> List[str]:
+        order: List[str] = []
+        flex_ids = flex_subset if flex_subset is not None else [
+            cid for cid, st in states.items() if st.flexible
+        ]
+        order.extend(sorted(flex_ids, key=lambda cid: states[cid].priority))
+        extra_ids = extra if extra is not None else [
+            cid for cid, st in states.items() if not st.flexible
+        ]
+        order.extend(extra_ids)
+        seen: Set[str] = set()
+        filtered: List[str] = []
+        for cid in order:
+            if cid not in seen:
+                seen.add(cid)
+                filtered.append(cid)
+        return filtered
 
     def _current_timestamp(self, payload: Dict[str, Any]) -> datetime:
-        candidates = [
-            payload.get("timestamp"),
-            payload.get("timestamp.$date"),
-        ]
-        for candidate in candidates:
-            parsed = _parse_datetime(candidate)
-            if parsed:
-                return parsed.astimezone(timezone.utc)
-        return datetime.now(timezone.utc)
+        return _current_timestamp(payload)
+
+
+@dataclass
+class BreakerOnlyConfig:
+    max_board_kw: float
+    charger_limit_kw: float
+    chargers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    line_limits: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    min_connected_kw: float = 1.6
+
+    @classmethod
+    def from_dict(cls, payload: Dict[str, Any]) -> "BreakerOnlyConfig":
+        data = dict(payload)
+        return cls(
+            max_board_kw=_safe_float(data.pop("max_board_kw", 33.0)),
+            charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 4.6)),
+            chargers=dict(data.pop("chargers", {})),
+            line_limits=dict(data.pop("line_limits", {})),
+            min_connected_kw=_safe_float(data.pop("min_connected_kw", 1.6)),
+        )
+
+
+class BreakerOnlyRuntime:
+    def __init__(self, config: BreakerOnlyConfig):
+        self.config = config
+
+    def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
+        cfg = self.config
+        actions: Dict[str, float] = {}
+        min_levels: Dict[str, float] = {}
+        max_levels: Dict[str, float] = {}
+        states: Dict[str, ChargerState] = {}
+
+        line_map: Dict[str, str] = {}
+        for line_name in cfg.line_limits.keys():
+            for cid in _line_chargers(cfg, line_name):
+                line_map[cid] = line_name
+
+        for charger_id, meta in cfg.chargers.items():
+            base_min_kw = max(_safe_float(meta.get("min_kw", 0.0), 0.0), 0.0)
+            max_kw = max(
+                _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
+            )
+            line = meta.get("line") or line_map.get(charger_id)
+            ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
+            ev_id = str(ev_raw).strip() if ev_raw is not None else ""
+            session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
+            session_power = _clamp(session_power, 0.0, max_kw)
+            connected = bool(ev_id) and session_power >= cfg.min_connected_kw
+            min_kw = base_min_kw
+            if connected:
+                min_kw = max(min_kw, cfg.min_connected_kw)
+            state = ChargerState(
+                id=charger_id,
+                min_kw=min_kw,
+                max_kw=max_kw,
+                line=line,
+                ev_id=ev_id,
+                connected=connected,
+                allow_flex=False,
+                session_power=session_power,
+            )
+            states[charger_id] = state
+            min_levels[charger_id] = min_kw
+            max_levels[charger_id] = max_kw
+            actions[charger_id] = min_kw
+
+        for line_name, info in cfg.line_limits.items():
+            limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
+            chargers = _line_chargers(cfg, line_name)
+            active = [cid for cid in chargers if states.get(cid) and states[cid].connected]
+            if not active:
+                continue
+            share = limit / len(active)
+            for cid in active:
+                target = min(max_levels[cid], max(share, min_levels[cid]))
+                actions[cid] = target
+
+        board_total = sum(actions.values())
+        if board_total - cfg.max_board_kw > 1e-6:
+            order = [cid for cid, state in states.items() if state.connected]
+            if not order:
+                order = list(actions.keys())
+            _reduce_actions(order, board_total - cfg.max_board_kw, actions, min_levels)
+
+        for cid, value in actions.items():
+            actions[cid] = _clamp(value, min_levels[cid], max_levels[cid])
+        return {cid: float(val) for cid, val in actions.items()}
+
+    def _current_timestamp(self, payload: Dict[str, Any]) -> datetime:
+        return _current_timestamp(payload)

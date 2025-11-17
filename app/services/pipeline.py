@@ -9,7 +9,12 @@ import numpy as np
 import onnxruntime as ort
 
 from app.services.preprocessor import AgentPreprocessor, build_encoder
-from app.services.rbc import IchargingBreakerRuntime, IchargingRuntimeConfig
+from app.services.rbc import (
+    BreakerOnlyConfig,
+    BreakerOnlyRuntime,
+    IchargingBreakerRuntime,
+    IchargingRuntimeConfig,
+)
 from app.settings import settings
 from app.utils.manifest import Manifest
 from app.logging import get_logger
@@ -82,9 +87,13 @@ class RuleBasedRuntime:
         self.providers = ["rule_based"]
         self.strategy = config.get("strategy")
         self._icharging_runtime: IchargingBreakerRuntime | None = None
+        self._breaker_runtime: BreakerOnlyRuntime | None = None
         if self.strategy in {"breaker_allocation", "icharging_breaker"}:
-            icharging_cfg = IchargingRuntimeConfig.from_dict(config)
+            icharging_cfg = IchargingRuntimeConfig.from_dict(dict(config))
             self._icharging_runtime = IchargingBreakerRuntime(icharging_cfg)
+        elif self.strategy in {"breaker_only", "icharging_breaker_v0"}:
+            breaker_cfg = BreakerOnlyConfig.from_dict(dict(config))
+            self._breaker_runtime = BreakerOnlyRuntime(breaker_cfg)
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)
@@ -95,6 +104,8 @@ class RuleBasedRuntime:
 
         if self._icharging_runtime:
             return self._icharging_runtime.allocate(payload)
+        if self._breaker_runtime:
+            return self._breaker_runtime.allocate(payload)
 
         for rule in self.rules:
             conditions = rule.get("if", {})

@@ -1,0 +1,355 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "ichargingusecase_breaker_only",
+    "run_name": "breaker_only_v0",
+    "bundle_version": "v0"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "RuleBasedBreaker",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "timestamp",
+        "non_shiftable_load",
+        "solar_generation",
+        "energy_price",
+        "charging_sessions.AC000001_1.power",
+        "charging_sessions.AC000002_1.power",
+        "charging_sessions.AC000003_1.power",
+        "charging_sessions.AC000004_1.power",
+        "charging_sessions.AC000005_1.power",
+        "charging_sessions.AC000006_1.power",
+        "charging_sessions.AC000007_1.power",
+        "charging_sessions.AC000008_1.power",
+        "charging_sessions.AC000009_1.power",
+        "charging_sessions.AC000010_1.power",
+        "charging_sessions.AC000011_1.power",
+        "charging_sessions.AC000012_1.power",
+        "charging_sessions.AC000013_1.power",
+        "charging_sessions.AC000014_1.power",
+        "charging_sessions.ACEXT001_1.power",
+        "charging_sessions.ACEXT002_1.power",
+        "charging_sessions.ACEXT003_1.power",
+        "charging_sessions.ACEXT004_1.power"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "high": [
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            3.0,
+            3.0
+          ]
+        }
+      ]
+    ],
+    "action_names": [
+      "AC000001_1",
+      "AC000002_1",
+      "AC000003_1",
+      "AC000004_1",
+      "AC000005_1",
+      "AC000006_1",
+      "AC000007_1",
+      "AC000008_1",
+      "AC000009_1",
+      "AC000010_1",
+      "AC000011_1",
+      "AC000012_1",
+      "AC000013_1",
+      "AC000014_1",
+      "ACEXT001_1",
+      "ACEXT002_1",
+      "ACEXT003_1",
+      "ACEXT004_1",
+      "b_1",
+      "b_2"
+    ],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "breaker_only",
+          "max_board_kw": 33,
+          "charger_limit_kw": 4.6,
+          "min_connected_kw": 1.6,
+          "chargers": {
+            "AC000001_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000003_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000004_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000005_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000006_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000007_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000008_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000009_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000010_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000011_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000012_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000013_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "AC000014_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "ACEXT001_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "ACEXT002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "ACEXT003_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            },
+            "ACEXT004_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6
+            }
+          },
+          "line_limits": {
+            "L1": {
+              "limit_kw": 11
+            },
+            "L2": {
+              "limit_kw": 11
+            },
+            "L3": {
+              "limit_kw": 11
+            }
+          },
+          "action_order": [
+            "AC000001_1",
+            "AC000002_1",
+            "AC000003_1",
+            "AC000004_1",
+            "AC000005_1",
+            "AC000006_1",
+            "AC000007_1",
+            "AC000008_1",
+            "AC000009_1",
+            "AC000010_1",
+            "AC000011_1",
+            "AC000012_1",
+            "AC000013_1",
+            "AC000014_1",
+            "ACEXT001_1",
+            "ACEXT002_1",
+            "ACEXT003_1",
+            "ACEXT004_1",
+            "b_1",
+            "b_2"
+          ]
+        }
+      }
+    ]
+  }
+}

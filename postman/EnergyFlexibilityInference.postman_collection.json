@@ -379,6 +379,125 @@
           }
         }
       ]
+    },
+    {
+      "name": "11 - Admin Load (breaker-only v0)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{breakerOnlyManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{breakerOnlyAliasPath}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('breaker-only pipeline loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('loaded');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Inference (breaker-only limiter)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-07T08:00:00Z\",\n    \"non_shiftable_load\": 0,\n    \"solar_generation\": 0,\n    \"energy_price\": 0,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 2.4, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 2.6, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.8, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.1, \"electric_vehicle\": 11825}\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 0}\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('breaker-only inference responds', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "pm.test('All active chargers respect min/max and board limit', function () {",
+              "  const body = pm.response.json();",
+              "  const actions = body.actions['0'];",
+              "  ['AC000004_1','AC000007_1','AC000005_1','AC000006_1'].forEach(function (cid) {",
+              "    pm.expect(actions[cid]).to.be.above(1.59);",
+              "    pm.expect(actions[cid]).to.be.below(4.61);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Admin Unload (breaker-only)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('breaker-only pipeline unloaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const body = pm.response.json();",
+              "  pm.expect(body.status).to.eql('unloaded');",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -401,6 +520,14 @@
     {
       "key": "ichargingAliasPath",
       "value": "/data/ichargingusecase_rule_based/aliases.json"
+    },
+    {
+      "key": "breakerOnlyManifestPath",
+      "value": "/data/ichargingusecase_v0/artifact_manifest.json"
+    },
+    {
+      "key": "breakerOnlyAliasPath",
+      "value": "/data/ichargingusecase_v0/aliases.json"
     }
   ]
 }
