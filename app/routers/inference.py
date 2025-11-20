@@ -34,7 +34,7 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
 
     # Emit per-request action summary with phase/board totals for debugging.
     try:
-        manifest = store.manifest
+        manifest = pipeline.manifest
         agent_cfg = manifest.agent.artifacts[pipeline.agent_index].config or {}
         chargers_cfg = agent_cfg.get("chargers", {})
         actions_for_agent = actions.get(str(pipeline.agent_index), actions.get(pipeline.agent_index, {}))
