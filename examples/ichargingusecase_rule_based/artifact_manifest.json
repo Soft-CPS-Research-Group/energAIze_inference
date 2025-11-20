@@ -223,7 +223,7 @@
           "strategy": "icharging_breaker",
           "max_board_kw": 33,
           "charger_limit_kw": 4.6,
-          "control_interval_minutes": 15,
+          "control_interval_minutes": 1,
           "default_capacity_kwh": 75,
           "default_departure_buffer_minutes": 60,
           "flexible_urgency_threshold": 0.7,
