@@ -10,10 +10,9 @@ from app.version import __version__
 from app.logging import get_logger
 
 router = APIRouter(prefix="/info", tags=["info"])
-
-
 def get_record():
     record = store.get_record()
+    ## Check if model is configured
     if not record:
         get_logger().warning("Info requested before model configuration")
         raise HTTPException(status_code=503, detail="Model not configured")
