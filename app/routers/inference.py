@@ -47,6 +47,8 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
         for cid, value in actions_for_agent.items():
             if str(cid).startswith("b_"):
                 continue
+            if not connected.get(cid):
+                continue
             meta = chargers_cfg.get(cid, {})
             phases = meta.get("phases") or ([meta.get("line")] if meta.get("line") else [])
             phases = [p for p in phases if p]
@@ -54,9 +56,7 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
             per_phase = value / n_phases
             for phase in phases or ["unknown"]:
                 line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
-        board_total = sum(
-            v for k, v in actions_for_agent.items() if not str(k).startswith("b_")
-        )
+        board_total = sum(v for k, v in actions_for_agent.items() if connected.get(k))
         log.info(
             "inference.actions",
             actions=actions_for_agent,
