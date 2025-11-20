@@ -38,6 +38,11 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
         agent_cfg = manifest.agent.artifacts[pipeline.agent_index].config or {}
         chargers_cfg = agent_cfg.get("chargers", {})
         actions_for_agent = actions.get(str(pipeline.agent_index), actions.get(pipeline.agent_index, {}))
+        connected = {
+            cid: bool(str(flattened.get(f"charging_sessions.{cid}.electric_vehicle", "")).strip())
+            for cid in actions_for_agent
+            if not str(cid).startswith("b_")
+        }
         line_totals: dict[str, float] = {}
         for cid, value in actions_for_agent.items():
             if str(cid).startswith("b_"):
@@ -52,7 +57,13 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
         board_total = sum(
             v for k, v in actions_for_agent.items() if not str(k).startswith("b_")
         )
-        log.info("inference.actions", actions=actions_for_agent, phase_totals=line_totals, board_total=board_total)
+        log.info(
+            "inference.actions",
+            actions=actions_for_agent,
+            connected=connected,
+            phase_totals=line_totals,
+            board_total=board_total,
+        )
     except Exception:
         log.exception("inference.action_logging_failed")
 
