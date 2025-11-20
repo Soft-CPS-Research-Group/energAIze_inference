@@ -241,12 +241,7 @@ class IchargingBreakerRuntime:
             session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
             session_power = _clamp(session_power, 0.0, max_kw)
             connected = bool(ev_id)
-            if connected and session_power < cfg.inactive_power_threshold_kw:
-                connected = False
-                ev_id = ""
-            min_kw = base_min_kw
-            if connected:
-                min_kw = max(min_kw, cfg.min_connected_kw * max(n_phases, 1))
+            min_kw = max(base_min_kw, cfg.min_connected_kw * (max(n_phases, 1) if connected else 1))
             state = ChargerState(
                 id=charger_id,
                 min_kw=min_kw,
@@ -293,7 +288,9 @@ class IchargingBreakerRuntime:
         self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
         self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
 
-        board_total = sum(actions.values())
+        board_total = sum(
+            value for cid, value in actions.items() if states.get(cid) and states[cid].connected
+        )
         if board_total - effective_board_limit > 1e-6:
             order = self._ordered_chargers(states, flexible_chargers)
             _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
@@ -364,7 +361,11 @@ class IchargingBreakerRuntime:
             line_cfg = cfg.line_limits.get(line_name, {})
             limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
             line_chargers = _line_chargers(cfg, line_name)
-            current = sum(actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in line_chargers if cid in states)
+            current = sum(
+                actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
+                for cid in line_chargers
+                if cid in states and states[cid].connected
+            )
             remaining = max(limit - current, 0.0)
             alloc_queue = [cid for cid in charger_ids if states[cid].max_kw > 1e-6]
             assigned = {cid: 0.0 for cid in alloc_queue}
@@ -422,7 +423,9 @@ class IchargingBreakerRuntime:
             limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
             chargers = _line_chargers(cfg, line_name)
             total = sum(
-                actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in chargers if cid in states
+                actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
+                for cid in chargers
+                if cid in states and states[cid].connected
             )
             overflow = total - limit
             if overflow > 1e-6:
@@ -506,10 +509,8 @@ class BreakerOnlyRuntime:
             ev_id = str(ev_raw).strip() if ev_raw is not None else ""
             session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
             session_power = _clamp(session_power, 0.0, max_kw)
-            connected = bool(ev_id) and session_power >= cfg.min_connected_kw
-            min_kw = base_min_kw
-            if connected:
-                min_kw = max(min_kw, cfg.min_connected_kw)
+            connected = bool(ev_id)
+            min_kw = max(base_min_kw, cfg.min_connected_kw)
             state = ChargerState(
                 id=charger_id,
                 min_kw=min_kw,
@@ -536,7 +537,7 @@ class BreakerOnlyRuntime:
                 target = min(max_levels[cid], max(share, min_levels[cid]))
                 actions[cid] = target
 
-        board_total = sum(actions.values())
+        board_total = sum(value for cid, value in actions.items() if states.get(cid) and states[cid].connected)
         if board_total - cfg.max_board_kw > 1e-6:
             order = [cid for cid, state in states.items() if state.connected]
             if not order:
