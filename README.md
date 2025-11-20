@@ -208,6 +208,8 @@ inference with nested payload flattening and alias remapping, unloading, then
 loading the iCharging breaker controller to validate constraint handling and EV
 prioritisation.
 
+Run the CI
+
 ### Docker Compose
 
 Run the stack with the provided compose file:
