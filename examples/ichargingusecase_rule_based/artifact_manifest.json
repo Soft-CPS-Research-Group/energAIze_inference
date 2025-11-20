@@ -39,7 +39,8 @@
         "charging_sessions.ACEXT001_1.power",
         "charging_sessions.ACEXT002_1.power",
         "charging_sessions.ACEXT003_1.power",
-        "charging_sessions.ACEXT004_1.power"
+        "charging_sessions.ACEXT004_1.power",
+        "charging_sessions.BB000018_1.power"
       ]
     ],
     "encoders": [
@@ -157,6 +158,7 @@
             0,
             0,
             0,
+            0,
             0
           ],
           "high": [
@@ -179,7 +181,8 @@
             4.6,
             4.6,
             3.0,
-            3.0
+            3.0,
+            9.0
           ]
         }
       ]
@@ -203,6 +206,7 @@
       "ACEXT002_1",
       "ACEXT003_1",
       "ACEXT004_1",
+      "BB000018_1",
       "b_1",
       "b_2"
     ],
@@ -349,6 +353,12 @@
               "min_kw": 0.0,
               "max_kw": 4.6,
               "allow_flex_when_ev": true
+            },
+            "BB000018_1": {
+              "phases": ["L1", "L2", "L3"],
+              "min_kw": 0.0,
+              "max_kw": 9.0,
+              "allow_flex_when_ev": true
             }
           },
           "line_limits": {
@@ -381,6 +391,7 @@
             "ACEXT002_1",
             "ACEXT003_1",
             "ACEXT004_1",
+            "BB000018_1",
             "b_1",
             "b_2"
           ],

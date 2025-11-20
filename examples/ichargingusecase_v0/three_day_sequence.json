@@ -6,18 +6,50 @@
     "solar_generation": 2.5,
     "energy_price": 0.0,
     "charging_sessions": {
-      "AC000004_1": { "power": 4.0, "electric_vehicle": 11824 },
-      "AC000007_1": { "power": 2.5, "electric_vehicle": 11823 },
-      "AC000005_1": { "power": 2.0, "electric_vehicle": 11833 },
-      "AC000006_1": { "power": 2.0, "electric_vehicle": 11825 }
+      "AC000004_1": {
+        "power": 4.0,
+        "electric_vehicle": 11824
+      },
+      "AC000007_1": {
+        "power": 2.5,
+        "electric_vehicle": 11823
+      },
+      "AC000005_1": {
+        "power": 2.0,
+        "electric_vehicle": 11833
+      },
+      "AC000006_1": {
+        "power": 2.0,
+        "electric_vehicle": 11825
+      },
+      "BB000018_1": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
     },
     "electric_vehicles": {
-      "11824": { "SoC": 0.25, "flexibility": {} },
-      "11823": { "SoC": 0.4, "flexibility": {} },
-      "11833": { "SoC": 0.6, "flexibility": {} },
-      "11825": { "SoC": 0.5, "flexibility": {} }
+      "11824": {
+        "SoC": 0.25,
+        "flexibility": {}
+      },
+      "11823": {
+        "SoC": 0.4,
+        "flexibility": {}
+      },
+      "11833": {
+        "SoC": 0.6,
+        "flexibility": {}
+      },
+      "11825": {
+        "SoC": 0.5,
+        "flexibility": {}
+      }
     },
-    "pv_panels": { "PV01": { "energy": 2.5 } }
+    "pv_panels": {
+      "PV01": {
+        "energy": 2.5
+      }
+    }
   },
   {
     "description": "Day 1 evening, tight board limit forces shedding",
@@ -26,18 +58,50 @@
     "solar_generation": 0.0,
     "energy_price": 0.1,
     "charging_sessions": {
-      "AC000004_1": { "power": 4.6, "electric_vehicle": 11824 },
-      "AC000007_1": { "power": 4.6, "electric_vehicle": 11823 },
-      "AC000005_1": { "power": 2.5, "electric_vehicle": 11833 },
-      "AC000006_1": { "power": 2.5, "electric_vehicle": 11825 }
+      "AC000004_1": {
+        "power": 4.6,
+        "electric_vehicle": 11824
+      },
+      "AC000007_1": {
+        "power": 4.6,
+        "electric_vehicle": 11823
+      },
+      "AC000005_1": {
+        "power": 2.5,
+        "electric_vehicle": 11833
+      },
+      "AC000006_1": {
+        "power": 2.5,
+        "electric_vehicle": 11825
+      },
+      "BB000018_1": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
     },
     "electric_vehicles": {
-      "11824": { "SoC": 0.5, "flexibility": {} },
-      "11823": { "SoC": 0.7, "flexibility": {} },
-      "11833": { "SoC": 0.6, "flexibility": {} },
-      "11825": { "SoC": 0.55, "flexibility": {} }
+      "11824": {
+        "SoC": 0.5,
+        "flexibility": {}
+      },
+      "11823": {
+        "SoC": 0.7,
+        "flexibility": {}
+      },
+      "11833": {
+        "SoC": 0.6,
+        "flexibility": {}
+      },
+      "11825": {
+        "SoC": 0.55,
+        "flexibility": {}
+      }
     },
-    "pv_panels": { "PV01": { "energy": 0.0 } }
+    "pv_panels": {
+      "PV01": {
+        "energy": 0.0
+      }
+    }
   },
   {
     "description": "Day 2 midday, new EV arrives",
@@ -46,18 +110,50 @@
     "solar_generation": 4.0,
     "energy_price": 0.05,
     "charging_sessions": {
-      "AC000004_1": { "power": 3.0, "electric_vehicle": 11824 },
-      "AC000007_1": { "power": 4.0, "electric_vehicle": 11823 },
-      "AC000005_1": { "power": 3.2, "electric_vehicle": 11833 },
-      "ACEXT004_1": { "power": 3.0, "electric_vehicle": 11821 }
+      "AC000004_1": {
+        "power": 3.0,
+        "electric_vehicle": 11824
+      },
+      "AC000007_1": {
+        "power": 4.0,
+        "electric_vehicle": 11823
+      },
+      "AC000005_1": {
+        "power": 3.2,
+        "electric_vehicle": 11833
+      },
+      "ACEXT004_1": {
+        "power": 3.0,
+        "electric_vehicle": 11821
+      },
+      "BB000018_1": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
     },
     "electric_vehicles": {
-      "11824": { "SoC": 0.6, "flexibility": {} },
-      "11823": { "SoC": 0.3, "flexibility": {} },
-      "11833": { "SoC": 0.65, "flexibility": {} },
-      "11821": { "SoC": 0.2, "flexibility": {} }
+      "11824": {
+        "SoC": 0.6,
+        "flexibility": {}
+      },
+      "11823": {
+        "SoC": 0.3,
+        "flexibility": {}
+      },
+      "11833": {
+        "SoC": 0.65,
+        "flexibility": {}
+      },
+      "11821": {
+        "SoC": 0.2,
+        "flexibility": {}
+      }
     },
-    "pv_panels": { "PV01": { "energy": 4.0 } }
+    "pv_panels": {
+      "PV01": {
+        "energy": 4.0
+      }
+    }
   },
   {
     "description": "Day 3 early morning, no flexibility data available",
@@ -66,16 +162,42 @@
     "solar_generation": 0.0,
     "energy_price": 0.0,
     "charging_sessions": {
-      "AC000004_1": { "power": 1.8, "electric_vehicle": 11824 },
-      "AC000007_1": { "power": 1.8, "electric_vehicle": 11823 },
-      "AC000005_1": { "power": 1.8, "electric_vehicle": 11833 }
+      "AC000004_1": {
+        "power": 1.8,
+        "electric_vehicle": 11824
+      },
+      "AC000007_1": {
+        "power": 1.8,
+        "electric_vehicle": 11823
+      },
+      "AC000005_1": {
+        "power": 1.8,
+        "electric_vehicle": 11833
+      },
+      "BB000018_1": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
     },
     "electric_vehicles": {
-      "11824": { "SoC": 0.75, "flexibility": {} },
-      "11823": { "SoC": 0.8, "flexibility": {} },
-      "11833": { "SoC": 0.7, "flexibility": {} }
+      "11824": {
+        "SoC": 0.75,
+        "flexibility": {}
+      },
+      "11823": {
+        "SoC": 0.8,
+        "flexibility": {}
+      },
+      "11833": {
+        "SoC": 0.7,
+        "flexibility": {}
+      }
     },
-    "pv_panels": { "PV01": { "energy": 0.0 } }
+    "pv_panels": {
+      "PV01": {
+        "energy": 0.0
+      }
+    }
   },
   {
     "description": "Day 3 afternoon, EV with null SoC treated as non-flex",
@@ -84,13 +206,33 @@
     "solar_generation": 1.0,
     "energy_price": 0.0,
     "charging_sessions": {
-      "AC000004_1": { "power": 2.2, "electric_vehicle": 11824 },
-      "AC000007_1": { "power": 2.2, "electric_vehicle": 11823 }
+      "AC000004_1": {
+        "power": 2.2,
+        "electric_vehicle": 11824
+      },
+      "AC000007_1": {
+        "power": 2.2,
+        "electric_vehicle": 11823
+      },
+      "BB000018_1": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
     },
     "electric_vehicles": {
-      "11824": { "SoC": null, "flexibility": {} },
-      "11823": { "SoC": 0.4, "flexibility": {} }
+      "11824": {
+        "SoC": null,
+        "flexibility": {}
+      },
+      "11823": {
+        "SoC": 0.4,
+        "flexibility": {}
+      }
     },
-    "pv_panels": { "PV01": { "energy": 1.0 } }
+    "pv_panels": {
+      "PV01": {
+        "energy": 1.0
+      }
+    }
   }
 ]

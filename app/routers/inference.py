@@ -21,13 +21,39 @@ def get_runtime_pipeline():
 @router.post("", response_model=InferenceResponse)
 async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtime_pipeline)):
     """Run inference for the configured agent using the supplied feature dict."""
+    log = get_logger()
     try:
         flattened = flatten_payload(payload.features)
         actions = pipeline.inference(flattened)
     except KeyError as exc:
-        get_logger().warning("Inference payload missing data", missing=str(exc))
+        log.warning("Inference payload missing data", missing=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # noqa: BLE001
-        get_logger().exception("Inference failed")
+        log.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference execution failed") from exc
+
+    # Emit per-request action summary with phase/board totals for debugging.
+    try:
+        manifest = store.manifest
+        agent_cfg = manifest.agent.artifacts[pipeline.agent_index].config or {}
+        chargers_cfg = agent_cfg.get("chargers", {})
+        actions_for_agent = actions.get(str(pipeline.agent_index), actions.get(pipeline.agent_index, {}))
+        line_totals: dict[str, float] = {}
+        for cid, value in actions_for_agent.items():
+            if str(cid).startswith("b_"):
+                continue
+            meta = chargers_cfg.get(cid, {})
+            phases = meta.get("phases") or ([meta.get("line")] if meta.get("line") else [])
+            phases = [p for p in phases if p]
+            n_phases = max(len(phases), 1)
+            per_phase = value / n_phases
+            for phase in phases or ["unknown"]:
+                line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
+        board_total = sum(
+            v for k, v in actions_for_agent.items() if not str(k).startswith("b_")
+        )
+        log.info("inference.actions", actions=actions_for_agent, phase_totals=line_totals, board_total=board_total)
+    except Exception:
+        log.exception("inference.action_logging_failed")
+
     return InferenceResponse(actions=actions)

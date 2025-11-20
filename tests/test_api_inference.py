@@ -85,13 +85,19 @@ def test_breaker_only_replay_full_dataset():
 
 def _replay_log_dataset(client_loader):
     client = client_loader()
-    dataset_path = Path("dados_de_inferência_IC_11.11.2025_a_14.11.2025.json")
-    records = json.loads(dataset_path.read_text(encoding="utf-8"))
+    dataset_paths = [
+        Path("dados_de_inferência_IC_11.11.2025_a_14.11.2025.json"),
+        Path("dados_de_inferência_IC_14.11.2025_a_18.11.2025.json"),
+    ]
+    records = []
+    for dataset_path in dataset_paths:
+        if dataset_path.exists():
+            records.extend(json.loads(dataset_path.read_text(encoding="utf-8")))
 
     line_groups = {
-        "L1": ["ACEXT003_1", "ACEXT002_1", "AC000014_1", "AC000011_1", "AC000008_1", "AC000005_1", "AC000002_1", "ACEXT001_1"],
-        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1"],
-        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1"],
+        "L1": ["ACEXT003_1", "ACEXT002_1", "AC000014_1", "AC000011_1", "AC000008_1", "AC000005_1", "AC000002_1", "ACEXT001_1", "BB000018_1"],
+        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1", "BB000018_1"],
+        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1", "BB000018_1"],
     }
     charger_max_kw = 4.6
 
@@ -228,7 +234,7 @@ def test_breaker_allocation_strategy():
         "AC000001_1", "AC000002_1", "AC000003_1", "AC000004_1", "AC000005_1",
         "AC000006_1", "AC000007_1", "AC000008_1", "AC000009_1", "AC000010_1",
         "AC000011_1", "AC000012_1", "AC000013_1", "AC000014_1",
-        "ACEXT001_1", "ACEXT002_1", "ACEXT003_1", "ACEXT004_1"
+        "ACEXT001_1", "ACEXT002_1", "ACEXT003_1", "ACEXT004_1", "BB000018_1"
     ]
     charging_sessions = {cid: {"power": 0.0, "electric_vehicle": ""} for cid in charger_ids}
     charging_sessions.update(
@@ -296,9 +302,10 @@ def test_breaker_allocation_strategy():
             "AC000005_1",
             "AC000002_1",
             "ACEXT001_1",
+            "BB000018_1",
         ],
-        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1"],
-        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1"],
+        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1", "BB000018_1"],
+        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1", "BB000018_1"],
     }
 
     try:
@@ -593,9 +600,9 @@ def test_icharging_multi_step_sequence():
         return min(required, 4.6)
 
     line_groups = {
-        "L1": ["ACEXT003_1", "ACEXT002_1", "AC000014_1", "AC000011_1", "AC000008_1", "AC000005_1", "AC000002_1", "ACEXT001_1"],
-        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1"],
-        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1"],
+        "L1": ["ACEXT003_1", "ACEXT002_1", "AC000014_1", "AC000011_1", "AC000008_1", "AC000005_1", "AC000002_1", "ACEXT001_1", "BB000018_1"],
+        "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1", "BB000018_1"],
+        "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1", "BB000018_1"],
     }
 
     scenarios = [

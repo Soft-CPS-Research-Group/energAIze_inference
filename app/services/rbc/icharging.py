@@ -80,6 +80,11 @@ def _line_chargers(cfg: "IchargingRuntimeConfig | BreakerOnlyConfig", line_name:
         return [str(c) for c in preconfigured]
     derived = []
     for cid, meta in cfg.chargers.items():
+        phases = meta.get("phases")
+        if phases:
+            if line_name in phases:
+                derived.append(str(cid))
+            continue
         if meta.get("line") == line_name:
             derived.append(str(cid))
     return derived
@@ -180,10 +185,12 @@ class ChargerState:
     min_kw: float
     max_kw: float
     line: Optional[str]
-    ev_id: str
-    connected: bool
-    allow_flex: bool
-    session_power: float
+    phases: Optional[List[str]] = None
+    n_phases: int = 1
+    ev_id: str = ""
+    connected: bool = False
+    allow_flex: bool = True
+    session_power: float = 0.0
     flexible: bool = False
     required_kw: float = 0.0
     priority: float = 0.0
@@ -220,6 +227,10 @@ class IchargingBreakerRuntime:
         )
 
         for charger_id, meta in cfg.chargers.items():
+            phases = meta.get("phases")
+            n_phases = max(len(phases), 1) if phases else 1
+            phases = meta.get("phases")
+            n_phases = max(len(phases), 1) if phases else 1
             base_min_kw = max(_safe_float(meta.get("min_kw", 0.0), 0.0), 0.0)
             max_kw = max(
                 _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
@@ -235,12 +246,14 @@ class IchargingBreakerRuntime:
                 ev_id = ""
             min_kw = base_min_kw
             if connected:
-                min_kw = max(min_kw, cfg.min_connected_kw)
+                min_kw = max(min_kw, cfg.min_connected_kw * max(n_phases, 1))
             state = ChargerState(
                 id=charger_id,
                 min_kw=min_kw,
                 max_kw=max_kw,
                 line=line,
+                phases=phases if phases else ([line] if line else None),
+                n_phases=n_phases,
                 ev_id=ev_id,
                 connected=connected,
                 allow_flex=bool(meta.get("allow_flex_when_ev", True)),
@@ -272,8 +285,9 @@ class IchargingBreakerRuntime:
                     continue
 
             state.is_active_nonflex = state.connected
-            if state.line and state.is_active_nonflex:
-                nonflex_by_line.setdefault(state.line, []).append(charger_id)
+            if state.phases and state.is_active_nonflex:
+                for ln in state.phases:
+                    nonflex_by_line.setdefault(ln, []).append(charger_id)
 
         self._distribute_nonflex(cfg, states, nonflex_by_line, actions)
         self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
@@ -350,7 +364,7 @@ class IchargingBreakerRuntime:
             line_cfg = cfg.line_limits.get(line_name, {})
             limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
             line_chargers = _line_chargers(cfg, line_name)
-            current = sum(actions.get(cid, 0.0) for cid in line_chargers)
+            current = sum(actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in line_chargers if cid in states)
             remaining = max(limit - current, 0.0)
             alloc_queue = [cid for cid in charger_ids if states[cid].max_kw > 1e-6]
             assigned = {cid: 0.0 for cid in alloc_queue}
@@ -359,7 +373,8 @@ class IchargingBreakerRuntime:
                 next_queue: List[str] = []
                 for cid in alloc_queue:
                     state = states[cid]
-                    capacity = state.max_kw
+                    per_line_cap = state.max_kw / max(state.n_phases, 1)
+                    capacity = per_line_cap
                     addition = min(share, capacity)
                     assigned[cid] += addition
                     remaining -= addition
@@ -369,7 +384,7 @@ class IchargingBreakerRuntime:
                     break
                 alloc_queue = next_queue
             for cid, value in assigned.items():
-                actions[cid] = max(actions.get(cid, 0.0), value)
+                actions[cid] = max(actions.get(cid, 0.0), value * max(states[cid].n_phases, 1))
 
     def _apply_solar_bonus(
         self,
@@ -406,12 +421,14 @@ class IchargingBreakerRuntime:
         for line_name, info in cfg.line_limits.items():
             limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
             chargers = _line_chargers(cfg, line_name)
-            total = sum(actions.get(cid, 0.0) for cid in chargers)
+            total = sum(
+                actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in chargers if cid in states
+            )
             overflow = total - limit
             if overflow > 1e-6:
                 order = self._ordered_chargers(
                     states,
-                    [cid for cid in flexible_chargers if states[cid].line == line_name],
+                    [cid for cid in flexible_chargers if states[cid].phases and line_name in states[cid].phases],
                     extra=[cid for cid in chargers if cid in states and not states[cid].flexible],
                 )
                 _reduce_actions(order, overflow, actions, min_levels)
