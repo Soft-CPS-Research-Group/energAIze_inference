@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
@@ -71,6 +72,10 @@ def _current_timestamp(payload: Dict[str, Any]) -> datetime:
         if parsed:
             return parsed.astimezone(timezone.utc)
     return datetime.now(timezone.utc)
+
+
+def _round_down_one_decimal(value: float) -> float:
+    return math.floor(value * 10.0) / 10.0
 
 
 def _line_chargers(cfg: "IchargingRuntimeConfig | BreakerOnlyConfig", line_name: str) -> List[str]:
@@ -296,7 +301,15 @@ class IchargingBreakerRuntime:
             _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
             self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
 
-        return {cid: float(value) for cid, value in actions.items()}
+        quantized: Dict[str, float] = {}
+        for cid, value in actions.items():
+            if cid not in states:
+                quantized[cid] = float(_round_down_one_decimal(value))
+                continue
+            q = _round_down_one_decimal(value)
+            q = _clamp(q, min_levels.get(cid, 0.0), max_levels.get(cid, states[cid].max_kw))
+            quantized[cid] = float(q)
+        return quantized
 
     def _populate_flexible_state(
         self,
@@ -545,6 +558,7 @@ class BreakerOnlyRuntime:
             _reduce_actions(order, board_total - cfg.max_board_kw, actions, min_levels)
 
         for cid, value in actions.items():
+            value = _round_down_one_decimal(value)
             actions[cid] = _clamp(value, min_levels[cid], max_levels[cid])
         return {cid: float(val) for cid, val in actions.items()}
 
