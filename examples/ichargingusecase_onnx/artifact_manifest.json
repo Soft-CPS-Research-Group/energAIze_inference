@@ -1,0 +1,213 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "ichargingusecase_onnx",
+    "run_name": "icharging_onnx_sample",
+    "bundle_version": "onnx-v0"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "ONNX",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "charging_sessions.AC000001_1.power",
+        "charging_sessions.AC000002_1.power",
+        "charging_sessions.AC000003_1.power",
+        "charging_sessions.AC000004_1.power",
+        "charging_sessions.AC000005_1.power",
+        "charging_sessions.AC000006_1.power",
+        "charging_sessions.AC000007_1.power",
+        "charging_sessions.AC000008_1.power",
+        "charging_sessions.AC000009_1.power",
+        "charging_sessions.AC000010_1.power",
+        "charging_sessions.AC000011_1.power",
+        "charging_sessions.AC000012_1.power",
+        "charging_sessions.AC000013_1.power",
+        "charging_sessions.AC000014_1.power",
+        "charging_sessions.ACEXT001_1.power",
+        "charging_sessions.ACEXT002_1.power",
+        "charging_sessions.ACEXT003_1.power",
+        "charging_sessions.ACEXT004_1.power",
+        "charging_sessions.BB000018_1.power"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "high": [
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0,
+            9.0
+          ]
+        }
+      ]
+    ],
+    "action_names": [
+      "AC000001_1",
+      "AC000002_1",
+      "AC000003_1",
+      "AC000004_1",
+      "AC000005_1",
+      "AC000006_1",
+      "AC000007_1",
+      "AC000008_1",
+      "AC000009_1",
+      "AC000010_1",
+      "AC000011_1",
+      "AC000012_1",
+      "AC000013_1",
+      "AC000014_1",
+      "ACEXT001_1",
+      "ACEXT002_1",
+      "ACEXT003_1",
+      "ACEXT004_1",
+      "BB000018_1",
+      "b_1",
+      "b_2"
+    ],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "onnx",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "onnx_models/agent_0.onnx",
+        "observation_dimension": 19,
+        "action_dimension": 21,
+        "config": {}
+      }
+    ]
+  }
+}

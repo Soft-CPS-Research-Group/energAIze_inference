@@ -83,6 +83,34 @@ def test_breaker_only_replay_full_dataset():
     _replay_log_dataset(_load_breaker_only_bundle)
 
 
+def test_onnx_icharging_sample_bundle():
+    manifest_path = Path("examples/ichargingusecase_onnx/artifact_manifest.json")
+    artifacts_dir = manifest_path.parent
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, artifacts_dir, 0)
+    client = TestClient(app)
+    all_chargers = [
+        "AC000001_1","AC000002_1","AC000003_1","AC000004_1","AC000005_1","AC000006_1",
+        "AC000007_1","AC000008_1","AC000009_1","AC000010_1","AC000011_1","AC000012_1",
+        "AC000013_1","AC000014_1","ACEXT001_1","ACEXT002_1","ACEXT003_1","ACEXT004_1","BB000018_1",
+    ]
+    charging_sessions = {cid: {"power": 0.0, "electric_vehicle": ""} for cid in all_chargers}
+    charging_sessions["AC000001_1"]["power"] = 1.0
+    charging_sessions["AC000001_1"]["electric_vehicle"] = 1
+    charging_sessions["AC000002_1"]["power"] = 2.0
+    charging_sessions["AC000002_1"]["electric_vehicle"] = 2
+    charging_sessions["AC000003_1"]["power"] = 3.0
+    charging_sessions["AC000003_1"]["electric_vehicle"] = 3
+    payload = {"charging_sessions": charging_sessions}
+    try:
+        response = client.post("/inference", json={"features": payload})
+        assert response.status_code == 200
+        body = response.json()
+        assert "actions" in body and "0" in body["actions"]
+    finally:
+        store.unload()
+
 def _replay_log_dataset(client_loader):
     client = client_loader()
     dataset_paths = [

@@ -74,6 +74,8 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             path=str(request.url.path),
             method=request.method,
         )
+        # propagate request_id on the request for downstream handlers
+        request.state.request_id = request_id
         token = _logger_ctx.set(request_logger)
 
         try:

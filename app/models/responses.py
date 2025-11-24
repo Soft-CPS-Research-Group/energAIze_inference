@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 class InferenceResponse(BaseModel):
     actions: Dict[str, Dict[str, float]]
+    request_id: str | None = None
 
 
 class InfoResponse(BaseModel):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from app.models.requests import InferenceRequest
 from app.models.responses import InferenceResponse
 from app.logging import get_logger
@@ -19,9 +19,12 @@ def get_runtime_pipeline():
 
 
 @router.post("", response_model=InferenceResponse)
-async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtime_pipeline)):
+async def run_inference(payload: InferenceRequest, request: Request, pipeline = Depends(get_runtime_pipeline)):
     """Run inference for the configured agent using the supplied feature dict."""
     log = get_logger()
+    request_id = None
+    if request is not None:
+        request_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
     try:
         flattened = flatten_payload(payload.features)
         actions = pipeline.inference(flattened)
@@ -67,4 +70,4 @@ async def run_inference(payload: InferenceRequest, pipeline = Depends(get_runtim
     except Exception:
         log.exception("inference.action_logging_failed")
 
-    return InferenceResponse(actions=actions)
+    return InferenceResponse(actions=actions, request_id=request_id)
