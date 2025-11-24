@@ -60,6 +60,7 @@ async def run_inference(payload: InferenceRequest, request: Request, pipeline = 
             for phase in phases or ["unknown"]:
                 line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
         board_total = sum(v for k, v in actions_for_agent.items() if connected.get(k))
+        line_totals = dict(sorted(line_totals.items()))
         log.info(
             "inference.actions",
             actions=actions_for_agent,
