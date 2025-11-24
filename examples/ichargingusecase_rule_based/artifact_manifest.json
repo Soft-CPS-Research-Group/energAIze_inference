@@ -236,14 +236,8 @@
           "inactive_power_threshold_kw": 1.4,
           "solar_generation_key": "solar_generation",
           "vehicle_capacities": {
-            "11824": 75,
-            "11823": 75,
-            "11833": 75,
-            "11825": 75,
-            "11822": 75,
-            "11832": 75,
-            "11838": 75,
-            "11821": 75
+            "2": 50,
+            "11823": 77
           },
           "chargers": {
             "AC000001_1": {
