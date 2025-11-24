@@ -271,6 +271,10 @@
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "x-request-id",
+            "value": "{{requestIdExample}}"
           }
         ],
         "body": {
@@ -318,7 +322,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:00:00Z\",\n    \"non_shiftable_load\": 5,\n    \"energy_price\": 0,\n    \"solar_generation\": 1.5,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.0, \"electric_vehicle\": 11833}\n    },\n    \"electric_vehicles\": {\n      \"11824\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.95,\n          \"estimated_time_at_departure\": \"2025-11-04T09:15:00Z\",\n          \"capacity_kwh\": 80\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.6,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2025-11-04T11:00:00Z\",\n          \"capacity_kwh\": 70\n        }\n      },\n      \"11833\": {\n        \"SoC\": 0.5,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.6,\n          \"estimated_time_at_departure\": \"2025-11-04T12:00:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 2.0}\n    }\n  }\n}"
+          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:00:00Z\",\n    \"non_shiftable_load\": 5,\n    \"energy_price\": 0,\n    \"solar_generation\": 1.5,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 2\n      },\n      \"AC000007_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 11823\n      }\n    },\n    \"electric_vehicles\": {\n      \"2\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.9,\n          \"estimated_time_at_departure\": \"2025-11-04T09:15:00Z\"\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.6,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2025-11-04T11:00:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\n        \"energy\": 2.0\n      }\n    }\n  }\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/inference",
@@ -533,6 +537,10 @@
           {
             "key": "Content-Type",
             "value": "application/json"
+          },
+          {
+            "key": "x-request-id",
+            "value": "{{requestIdExample}}"
           }
         ],
         "body": {
@@ -604,6 +612,10 @@
     {
       "key": "onnxAliasPath",
       "value": "/data/ichargingusecase_onnx/aliases.json"
+    },
+    {
+      "key": "requestIdExample",
+      "value": "test-request-123"
     }
   ]
 }
