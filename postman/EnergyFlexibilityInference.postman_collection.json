@@ -498,6 +498,74 @@
           }
         }
       ]
+    },
+    {
+      "name": "14 - Admin Load (ONNX iCharging sample)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"manifest_path\": \"{{onnxManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{onnxAliasPath}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/admin/load",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "load"
+          ]
+        }
+      }
+    },
+    {
+      "name": "15 - Inference (ONNX iCharging sample)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"features\": {\n    \"charging_sessions\": {\n      \"AC000001_1\": {\"power\": 1.0, \"electric_vehicle\": 1},\n      \"AC000002_1\": {\"power\": 2.0, \"electric_vehicle\": 2},\n      \"AC000003_1\": {\"power\": 3.0, \"electric_vehicle\": 3},\n      \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000005_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000006_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000007_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000008_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000009_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000010_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000011_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000012_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000013_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000014_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT001_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT002_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT003_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"BB000018_1\": {\"power\": 0, \"electric_vehicle\": \"\"}\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/inference",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "inference"
+          ]
+        }
+      }
+    },
+    {
+      "name": "16 - Admin Unload (ONNX)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/admin/unload",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "admin",
+            "unload"
+          ]
+        }
+      }
     }
   ],
   "variable": [
@@ -528,6 +596,14 @@
     {
       "key": "breakerOnlyAliasPath",
       "value": "/data/ichargingusecase_v0/aliases.json"
+    },
+    {
+      "key": "onnxManifestPath",
+      "value": "/data/ichargingusecase_onnx/artifact_manifest.json"
+    },
+    {
+      "key": "onnxAliasPath",
+      "value": "/data/ichargingusecase_onnx/aliases.json"
     }
   ]
 }

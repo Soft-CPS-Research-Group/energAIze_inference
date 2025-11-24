@@ -20,6 +20,12 @@ from app.utils.manifest import Manifest
 from app.logging import get_logger
 
 
+def _round_down_one_decimal(value: float) -> float:
+    import math
+
+    return math.floor(value * 10.0) / 10.0
+
+
 def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[str, float]:
     """Apply feature alias mapping to the incoming payload."""
     if not aliases:
@@ -41,6 +47,7 @@ class OnnxAgentRuntime:
         preprocessor: AgentPreprocessor,
         action_names: List[str],
         feature_aliases: Dict[str, str] | None = None,
+        action_bounds: Dict[str, List[float]] | None = None,
     ):
         self.index = index
         self.session = session
@@ -48,19 +55,35 @@ class OnnxAgentRuntime:
         self.action_names = action_names
         self.feature_aliases = feature_aliases or {}
         self.providers = session.get_providers()
+        self._low = action_bounds.get("low") if action_bounds else None
+        self._high = action_bounds.get("high") if action_bounds else None
 
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)
         features = self.preprocessor.transform(payload)
         log = get_logger()
-        log.debug("Running ONNX inference", agent_index=self.index)
-        outputs = self.session.run(None, {self.session.get_inputs()[0].name: features.reshape(1, -1)})
-        actions = outputs[0].squeeze(0)
-        mapping: Dict[str, float] = {}
-        for i, value in enumerate(actions.tolist()):
-            key = self.action_names[i] if i < len(self.action_names) else f"action_{i}"
-            mapping[key] = value
-        return mapping
+        try:
+            log.debug("Running ONNX inference", agent_index=self.index)
+            outputs = self.session.run(None, {self.session.get_inputs()[0].name: features.reshape(1, -1)})
+            actions = outputs[0].squeeze(0)
+            mapping: Dict[str, float] = {}
+            for i, value in enumerate(actions.tolist()):
+                key = self.action_names[i] if i < len(self.action_names) else f"action_{i}"
+                mapping[key] = self._postprocess_value(value, i)
+            return mapping
+        except Exception:
+            log.exception("onnx.inference_failed", agent_index=self.index)
+            return {name: 0.0 for name in self.action_names}
+
+    def _postprocess_value(self, value: float, idx: int) -> float:
+        # clamp to bounds if provided
+        if self._low and idx < len(self._low):
+            value = max(value, float(self._low[idx]))
+        if self._high and idx < len(self._high):
+            value = min(value, float(self._high[idx]))
+        # round down to one decimal place
+        value = _round_down_one_decimal(value)
+        return float(value)
 
 
 class RuleBasedRuntime:
@@ -174,12 +197,22 @@ class InferencePipeline:
                 path_or_bytes=artifact_path.as_posix(),
                 providers=settings.onnx_execution_providers,
             )
+            bounds = None
+            if env.action_bounds:
+                try:
+                    bounds = env.action_bounds[artifact.agent_index][0]
+                except Exception:
+                    try:
+                        bounds = env.action_bounds[0][0]
+                    except Exception:
+                        bounds = None
             return OnnxAgentRuntime(
                 index=artifact.agent_index,
                 session=session,
                 preprocessor=preprocessor,
                 action_names=action_names,
                 feature_aliases=feature_aliases,
+                action_bounds=bounds,
             )
 
         if artifact.format == "rule_based":
