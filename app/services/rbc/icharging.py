@@ -294,6 +294,7 @@ class IchargingBreakerRuntime:
         self._distribute_nonflex(cfg, states, nonflex_by_line, actions)
         self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
         self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
+        self._fill_remaining_headroom(cfg, states, actions, min_levels, flexible_chargers)
 
         board_total = sum(
             value for cid, value in actions.items() if states.get(cid) and states[cid].connected
@@ -440,6 +441,75 @@ class IchargingBreakerRuntime:
                 alloc_queue = next_queue
             for cid, value in assigned.items():
                 actions[cid] = max(actions.get(cid, 0.0), value * max(states[cid].n_phases, 1))
+
+    def _fill_remaining_headroom(
+        self,
+        cfg: IchargingRuntimeConfig,
+        states: Dict[str, ChargerState],
+        actions: Dict[str, float],
+        min_levels: Dict[str, float],
+        flexible_chargers: List[str],
+    ) -> None:
+        """
+        After flexible requirements are applied, if there is remaining headroom on a line and
+        board, top-up non-flex chargers (and flexible chargers up to their max) until limits
+        are hit. This prevents leaving unused capacity when a flexible EV requires little power.
+        """
+        # Board headroom considering connected chargers only
+        board_used = sum(actions.get(cid, 0.0) for cid, st in states.items() if st.connected)
+        board_remaining = max(cfg.max_board_kw - board_used, 0.0)
+        if board_remaining <= 1e-6:
+            return
+
+        # Work line by line
+        for line_name, line_cfg in cfg.line_limits.items():
+            limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
+            line_chargers = [
+                cid for cid, st in states.items() if st.connected and st.line == line_name
+            ]
+            if not line_chargers:
+                continue
+            current = sum(actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in line_chargers)
+            remaining_line = max(limit - current, 0.0)
+            if remaining_line <= 1e-6:
+                continue
+
+            # Chargers eligible for top-up: connected chargers on this line with available headroom
+            topup_candidates = []
+            for cid in line_chargers:
+                st = states[cid]
+                max_allowed = st.max_kw
+                already = actions.get(cid, 0.0)
+                if already + 1e-6 >= max_allowed:
+                    continue
+                topup_candidates.append(cid)
+            if not topup_candidates:
+                continue
+
+            # Distribute min(board_remaining, remaining_line) across candidates proportionally
+            distributable = min(remaining_line, board_remaining)
+            while distributable > 1e-6 and topup_candidates:
+                share = distributable / len(topup_candidates)
+                next_round: List[str] = []
+                for cid in topup_candidates:
+                    st = states[cid]
+                    max_allowed = st.max_kw
+                    already = actions.get(cid, 0.0)
+                    add = min(share, max_allowed - already)
+                    actions[cid] = already + add
+                    distributable -= add
+                    board_remaining = max(board_remaining - add, 0.0)
+                    if board_remaining <= 1e-6:
+                        break
+                    if already + add + 1e-6 < max_allowed:
+                        next_round.append(cid)
+                if board_remaining <= 1e-6:
+                    break
+                if next_round == topup_candidates:
+                    # No one could accept more
+                    break
+                topup_candidates = next_round
+
 
     def _apply_solar_bonus(
         self,
