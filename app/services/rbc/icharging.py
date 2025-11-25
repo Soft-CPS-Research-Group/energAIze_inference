@@ -5,6 +5,8 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
+from app.logging import get_logger
+
 
 DEFAULT_FLEX_FIELDS = {
     "soc": "electric_vehicles.{ev_id}.SoC",
@@ -309,6 +311,45 @@ class IchargingBreakerRuntime:
             q = _round_down_one_decimal(value)
             q = _clamp(q, min_levels.get(cid, 0.0), max_levels.get(cid, states[cid].max_kw))
             quantized[cid] = float(q)
+
+        # Runtime summary for debugging
+        try:
+            log = get_logger()
+            log_actions = quantized
+            line_totals: Dict[str, float] = {}
+            connected: Dict[str, str] = {}
+            for cid, state in states.items():
+                if not state.connected:
+                    continue
+                connected[cid] = state.ev_id
+                phases = state.phases or ([state.line] if state.line else [])
+                phases = [p for p in phases if p]
+                n_phases = max(len(phases), 1)
+                per_phase = log_actions.get(cid, 0.0) / n_phases
+                for phase in phases or ["unknown"]:
+                    line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
+            line_totals = dict(sorted(line_totals.items()))
+            board_total = sum(log_actions.get(cid, 0.0) for cid in connected)
+            flex_summary = {
+                cid: {
+                    "ev": states[cid].ev_id,
+                    "required_kw": _round_down_one_decimal(states[cid].required_kw),
+                    "priority": round(states[cid].priority, 3),
+                }
+                for cid in flexible_chargers
+            }
+            log.info(
+                "rbc.actions",
+                strategy="icharging_breaker",
+                actions=log_actions,
+                connected=connected,
+                flex=flex_summary,
+                phase_totals=line_totals,
+                board_total=board_total,
+            )
+        except Exception:
+            get_logger().exception("rbc.action_logging_failed")
+
         return quantized
 
     def _populate_flexible_state(
@@ -560,7 +601,33 @@ class BreakerOnlyRuntime:
         for cid, value in actions.items():
             value = _round_down_one_decimal(value)
             actions[cid] = _clamp(value, min_levels[cid], max_levels[cid])
-        return {cid: float(val) for cid, val in actions.items()}
+        quantized = {cid: float(val) for cid, val in actions.items()}
+
+        try:
+            log = get_logger()
+            line_totals: Dict[str, float] = {}
+            connected: Dict[str, str] = {}
+            for cid, state in states.items():
+                if not state.connected:
+                    continue
+                connected[cid] = state.ev_id
+                phase = state.line or "unknown"
+                per_phase = quantized.get(cid, 0.0) / max(state.n_phases, 1)
+                line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
+            line_totals = dict(sorted(line_totals.items()))
+            board_total = sum(quantized.get(cid, 0.0) for cid in connected)
+            log.info(
+                "rbc.actions",
+                strategy="breaker_only",
+                actions=quantized,
+                connected=connected,
+                phase_totals=line_totals,
+                board_total=board_total,
+            )
+        except Exception:
+            get_logger().exception("rbc.action_logging_failed")
+
+        return quantized
 
     def _current_timestamp(self, payload: Dict[str, Any]) -> datetime:
         return _current_timestamp(payload)
