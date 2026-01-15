@@ -8,7 +8,7 @@ services:
     ports:
       - "${HOST_PORT:-8000}:8000"
     environment:
-      LOG_JSON: "true"
+      LOG_JSON: "${LOG_JSON:-false}"
       MODEL_MANIFEST_PATH: "${MODEL_MANIFEST_PATH:-/data/rule_based/artifact_manifest.json}"
       MODEL_AGENT_INDEX: "${MODEL_AGENT_INDEX:-0}"
       ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CUDAExecutionProvider,CPUExecutionProvider}"

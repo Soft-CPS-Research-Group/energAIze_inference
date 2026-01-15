@@ -339,7 +339,7 @@ class IchargingBreakerRuntime:
                 }
                 for cid in flexible_chargers
             }
-            log.info(
+            log.debug(
                 "rbc.actions",
                 strategy="icharging_breaker",
                 actions=log_actions,
@@ -348,6 +348,54 @@ class IchargingBreakerRuntime:
                 phase_totals=line_totals,
                 board_total=board_total,
             )
+
+            def fmt_kw(value: float) -> str:
+                return f"{_round_down_one_decimal(value):.1f}"
+
+            line_chargers: Dict[str, List[str]] = {}
+            for cid in cfg.chargers:
+                state = states.get(cid)
+                if not state:
+                    continue
+                phases = state.phases or ([state.line] if state.line else [])
+                phases = [p for p in phases if p]
+                if not phases:
+                    phases = ["unknown"]
+                for phase in phases:
+                    line_chargers.setdefault(phase, []).append(cid)
+
+            ordered_lines = list(cfg.line_limits.keys())
+            for phase in line_chargers:
+                if phase not in ordered_lines:
+                    ordered_lines.append(phase)
+
+            summary_lines = [f"Board total: {fmt_kw(board_total)} kW"]
+            for phase in ordered_lines:
+                if phase not in line_chargers:
+                    continue
+                phase_total = line_totals.get(phase, 0.0)
+                summary_lines.append(f"{phase} - Phase total: {fmt_kw(phase_total)} kW")
+                for cid in line_chargers[phase]:
+                    state = states[cid]
+                    ev = state.ev_id or "-"
+                    connected_flag = "yes" if state.connected else "no"
+                    action_kw = log_actions.get(cid, 0.0)
+                    action_text = fmt_kw(action_kw)
+                    if state.n_phases > 1:
+                        per_phase = action_kw / max(state.n_phases, 1)
+                        action_text = f"{action_text} ({fmt_kw(per_phase)}/phase)"
+                    if state.flexible:
+                        flex_text = (
+                            f"flex=yes req={fmt_kw(state.required_kw)}"
+                            f" prio={state.priority:.2f}"
+                        )
+                    else:
+                        flex_text = "flex=no"
+                    summary_lines.append(
+                        f"  {cid} - ev={ev} connected={connected_flag} action={action_text} {flex_text}"
+                    )
+
+            log.info("rbc.summary\n{}", "\n".join(summary_lines))
         except Exception:
             get_logger().exception("rbc.action_logging_failed")
 

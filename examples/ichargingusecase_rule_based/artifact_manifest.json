@@ -250,13 +250,13 @@
               "line": "L1",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000003_1": {
               "line": "L2",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000004_1": {
               "line": "L3",
@@ -268,13 +268,13 @@
               "line": "L1",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000006_1": {
               "line": "L2",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000007_1": {
               "line": "L3",
@@ -286,13 +286,13 @@
               "line": "L1",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000009_1": {
               "line": "L2",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000010_1": {
               "line": "L3",
@@ -304,13 +304,13 @@
               "line": "L1",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000012_1": {
               "line": "L2",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "AC000013_1": {
               "line": "L3",
@@ -322,7 +322,7 @@
               "line": "L1",
               "min_kw": 0.0,
               "max_kw": 4.6,
-              "allow_flex_when_ev": false
+              "allow_flex_when_ev": true
             },
             "ACEXT001_1": {
               "line": "L1",
