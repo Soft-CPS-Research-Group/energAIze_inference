@@ -396,7 +396,7 @@ class IchargingBreakerRuntime:
                         f"  {cid} - ev={ev} connected={connected_flag} action={action_text} {flex_text}"
                     )
 
-            log.info("rbc.summary\n{}", "\n".join(summary_lines))
+            log.info("rbc.summary\n{}\n", "\n".join(summary_lines))
         except Exception:
             get_logger().exception("rbc.action_logging_failed")
 
