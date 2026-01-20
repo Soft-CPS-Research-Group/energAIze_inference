@@ -13,6 +13,7 @@ DEFAULT_FLEX_FIELDS = {
     "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
     "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure",
 }
+MIN_CONTROL_INTERVAL_MINUTES = 1.0 / 60.0
 
 
 def _maybe_float(value: Any) -> Optional[float]:
@@ -210,7 +211,7 @@ class IchargingBreakerRuntime:
 
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
-        control_minutes = max(cfg.control_interval_minutes, 1.0)
+        control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         min_minutes = control_minutes
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
         effective_board_limit = cfg.max_board_kw

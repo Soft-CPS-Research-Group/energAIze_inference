@@ -58,6 +58,64 @@ def _build_rule_based_bundle(tmp_path: Path) -> Path:
     return manifest_path
 
 
+def _build_icharging_subminute_bundle(tmp_path: Path) -> Path:
+    bundle_dir = tmp_path / "icharging_subminute"
+    bundle_dir.mkdir()
+
+    chargers = {
+        "AC000001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000004_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000007_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000010_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000013_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+    }
+    action_names = list(chargers.keys())
+    policy = {"default_actions": {name: 0.0 for name in action_names}, "rules": []}
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedBreaker", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["timestamp"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0.0] * len(action_names), "high": [4.6] * len(action_names)}]],
+            "action_names": action_names,
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {
+                        "use_preprocessor": False,
+                        "strategy": "icharging_breaker",
+                        "control_interval_minutes": 0.0833,
+                        "max_board_kw": 11.0,
+                        "charger_limit_kw": 4.6,
+                        "min_connected_kw": 1.6,
+                        "chargers": chargers,
+                        "line_limits": {"L1": {"limit_kw": 11.0}},
+                        "vehicle_capacities": {"2": 50},
+                    },
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
 def test_api_accepts_string_features(tmp_path):
     manifest_path = _build_rule_based_bundle(tmp_path)
     if store.is_configured():
@@ -617,6 +675,75 @@ def test_breaker_only_skips_idle_sessions():
         assert actions["AC000004_1"] <= 4.6 + 1e-6
         assert actions["AC000007_1"] >= 1.6 - 1e-6
         assert actions["AC000007_1"] <= 4.6 + 1e-6
+    finally:
+        store.unload()
+
+
+def test_subminute_control_interval_allows_lower_required_kw(tmp_path):
+    manifest_path = _build_icharging_subminute_bundle(tmp_path)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+    client = TestClient(app)
+    timestamp = "2025-11-04T09:00:00Z"
+    departure = "2025-11-04T09:00:30Z"
+    charging_sessions = {
+        "AC000001_1": {"power": 0.0, "electric_vehicle": 11831},
+        "AC000004_1": {"power": 0.0, "electric_vehicle": 2},
+        "AC000007_1": {"power": 0.0, "electric_vehicle": 11832},
+        "AC000010_1": {"power": 0.0, "electric_vehicle": 11833},
+        "AC000013_1": {"power": 0.0, "electric_vehicle": 11834},
+    }
+    payload = {
+        "timestamp": timestamp,
+        "non_shiftable_load": 0.0,
+        "solar_generation": 0.0,
+        "energy_price": 0.0,
+        "charging_sessions": charging_sessions,
+        "electric_vehicles": {
+            "2": {
+                "SoC": 0.5,
+                "flexibility": {
+                    "estimated_soc_at_departure": 0.5005,
+                    "estimated_time_at_departure": departure,
+                },
+            },
+            "11831": {
+                "SoC": 0.5,
+                "flexibility": {
+                    "estimated_soc_at_departure": -1,
+                    "estimated_time_at_departure": "",
+                },
+            },
+            "11832": {
+                "SoC": 0.5,
+                "flexibility": {
+                    "estimated_soc_at_departure": -1,
+                    "estimated_time_at_departure": "",
+                },
+            },
+            "11833": {
+                "SoC": 0.5,
+                "flexibility": {
+                    "estimated_soc_at_departure": -1,
+                    "estimated_time_at_departure": "",
+                },
+            },
+            "11834": {
+                "SoC": 0.5,
+                "flexibility": {
+                    "estimated_soc_at_departure": -1,
+                    "estimated_time_at_departure": "",
+                },
+            },
+        },
+    }
+
+    try:
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        assert actions["AC000004_1"] < 4.6 - 1e-6
     finally:
         store.unload()
 
