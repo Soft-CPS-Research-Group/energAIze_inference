@@ -33,6 +33,21 @@ class Settings(BaseSettings):
         env="LOG_JSON",
         description="Emit structured JSON logs when true",
     )
+    log_file: Path | None = Field(
+        default=None,
+        env="LOG_FILE",
+        description="Optional file path to write logs to",
+    )
+    log_file_rotation: str | None = Field(
+        default="50 MB",
+        env="LOG_FILE_ROTATION",
+        description="Rotation policy for log files (e.g. '50 MB' or '1 day')",
+    )
+    log_file_retention: str | None = Field(
+        default="7 days",
+        env="LOG_FILE_RETENTION",
+        description="Retention policy for log files (e.g. '7 days')",
+    )
     alias_mapping_path: Path | None = Field(
         default=None,
         env="FEATURE_ALIAS_PATH",
@@ -74,6 +89,12 @@ class Settings(BaseSettings):
     @validator("alias_mapping_path", pre=True)
     def _expand_alias_path(cls, value: str | Path | None) -> Path | None:
         if value is None:
+            return None
+        return Path(value).expanduser()
+
+    @validator("log_file", pre=True)
+    def _expand_log_file(cls, value: str | Path | None) -> Path | None:
+        if value in (None, ""):
             return None
         return Path(value).expanduser()
 

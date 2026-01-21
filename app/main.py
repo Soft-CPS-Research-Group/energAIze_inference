@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from functools import lru_cache
 
 import onnxruntime as ort
 from fastapi import FastAPI, HTTPException
@@ -46,10 +47,39 @@ app.include_router(inference.router)
 app.include_router(admin.router)
 
 
+@lru_cache(maxsize=1)
+def _cuda_available() -> bool:
+    if "CUDAExecutionProvider" not in ort.get_available_providers():
+        return False
+    try:
+        import onnx
+        from onnx import TensorProto, helper
+    except Exception:
+        get_logger().warning("onnx.unavailable_for_gpu_check")
+        return False
+
+    node = helper.make_node("Identity", ["x"], ["y"])
+    graph = helper.make_graph(
+        [node],
+        "gpu_check",
+        [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
+        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])],
+    )
+    model = helper.make_model(graph, producer_name="gpu_check")
+    try:
+        session = ort.InferenceSession(
+            model.SerializeToString(),
+            providers=["CUDAExecutionProvider"],
+        )
+        return "CUDAExecutionProvider" in session.get_providers()
+    except Exception:
+        return False
+
+
 @app.get("/health", tags=["info"])
 async def health_check():
     record = store.get_record()
-    gpu_available = "CUDAExecutionProvider" in ort.get_available_providers()
+    gpu_available = _cuda_available()
     providers = []
     manifest_path = None
     alias_path = None

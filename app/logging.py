@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+from pathlib import Path
 import sys
 import time
 import uuid
@@ -110,6 +111,13 @@ def _is_action_record(record: dict) -> bool:
     return record.get("message") in _ACTION_MESSAGES
 
 
+def _ensure_log_dir(path: Path) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        logger.warning("Failed to create log directory", log_path=str(path))
+
+
 def init_logging() -> None:
     """Configure Loguru with structured output and request-aware extras."""
 
@@ -142,6 +150,18 @@ def init_logging() -> None:
             backtrace=False,
             diagnose=False,
         )
+        if settings.log_file:
+            _ensure_log_dir(settings.log_file)
+            logger.add(
+                settings.log_file,
+                level=settings.log_level.upper(),
+                serialize=True,
+                rotation=settings.log_file_rotation or None,
+                retention=settings.log_file_retention or None,
+                enqueue=True,
+                backtrace=False,
+                diagnose=False,
+            )
     else:
         default_fmt = (
             "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | "
@@ -173,6 +193,30 @@ def init_logging() -> None:
             backtrace=False,
             diagnose=False,
         )
+        if settings.log_file:
+            _ensure_log_dir(settings.log_file)
+            logger.add(
+                settings.log_file,
+                level=settings.log_level.upper(),
+                format=default_fmt,
+                filter=lambda record: not _is_action_record(record),
+                rotation=settings.log_file_rotation or None,
+                retention=settings.log_file_retention or None,
+                enqueue=True,
+                backtrace=False,
+                diagnose=False,
+            )
+            logger.add(
+                settings.log_file,
+                level=settings.log_level.upper(),
+                format=action_fmt,
+                filter=_is_action_record,
+                rotation=settings.log_file_rotation or None,
+                retention=settings.log_file_retention or None,
+                enqueue=True,
+                backtrace=False,
+                diagnose=False,
+            )
 
 
 def get_logger():  # noqa: ANN001
