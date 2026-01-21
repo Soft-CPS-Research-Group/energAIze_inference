@@ -4,9 +4,14 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from loguru import logger
+from pydantic import ValidationError
 
+from app.logging import get_logger, init_logging
 from app.main import app
+from app.settings import settings
 from app.state import store
+from app.utils.manifest import load_manifest
 
 
 ICHARGING_BOARD_LIMIT_KW = 33.0
@@ -56,6 +61,53 @@ def _build_rule_based_bundle(tmp_path: Path) -> Path:
     manifest_path = bundle_dir / "artifact_manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     return manifest_path
+
+
+def _build_rule_based_alias_bundle(tmp_path: Path) -> tuple[Path, Path]:
+    bundle_dir = tmp_path / "alias_bundle"
+    bundle_dir.mkdir()
+
+    policy = {
+        "default_actions": {"hvac": 0.0},
+        "rules": [
+            {"if": {"electricity_pricing": 5}, "actions": {"hvac": 0.9}},
+        ],
+    }
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedPolicy", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["electricity_pricing"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0], "high": [1]}]],
+            "action_names": ["hvac"],
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {},
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    alias_path = bundle_dir / "aliases.json"
+    alias_path.write_text('{"energy_price": "electricity_pricing"}', encoding="utf-8")
+    return manifest_path, alias_path
 
 
 def _build_icharging_subminute_bundle(tmp_path: Path) -> Path:
@@ -129,6 +181,22 @@ def test_api_accepts_string_features(tmp_path):
         assert response.status_code == 200
         body = response.json()
         assert body["actions"]["0"]["hvac"] == 0.5
+    finally:
+        store.unload()
+
+
+def test_alias_mapping_applies_to_rule_based(tmp_path):
+    manifest_path, alias_path = _build_rule_based_alias_bundle(tmp_path)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0, alias_path)
+
+    client = TestClient(app)
+    try:
+        response = client.post("/inference", json={"features": {"energy_price": 5}})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["actions"]["0"]["hvac"] == pytest.approx(0.9, rel=1e-6)
     finally:
         store.unload()
 
@@ -292,6 +360,52 @@ def test_api_flattens_nested_payload(tmp_path):
         store.unload()
 
 
+def test_manifest_validation_rejects_missing_fields(tmp_path):
+    manifest_path = tmp_path / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps({"manifest_version": 1}), encoding="utf-8")
+    with pytest.raises(ValidationError):
+        load_manifest(manifest_path)
+
+
+def test_bundle_missing_artifact_raises(tmp_path):
+    bundle_dir = tmp_path / "missing_artifact"
+    bundle_dir.mkdir()
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "OnnxPolicy", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["feature"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0], "high": [1]}]],
+            "action_names": ["hvac"],
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "onnx",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "missing.onnx",
+                    "format": "onnx",
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    if store.is_configured():
+        store.unload()
+    with pytest.raises(FileNotFoundError):
+        store.load(manifest_path, bundle_dir, 0)
+
+
 def test_health_reports_metadata(tmp_path):
     manifest_path = _build_rule_based_bundle(tmp_path)
     if store.is_configured():
@@ -309,6 +423,34 @@ def test_health_reports_metadata(tmp_path):
         assert "gpu_available" in body
     finally:
         store.unload()
+
+
+def test_file_logging_writes_to_disk(tmp_path):
+    log_path = tmp_path / "logs" / "app.log"
+    prior_log_file = settings.log_file
+    prior_log_json = settings.log_json
+    prior_log_level = settings.log_level
+    prior_rotation = settings.log_file_rotation
+    prior_retention = settings.log_file_retention
+
+    settings.log_file = log_path
+    settings.log_json = False
+    settings.log_level = "INFO"
+    settings.log_file_rotation = None
+    settings.log_file_retention = None
+    try:
+        init_logging()
+        get_logger().info("file.log.test")
+        logger.complete()
+        assert log_path.exists()
+        assert "file.log.test" in log_path.read_text(encoding="utf-8")
+    finally:
+        settings.log_file = prior_log_file
+        settings.log_json = prior_log_json
+        settings.log_level = prior_log_level
+        settings.log_file_rotation = prior_rotation
+        settings.log_file_retention = prior_retention
+        init_logging()
 
 
 def test_breaker_allocation_strategy():
