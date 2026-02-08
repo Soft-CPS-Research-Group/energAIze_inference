@@ -15,6 +15,7 @@ from app.utils.manifest import load_manifest
 
 
 ICHARGING_BOARD_LIMIT_KW = 33.0
+BREAKER_ONLY_BASE_BOARD_LIMIT_KW = 55.0
 
 
 def _build_rule_based_bundle(tmp_path: Path) -> Path:
@@ -168,6 +169,64 @@ def _build_icharging_subminute_bundle(tmp_path: Path) -> Path:
     return manifest_path
 
 
+def _build_breaker_only_headroom_bundle(tmp_path: Path, per_phase_headroom_kw: float) -> Path:
+    bundle_dir = tmp_path / "breaker_only_headroom"
+    bundle_dir.mkdir()
+
+    chargers = {
+        "AC000001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6},
+        "AC000002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6},
+        "AC000003_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6},
+        "AC000004_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6},
+    }
+    action_names = list(chargers.keys())
+    policy = {"default_actions": {name: 0.0 for name in action_names}, "rules": []}
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedBreaker", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["timestamp"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0.0] * len(action_names), "high": [4.6] * len(action_names)}]],
+            "action_names": action_names,
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {
+                        "use_preprocessor": False,
+                        "strategy": "breaker_only",
+                        "control_interval_minutes": 1,
+                        "max_board_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW,
+                        "charger_limit_kw": 4.6,
+                        "min_connected_kw": 1.6,
+                        "per_phase_headroom_kw": per_phase_headroom_kw,
+                        "chargers": chargers,
+                        "line_limits": {"L1": {"limit_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW / 3.0}},
+                        "action_order": action_names,
+                    },
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
 def test_api_accepts_string_features(tmp_path):
     manifest_path = _build_rule_based_bundle(tmp_path)
     if store.is_configured():
@@ -202,11 +261,21 @@ def test_alias_mapping_applies_to_rule_based(tmp_path):
 
 
 def test_icharging_replay_full_dataset():
-    _replay_log_dataset(_load_icharging_bundle)
+    _replay_log_dataset(
+        _load_icharging_bundle,
+        lambda payload: ICHARGING_BOARD_LIMIT_KW,
+        lambda payload: 11.0,
+        lambda cid: 4.6,
+    )
 
 
 def test_breaker_only_replay_full_dataset():
-    _replay_log_dataset(_load_breaker_only_bundle)
+    _replay_log_dataset(
+        _load_breaker_only_bundle,
+        lambda payload: BREAKER_ONLY_BASE_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0),
+        lambda payload: (BREAKER_ONLY_BASE_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)) / 3.0,
+        lambda cid: 10.0 if cid == "BB000018_1" else 4.6,
+    )
 
 
 def test_onnx_icharging_sample_bundle():
@@ -237,7 +306,7 @@ def test_onnx_icharging_sample_bundle():
     finally:
         store.unload()
 
-def _replay_log_dataset(client_loader):
+def _replay_log_dataset(client_loader, board_limit_fn, line_limit_fn, max_kw_fn):
     client = client_loader()
     dataset_paths = [
         Path("dados_de_inferência_IC_11.11.2025_a_14.11.2025.json"),
@@ -253,8 +322,7 @@ def _replay_log_dataset(client_loader):
         "L2": ["ACEXT004_1", "AC000012_1", "AC000009_1", "AC000006_1", "AC000003_1", "BB000018_1"],
         "L3": ["AC000013_1", "AC000010_1", "AC000007_1", "AC000004_1", "AC000001_1", "BB000018_1"],
     }
-    charger_max_kw = 4.6
-
+    phase_counts = {"BB000018_1": 3}
     try:
         for record in records:
             payload = {
@@ -274,17 +342,23 @@ def _replay_log_dataset(client_loader):
             }
 
             board_total = sum(actions.get(cid, 0.0) for cid in actions if cid in connected)
-            assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+            board_limit = board_limit_fn(payload)
+            assert board_total <= board_limit + 1e-6
+            line_limit = line_limit_fn(payload)
             for chargers in line_groups.values():
-                total = sum(actions.get(cid, 0.0) for cid in chargers if cid in connected)
-                assert total <= 11.0 + 1e-6
+                total = sum(
+                    actions.get(cid, 0.0) / phase_counts.get(cid, 1)
+                    for cid in chargers
+                    if cid in connected
+                )
+                assert total <= line_limit + 1e-6
 
             for cid, session in payload["charging_sessions"].items():
                 ev_id = str(session.get("electric_vehicle") or "").strip()
                 action_val = actions.get(cid, 0.0)
                 if ev_id and action_val > 1e-6:
                     assert action_val >= 1.6 - 1e-6
-                assert actions.get(cid, 0.0) <= charger_max_kw + 1e-6
+                assert actions.get(cid, 0.0) <= max_kw_fn(cid) + 1e-6
     finally:
         store.unload()
 
@@ -789,7 +863,8 @@ def test_breaker_only_enforces_limits_and_minimums():
         for cid in charging_sessions:
             assert actions[cid] == pytest.approx(4.6, rel=1e-6)
         board_total = sum(actions.get(cid, 0.0) for cid in charging_sessions)
-        assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = BREAKER_ONLY_BASE_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert board_total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -817,6 +892,67 @@ def test_breaker_only_skips_idle_sessions():
         assert actions["AC000004_1"] <= 4.6 + 1e-6
         assert actions["AC000007_1"] >= 1.6 - 1e-6
         assert actions["AC000007_1"] <= 4.6 + 1e-6
+    finally:
+        store.unload()
+
+
+def test_breaker_only_bb_tri_phase_limits():
+    client = _load_breaker_only_bundle()
+    payload = {
+        "timestamp": "2025-11-07T10:00:00Z",
+        "non_shiftable_load": 0.0,
+        "solar_generation": 0.0,
+        "energy_price": 0.0,
+        "charging_sessions": {
+            "BB000018_1": {"power": 0.0, "electric_vehicle": ""},
+        },
+        "pv_panels": {"PV01": {"energy": 0.0}},
+    }
+
+    try:
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        assert actions["BB000018_1"] == pytest.approx(8.0, rel=1e-6)
+
+        payload["charging_sessions"]["BB000018_1"]["electric_vehicle"] = 9001
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        assert actions["BB000018_1"] >= 8.0 - 1e-6
+        assert actions["BB000018_1"] <= 10.0 + 1e-6
+    finally:
+        store.unload()
+
+
+def test_breaker_only_phase_headroom_respects_pv(tmp_path):
+    manifest_path = _build_breaker_only_headroom_bundle(tmp_path, per_phase_headroom_kw=1.0)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+
+    client = TestClient(app)
+    charging_sessions = {
+        "AC000001_1": {"power": 0.0, "electric_vehicle": 1001},
+        "AC000002_1": {"power": 0.0, "electric_vehicle": 1002},
+        "AC000003_1": {"power": 0.0, "electric_vehicle": 1003},
+        "AC000004_1": {"power": 0.0, "electric_vehicle": 1004},
+    }
+    payload = {
+        "timestamp": "2025-11-07T11:00:00Z",
+        "non_shiftable_load": 0.0,
+        "solar_generation": 6.0,
+        "energy_price": 0.0,
+        "charging_sessions": charging_sessions,
+    }
+
+    try:
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        total = sum(actions.values())
+        expected_limit = (BREAKER_ONLY_BASE_BOARD_LIMIT_KW + 6.0) / 3.0 - 1.0
+        assert total <= expected_limit + 1e-6
     finally:
         store.unload()
 

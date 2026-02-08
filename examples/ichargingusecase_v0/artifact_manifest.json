@@ -181,7 +181,7 @@
             4.6,
             3,
             3,
-            9
+            10
           ]
         }
       ]
@@ -225,9 +225,10 @@
           "use_preprocessor": false,
           "strategy": "breaker_only",
           "control_interval_minutes": 1,
-          "max_board_kw": 33,
+          "max_board_kw": 55,
           "charger_limit_kw": 4.6,
           "min_connected_kw": 1.6,
+          "per_phase_headroom_kw": 0.0,
           "chargers": {
             "AC000001_1": {
               "line": "L3",
@@ -325,19 +326,19 @@
                 "L2",
                 "L3"
               ],
-              "min_kw": 0.0,
-              "max_kw": 9.0
+              "min_kw": 8.0,
+              "max_kw": 10.0
             }
           },
           "line_limits": {
             "L1": {
-              "limit_kw": 11
+              "limit_kw": 18.333
             },
             "L2": {
-              "limit_kw": 11
+              "limit_kw": 18.333
             },
             "L3": {
-              "limit_kw": 11
+              "limit_kw": 18.333
             }
           },
           "action_order": [

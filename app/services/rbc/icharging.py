@@ -237,8 +237,6 @@ class IchargingBreakerRuntime:
         for charger_id, meta in cfg.chargers.items():
             phases = meta.get("phases")
             n_phases = max(len(phases), 1) if phases else 1
-            phases = meta.get("phases")
-            n_phases = max(len(phases), 1) if phases else 1
             base_min_kw = max(_safe_float(meta.get("min_kw", 0.0), 0.0), 0.0)
             max_kw = max(
                 _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
@@ -643,6 +641,8 @@ class BreakerOnlyConfig:
     chargers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     line_limits: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     min_connected_kw: float = 1.6
+    solar_generation_key: str = "solar_generation"
+    per_phase_headroom_kw: float = 0.0
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "BreakerOnlyConfig":
@@ -653,6 +653,8 @@ class BreakerOnlyConfig:
             chargers=dict(data.pop("chargers", {})),
             line_limits=dict(data.pop("line_limits", {})),
             min_connected_kw=_safe_float(data.pop("min_connected_kw", 1.6)),
+            solar_generation_key=data.pop("solar_generation_key", "solar_generation"),
+            per_phase_headroom_kw=_safe_float(data.pop("per_phase_headroom_kw", 0.0)),
         )
 
 
@@ -662,10 +664,16 @@ class BreakerOnlyRuntime:
 
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
+        solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
+        effective_board_limit = cfg.max_board_kw + solar_kw
+        per_phase_limit = effective_board_limit / 3.0 if cfg.line_limits else effective_board_limit
+        if cfg.line_limits and cfg.per_phase_headroom_kw > 0.0:
+            per_phase_limit = max(per_phase_limit - cfg.per_phase_headroom_kw, 0.0)
         actions: Dict[str, float] = {}
         min_levels: Dict[str, float] = {}
         max_levels: Dict[str, float] = {}
         states: Dict[str, ChargerState] = {}
+        nonflex_by_line: Dict[str, List[str]] = {}
 
         line_map: Dict[str, str] = {}
         for line_name in cfg.line_limits.keys():
@@ -673,6 +681,8 @@ class BreakerOnlyRuntime:
                 line_map[cid] = line_name
 
         for charger_id, meta in cfg.chargers.items():
+            phases = meta.get("phases")
+            n_phases = max(len(phases), 1) if phases else 1
             base_min_kw = max(_safe_float(meta.get("min_kw", 0.0), 0.0), 0.0)
             max_kw = max(
                 _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
@@ -683,12 +693,14 @@ class BreakerOnlyRuntime:
             session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
             session_power = _clamp(session_power, 0.0, max_kw)
             connected = bool(ev_id)
-            min_kw = max(base_min_kw, cfg.min_connected_kw)
+            min_kw = max(base_min_kw, cfg.min_connected_kw * (n_phases if connected else 1))
             state = ChargerState(
                 id=charger_id,
                 min_kw=min_kw,
                 max_kw=max_kw,
                 line=line,
+                phases=phases if phases else ([line] if line else None),
+                n_phases=n_phases,
                 ev_id=ev_id,
                 connected=connected,
                 allow_flex=False,
@@ -699,23 +711,21 @@ class BreakerOnlyRuntime:
             max_levels[charger_id] = max_kw
             actions[charger_id] = min_kw
 
-        for line_name, info in cfg.line_limits.items():
-            limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
-            chargers = _line_chargers(cfg, line_name)
-            active = [cid for cid in chargers if states.get(cid) and states[cid].connected]
-            if not active:
+            if not state.connected:
                 continue
-            share = limit / len(active)
-            for cid in active:
-                target = min(max_levels[cid], max(share, min_levels[cid]))
-                actions[cid] = target
+            if state.phases:
+                for ln in state.phases:
+                    nonflex_by_line.setdefault(ln, []).append(charger_id)
+
+        self._distribute_nonflex(cfg, states, nonflex_by_line, actions, per_phase_limit)
+        self._enforce_line_limits(cfg, states, actions, min_levels, per_phase_limit)
 
         board_total = sum(value for cid, value in actions.items() if states.get(cid) and states[cid].connected)
-        if board_total - cfg.max_board_kw > 1e-6:
+        if board_total - effective_board_limit > 1e-6:
             order = [cid for cid, state in states.items() if state.connected]
             if not order:
                 order = list(actions.keys())
-            _reduce_actions(order, board_total - cfg.max_board_kw, actions, min_levels)
+            _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
 
         for cid, value in actions.items():
             value = _round_down_one_decimal(value)
@@ -730,9 +740,12 @@ class BreakerOnlyRuntime:
                 if not state.connected:
                     continue
                 connected[cid] = state.ev_id
-                phase = state.line or "unknown"
-                per_phase = quantized.get(cid, 0.0) / max(state.n_phases, 1)
-                line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
+                phases = state.phases or ([state.line] if state.line else [])
+                phases = [p for p in phases if p]
+                n_phases = max(len(phases), 1)
+                per_phase = quantized.get(cid, 0.0) / n_phases
+                for phase in phases or ["unknown"]:
+                    line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
             line_totals = dict(sorted(line_totals.items()))
             board_total = sum(quantized.get(cid, 0.0) for cid in connected)
             log.info(
@@ -747,6 +760,65 @@ class BreakerOnlyRuntime:
             get_logger().exception("rbc.action_logging_failed")
 
         return quantized
+
+    def _distribute_nonflex(
+        self,
+        cfg: BreakerOnlyConfig,
+        states: Dict[str, ChargerState],
+        nonflex_by_line: Dict[str, List[str]],
+        actions: Dict[str, float],
+        limit_per_line: float,
+    ) -> None:
+        for line_name, charger_ids in nonflex_by_line.items():
+            limit = limit_per_line
+            line_chargers = _line_chargers(cfg, line_name)
+            current = sum(
+                actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
+                for cid in line_chargers
+                if cid in states and states[cid].connected
+            )
+            remaining = max(limit - current, 0.0)
+            alloc_queue = [cid for cid in charger_ids if states[cid].max_kw > 1e-6]
+            assigned = {cid: 0.0 for cid in alloc_queue}
+            while remaining > 1e-6 and alloc_queue:
+                share = remaining / len(alloc_queue)
+                next_queue: List[str] = []
+                for cid in alloc_queue:
+                    state = states[cid]
+                    per_line_cap = state.max_kw / max(state.n_phases, 1)
+                    addition = min(share, per_line_cap)
+                    assigned[cid] += addition
+                    remaining -= addition
+                    if addition + 1e-6 < per_line_cap:
+                        next_queue.append(cid)
+                if next_queue == alloc_queue:
+                    break
+                alloc_queue = next_queue
+            for cid, value in assigned.items():
+                actions[cid] = max(actions.get(cid, 0.0), value * max(states[cid].n_phases, 1))
+
+    def _enforce_line_limits(
+        self,
+        cfg: BreakerOnlyConfig,
+        states: Dict[str, ChargerState],
+        actions: Dict[str, float],
+        min_levels: Dict[str, float],
+        limit_per_line: float,
+    ) -> None:
+        for line_name in cfg.line_limits.keys():
+            limit = limit_per_line
+            chargers = _line_chargers(cfg, line_name)
+            total = sum(
+                actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
+                for cid in chargers
+                if cid in states and states[cid].connected
+            )
+            overflow = total - limit
+            if overflow > 1e-6:
+                order = [cid for cid in chargers if cid in states and states[cid].connected]
+                if not order:
+                    continue
+                _reduce_actions(order, overflow, actions, min_levels)
 
     def _current_timestamp(self, payload: Dict[str, Any]) -> datetime:
         return _current_timestamp(payload)
