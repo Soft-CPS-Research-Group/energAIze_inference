@@ -137,6 +137,7 @@ class IchargingRuntimeConfig:
     flexible_urgency_threshold: float = 0.7
     solar_generation_key: str = "solar_generation"
     min_connected_kw: float = 1.6
+    per_phase_headroom_kw: float = 0.0
     vehicle_capacities: Dict[str, float] = field(default_factory=dict)
     flexible_ev_ids: Optional[List[str]] = None
     allow_departure_fallback: bool = False
@@ -170,6 +171,7 @@ class IchargingRuntimeConfig:
             flexible_urgency_threshold=_safe_float(data.pop("flexible_urgency_threshold", 0.7)),
             solar_generation_key=data.pop("solar_generation_key", "solar_generation"),
             min_connected_kw=_safe_float(data.pop("min_connected_kw", 1.6)),
+            per_phase_headroom_kw=_safe_float(data.pop("per_phase_headroom_kw", 0.0)),
             vehicle_capacities=vehicle_capacities or {},
             flexible_ev_ids=flexible_ev_ids,
             allow_departure_fallback=bool(data.pop("allow_departure_fallback", False)),
@@ -214,7 +216,14 @@ class IchargingBreakerRuntime:
         control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         min_minutes = control_minutes
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
-        effective_board_limit = cfg.max_board_kw
+        effective_board_limit = cfg.max_board_kw + solar_kw
+        per_phase_limit = (
+            effective_board_limit / max(len(cfg.line_limits), 1)
+            if cfg.line_limits
+            else effective_board_limit
+        )
+        if cfg.line_limits and cfg.per_phase_headroom_kw > 0.0:
+            per_phase_limit = max(per_phase_limit - cfg.per_phase_headroom_kw, 0.0)
 
         line_map: Dict[str, str] = {}
         for line_name in cfg.line_limits.keys():
@@ -290,10 +299,20 @@ class IchargingBreakerRuntime:
                 for ln in state.phases:
                     nonflex_by_line.setdefault(ln, []).append(charger_id)
 
-        self._distribute_nonflex(cfg, states, nonflex_by_line, actions)
+        self._distribute_nonflex(cfg, states, nonflex_by_line, actions, per_phase_limit)
         self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
-        self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
-        self._fill_remaining_headroom(cfg, states, actions, min_levels, flexible_chargers)
+        self._enforce_line_limits(
+            cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
+        )
+        self._fill_remaining_headroom(
+            cfg,
+            states,
+            actions,
+            min_levels,
+            flexible_chargers,
+            per_phase_limit,
+            effective_board_limit,
+        )
 
         board_total = sum(
             value for cid, value in actions.items() if states.get(cid) and states[cid].connected
@@ -301,7 +320,9 @@ class IchargingBreakerRuntime:
         if board_total - effective_board_limit > 1e-6:
             order = self._ordered_chargers(states, flexible_chargers)
             _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
-            self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers)
+            self._enforce_line_limits(
+                cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
+            )
 
         quantized: Dict[str, float] = {}
         for cid, value in actions.items():
@@ -458,10 +479,10 @@ class IchargingBreakerRuntime:
         states: Dict[str, ChargerState],
         nonflex_by_line: Dict[str, List[str]],
         actions: Dict[str, float],
+        limit_per_line: float,
     ) -> None:
         for line_name, charger_ids in nonflex_by_line.items():
-            line_cfg = cfg.line_limits.get(line_name, {})
-            limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
+            limit = limit_per_line
             line_chargers = _line_chargers(cfg, line_name)
             current = sum(
                 actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
@@ -496,6 +517,8 @@ class IchargingBreakerRuntime:
         actions: Dict[str, float],
         min_levels: Dict[str, float],
         flexible_chargers: List[str],
+        limit_per_line: float,
+        board_limit: float,
     ) -> None:
         """
         After flexible requirements are applied, if there is remaining headroom on a line and
@@ -504,13 +527,13 @@ class IchargingBreakerRuntime:
         """
         # Board headroom considering connected chargers only
         board_used = sum(actions.get(cid, 0.0) for cid, st in states.items() if st.connected)
-        board_remaining = max(cfg.max_board_kw - board_used, 0.0)
+        board_remaining = max(board_limit - board_used, 0.0)
         if board_remaining <= 1e-6:
             return
 
         # Work line by line
-        for line_name, line_cfg in cfg.line_limits.items():
-            limit = _safe_float(line_cfg.get("limit_kw"), cfg.max_board_kw)
+        for line_name in cfg.line_limits:
+            limit = limit_per_line
             line_chargers = [
                 cid for cid, st in states.items() if st.connected and st.line == line_name
             ]
@@ -589,9 +612,10 @@ class IchargingBreakerRuntime:
         actions: Dict[str, float],
         min_levels: Dict[str, float],
         flexible_chargers: List[str],
+        limit_per_line: float,
     ) -> None:
         for line_name, info in cfg.line_limits.items():
-            limit = _safe_float(info.get("limit_kw"), cfg.max_board_kw)
+            limit = limit_per_line
             chargers = _line_chargers(cfg, line_name)
             total = sum(
                 actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
@@ -666,7 +690,11 @@ class BreakerOnlyRuntime:
         cfg = self.config
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
         effective_board_limit = cfg.max_board_kw + solar_kw
-        per_phase_limit = effective_board_limit / 3.0 if cfg.line_limits else effective_board_limit
+        per_phase_limit = (
+            effective_board_limit / max(len(cfg.line_limits), 1)
+            if cfg.line_limits
+            else effective_board_limit
+        )
         if cfg.line_limits and cfg.per_phase_headroom_kw > 0.0:
             per_phase_limit = max(per_phase_limit - cfg.per_phase_headroom_kw, 0.0)
         actions: Dict[str, float] = {}

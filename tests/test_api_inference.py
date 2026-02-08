@@ -9,12 +9,13 @@ from pydantic import ValidationError
 
 from app.logging import get_logger, init_logging
 from app.main import app
+from app.services.rbc.icharging import ChargerState, IchargingBreakerRuntime, IchargingRuntimeConfig
 from app.settings import settings
 from app.state import store
 from app.utils.manifest import load_manifest
 
 
-ICHARGING_BOARD_LIMIT_KW = 33.0
+ICHARGING_BOARD_LIMIT_KW = 55.0
 BREAKER_ONLY_BASE_BOARD_LIMIT_KW = 55.0
 
 
@@ -214,7 +215,133 @@ def _build_breaker_only_headroom_bundle(tmp_path: Path, per_phase_headroom_kw: f
                         "min_connected_kw": 1.6,
                         "per_phase_headroom_kw": per_phase_headroom_kw,
                         "chargers": chargers,
-                        "line_limits": {"L1": {"limit_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW / 3.0}},
+                        "line_limits": {
+                            "L1": {"limit_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW / 3.0},
+                            "L2": {"limit_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW / 3.0},
+                            "L3": {"limit_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW / 3.0},
+                        },
+                        "action_order": action_names,
+                    },
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
+def _build_icharging_headroom_bundle(tmp_path: Path, per_phase_headroom_kw: float) -> Path:
+    bundle_dir = tmp_path / "icharging_headroom"
+    bundle_dir.mkdir()
+
+    chargers = {
+        "AC000001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+    }
+    action_names = list(chargers.keys())
+    policy = {"default_actions": {name: 0.0 for name in action_names}, "rules": []}
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedBreaker", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["timestamp"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0.0] * len(action_names), "high": [4.6] * len(action_names)}]],
+            "action_names": action_names,
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {
+                        "use_preprocessor": False,
+                        "strategy": "icharging_breaker",
+                        "control_interval_minutes": 1,
+                        "max_board_kw": ICHARGING_BOARD_LIMIT_KW,
+                        "charger_limit_kw": 4.6,
+                        "min_connected_kw": 1.6,
+                        "per_phase_headroom_kw": per_phase_headroom_kw,
+                        "chargers": chargers,
+                        "line_limits": {
+                            "L1": {"limit_kw": ICHARGING_BOARD_LIMIT_KW / 3.0},
+                            "L2": {"limit_kw": ICHARGING_BOARD_LIMIT_KW / 3.0},
+                            "L3": {"limit_kw": ICHARGING_BOARD_LIMIT_KW / 3.0},
+                        },
+                        "action_order": action_names,
+                    },
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
+def _build_icharging_pv_bundle(tmp_path: Path) -> Path:
+    bundle_dir = tmp_path / "icharging_pv"
+    bundle_dir.mkdir()
+
+    base_board_kw = 9.0
+    chargers = {
+        "AC000001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000003_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000004_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+        "AC000005_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": True},
+    }
+    action_names = list(chargers.keys())
+    policy = {"default_actions": {name: 0.0 for name in action_names}, "rules": []}
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedBreaker", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["timestamp"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0.0] * len(action_names), "high": [4.6] * len(action_names)}]],
+            "action_names": action_names,
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {
+                        "use_preprocessor": False,
+                        "strategy": "icharging_breaker",
+                        "control_interval_minutes": 1,
+                        "max_board_kw": base_board_kw,
+                        "charger_limit_kw": 4.6,
+                        "min_connected_kw": 1.6,
+                        "chargers": chargers,
+                        "line_limits": {
+                            "L1": {"limit_kw": base_board_kw / 3.0},
+                            "L2": {"limit_kw": base_board_kw / 3.0},
+                            "L3": {"limit_kw": base_board_kw / 3.0},
+                        },
                         "action_order": action_names,
                     },
                 }
@@ -263,9 +390,9 @@ def test_alias_mapping_applies_to_rule_based(tmp_path):
 def test_icharging_replay_full_dataset():
     _replay_log_dataset(
         _load_icharging_bundle,
-        lambda payload: ICHARGING_BOARD_LIMIT_KW,
-        lambda payload: 11.0,
-        lambda cid: 4.6,
+        lambda payload: ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0),
+        lambda payload: (ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)) / 3.0,
+        lambda cid: 10.0 if cid == "BB000018_1" else 4.6,
     )
 
 
@@ -618,18 +745,28 @@ def test_breaker_allocation_strategy():
         assert response.status_code == 200
         actions = response.json()["actions"]["0"]
 
+        per_phase_limit = (ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)) / 3.0
         for line, chargers in line_groups.items():
-            limit = 11.0
-            total = sum(actions.get(cid, 0.0) for cid in chargers if payload["charging_sessions"][cid]["electric_vehicle"])
-            assert total <= limit + 1e-6
+            total = 0.0
+            for cid in chargers:
+                if not payload["charging_sessions"][cid]["electric_vehicle"]:
+                    continue
+                action = actions.get(cid, 0.0)
+                if cid == "BB000018_1":
+                    total += action / 3.0
+                else:
+                    total += action
+            assert total <= per_phase_limit + 1e-6
             for cid in chargers:
                 action = actions.get(cid, 0.0)
-                assert 0.0 <= action <= 4.6 + 1e-6
+                max_kw = 10.0 if cid == "BB000018_1" else 4.6
+                assert 0.0 <= action <= max_kw + 1e-6
 
         board_total = sum(
             actions.get(cid, 0.0) for cid in charger_ids if payload["charging_sessions"][cid]["electric_vehicle"]
         )
-        assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert board_total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -694,7 +831,8 @@ def test_breaker_allocation_prioritises_urgent_ev():
         assert actions["AC000004_1"] == pytest.approx(4.6, rel=1e-6)
         assert actions["AC000007_1"] <= 4.6 + 1e-6
         total = sum(actions[cid] for cid in charging_sessions)
-        assert total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -747,12 +885,14 @@ def test_nonflex_distribution_balances_phase():
             + actions["AC000007_1"]
             + actions["AC000013_1"]
         )
-        assert total_l3 <= 11.0 + 1e-6
+        per_phase_limit = (ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)) / 3.0
+        assert total_l3 <= per_phase_limit + 1e-6
         for cid in ["AC000004_1", "AC000007_1", "AC000013_1"]:
             assert actions[cid] >= 1.6 - 1e-6
             assert actions[cid] <= 4.6 + 1e-6
         board_total = sum(actions.get(cid, 0.0) for cid in charging_sessions)
-        assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert board_total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -786,7 +926,8 @@ def test_flexible_ev_consumes_solar_headroom():
         actions = resp.json()["actions"]["0"]
         assert actions["AC000004_1"] > 4.0
         total = sum(actions[cid] for cid in charging_sessions)
-        assert total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -832,7 +973,8 @@ def test_nonflex_minimum_power_enforced():
         assert actions["AC000006_1"] <= 4.6 + 1e-6
         assert actions["AC000009_1"] <= 4.6 + 1e-6
         board_total = sum(actions.get(cid, 0.0) for cid in charging_sessions)
-        assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6
+        board_limit = ICHARGING_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        assert board_total <= board_limit + 1e-6
     finally:
         store.unload()
 
@@ -925,6 +1067,87 @@ def test_breaker_only_bb_tri_phase_limits():
         store.unload()
 
 
+def test_icharging_bb_tri_phase_limits():
+    client = _load_icharging_bundle()
+    payload = {
+        "timestamp": "2025-11-07T10:00:00Z",
+        "non_shiftable_load": 0.0,
+        "solar_generation": 0.0,
+        "energy_price": 0.0,
+        "charging_sessions": {
+            "BB000018_1": {"power": 0.0, "electric_vehicle": ""},
+        },
+        "electric_vehicles": {},
+        "pv_panels": {"PV01": {"energy": 0.0}},
+    }
+
+    try:
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        assert actions["BB000018_1"] == pytest.approx(8.0, rel=1e-6)
+
+        payload["charging_sessions"]["BB000018_1"]["electric_vehicle"] = 9001
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        assert actions["BB000018_1"] >= 8.0 - 1e-6
+        assert actions["BB000018_1"] <= 10.0 + 1e-6
+    finally:
+        store.unload()
+
+
+def test_bb_treated_as_flexible_with_targets():
+    cfg = IchargingRuntimeConfig.from_dict(
+        {
+            "max_board_kw": ICHARGING_BOARD_LIMIT_KW,
+            "charger_limit_kw": 4.6,
+            "line_limits": {"L1": {"limit_kw": 18.333}, "L2": {"limit_kw": 18.333}, "L3": {"limit_kw": 18.333}},
+            "chargers": {
+                "BB000018_1": {
+                    "phases": ["L1", "L2", "L3"],
+                    "min_kw": 8.0,
+                    "max_kw": 10.0,
+                    "allow_flex_when_ev": True,
+                }
+            },
+        }
+    )
+    runtime = IchargingBreakerRuntime(cfg)
+    state = ChargerState(
+        id="BB000018_1",
+        min_kw=8.0,
+        max_kw=10.0,
+        line=None,
+        phases=["L1", "L2", "L3"],
+        n_phases=3,
+        ev_id="9001",
+        connected=True,
+        allow_flex=True,
+        session_power=0.0,
+    )
+    payload = {
+        "timestamp": "2025-11-07T12:00:00Z",
+        "electric_vehicles.9001.SoC": 0.2,
+        "electric_vehicles.9001.flexibility.estimated_soc_at_departure": 0.9,
+        "electric_vehicles.9001.flexibility.estimated_time_at_departure": "2025-11-07T14:00:00Z",
+    }
+
+    now = runtime._current_timestamp(payload)
+    ok = runtime._populate_flexible_state(
+        cfg,
+        payload,
+        state,
+        now,
+        control_minutes=1.0,
+        min_minutes=1.0,
+        whitelist=None,
+    )
+    assert ok is True
+    assert state.flexible is True
+    assert 8.0 - 1e-6 <= state.required_kw <= 10.0 + 1e-6
+
+
 def test_breaker_only_phase_headroom_respects_pv(tmp_path):
     manifest_path = _build_breaker_only_headroom_bundle(tmp_path, per_phase_headroom_kw=1.0)
     if store.is_configured():
@@ -953,6 +1176,82 @@ def test_breaker_only_phase_headroom_respects_pv(tmp_path):
         total = sum(actions.values())
         expected_limit = (BREAKER_ONLY_BASE_BOARD_LIMIT_KW + 6.0) / 3.0 - 1.0
         assert total <= expected_limit + 1e-6
+    finally:
+        store.unload()
+
+
+def test_icharging_phase_headroom_respects_pv(tmp_path):
+    manifest_path = _build_icharging_headroom_bundle(tmp_path, per_phase_headroom_kw=1.0)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+
+    client = TestClient(app)
+    charging_sessions = {
+        "AC000001_1": {"power": 0.0, "electric_vehicle": 1001},
+        "AC000002_1": {"power": 0.0, "electric_vehicle": 1002},
+        "AC000003_1": {"power": 0.0, "electric_vehicle": 1003},
+        "AC000004_1": {"power": 0.0, "electric_vehicle": 1004},
+        "AC000005_1": {"power": 0.0, "electric_vehicle": 1005},
+    }
+    payload = {
+        "timestamp": "2025-11-07T11:30:00Z",
+        "non_shiftable_load": 0.0,
+        "solar_generation": 6.0,
+        "energy_price": 0.0,
+        "charging_sessions": charging_sessions,
+    }
+
+    try:
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        total = sum(actions.values())
+        expected_limit = (ICHARGING_BOARD_LIMIT_KW + 6.0) / 3.0 - 1.0
+        assert total <= expected_limit + 1e-6
+    finally:
+        store.unload()
+
+
+def test_icharging_pv_increases_flex_capacity(tmp_path):
+    manifest_path = _build_icharging_pv_bundle(tmp_path)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+
+    client = TestClient(app)
+
+    def run_with_pv(pv_kw: float) -> float:
+        charging_sessions = {
+            "AC000001_1": {"power": 0.0, "electric_vehicle": 1001},
+        }
+        electric_vehicles = {
+            "1001": {
+                "SoC": 0.2,
+                "flexibility": {
+                    "estimated_soc_at_departure": 0.25,
+                    "estimated_time_at_departure": "2025-11-07T14:00:00Z",
+                },
+            },
+        }
+        payload = {
+            "timestamp": "2025-11-07T12:00:00Z",
+            "non_shiftable_load": 0.0,
+            "solar_generation": pv_kw,
+            "energy_price": 0.0,
+            "charging_sessions": charging_sessions,
+            "electric_vehicles": electric_vehicles,
+        }
+        resp = client.post("/inference", json={"features": payload})
+        assert resp.status_code == 200
+        actions = resp.json()["actions"]["0"]
+        return actions.get("AC000001_1", 0.0)
+
+    try:
+        total_no_pv = run_with_pv(0.0)
+        total_with_pv = run_with_pv(6.0)
+        assert total_no_pv <= 3.1
+        assert total_with_pv >= total_no_pv + 1.0
     finally:
         store.unload()
 
@@ -1262,10 +1561,20 @@ def test_icharging_multi_step_sequence():
             }
 
             board_total = sum(actions.get(cid, 0.0) for cid in connected)
-            assert board_total <= ICHARGING_BOARD_LIMIT_KW + 1e-6, scenario["description"]
+            board_limit = ICHARGING_BOARD_LIMIT_KW + scenario["solar_generation"]
+            assert board_total <= board_limit + 1e-6, scenario["description"]
+            per_phase_limit = board_limit / 3.0
             for chargers in line_groups.values():
-                total = sum(actions.get(cid, 0.0) for cid in chargers if cid in connected)
-                assert total <= 11.0 + 1e-6, scenario["description"]
+                total = 0.0
+                for cid in chargers:
+                    if cid not in connected:
+                        continue
+                    action = actions.get(cid, 0.0)
+                    if cid == "BB000018_1":
+                        total += action / 3.0
+                    else:
+                        total += action
+                assert total <= per_phase_limit + 1e-6, scenario["description"]
 
             if "null SoC treated as non-flex" in scenario["description"]:
                 for cid in scenario["charging_sessions"]:
