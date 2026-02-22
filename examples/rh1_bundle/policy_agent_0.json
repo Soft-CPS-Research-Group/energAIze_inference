@@ -1,0 +1,9 @@
+{
+  "default_actions": {
+    "ev_charge_kw": 0.0,
+    "battery_kw": 0.0,
+    "cooling_kw": 0.0,
+    "dhw_heater_kw": 0.0
+  },
+  "rules": []
+}

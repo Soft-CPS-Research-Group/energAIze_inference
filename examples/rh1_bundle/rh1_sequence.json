@@ -1,0 +1,222 @@
+[
+  {
+    "description": "Cheap period with connected EV and room in battery",
+    "timestamp": "2026-02-22T09:00:00Z",
+    "non_shiftable_load": 1.9,
+    "solar_generation": 1.2,
+    "electricity_pricing": {
+      "current": 0.11,
+      "h1": 0.15,
+      "h2": 0.19,
+      "h6": 0.24,
+      "h12": 0.21,
+      "h24": 0.16
+    },
+    "grid": {
+      "import_limit_kw": 8.0,
+      "export_limit_kw": 5.0
+    },
+    "electrical_storage": {
+      "soc": 0.35
+    },
+    "cooling": {
+      "temperature": {
+        "current_c": 24.0,
+        "min_c": 21.0,
+        "max_c": 25.0
+      }
+    },
+    "dhw": {
+      "temperature": {
+        "current_c": 50.0,
+        "min_c": 47.0,
+        "max_c": 56.0
+      }
+    },
+    "charging_sessions": {
+      "EVC01": {
+        "power": 0.0,
+        "electric_vehicle": "EV1"
+      }
+    },
+    "electric_vehicles": {
+      "EV1": {
+        "SoC": 0.30,
+        "flexibility": {
+          "estimated_soc_at_departure": 0.80,
+          "estimated_time_at_departure": "2026-02-22T14:00:00Z"
+        }
+      }
+    }
+  },
+  {
+    "description": "Peak price with urgent EV deadline and battery discharge",
+    "timestamp": "2026-02-22T18:00:00Z",
+    "non_shiftable_load": 3.1,
+    "solar_generation": 0.0,
+    "electricity_pricing": {
+      "current": 0.31,
+      "h1": 0.28,
+      "h2": 0.23,
+      "h6": 0.16,
+      "h12": 0.14,
+      "h24": 0.18
+    },
+    "grid": {
+      "import_limit_kw": 8.0,
+      "export_limit_kw": 5.0
+    },
+    "electrical_storage": {
+      "soc": 0.75
+    },
+    "cooling": {
+      "temperature": {
+        "current_c": 25.5,
+        "min_c": 21.0,
+        "max_c": 25.0
+      }
+    },
+    "dhw": {
+      "temperature": {
+        "current_c": 46.5,
+        "min_c": 47.0,
+        "max_c": 56.0
+      }
+    },
+    "charging_sessions": {
+      "EVC01": {
+        "power": 0.0,
+        "electric_vehicle": "EV1"
+      }
+    },
+    "electric_vehicles": {
+      "EV1": {
+        "SoC": 0.55,
+        "flexibility": {
+          "estimated_soc_at_departure": 0.85,
+          "estimated_time_at_departure": "2026-02-22T19:00:00Z"
+        }
+      }
+    }
+  },
+  {
+    "description": "Missing HVAC/DHW temperatures triggers safe fallback",
+    "timestamp": "2026-02-23T03:00:00Z",
+    "non_shiftable_load": 1.5,
+    "solar_generation": 0.0,
+    "electricity_pricing": {
+      "current": 0.17,
+      "h1": 0.18,
+      "h2": 0.20,
+      "h6": 0.23,
+      "h12": 0.19,
+      "h24": 0.16
+    },
+    "grid": {
+      "import_limit_kw": 8.0,
+      "export_limit_kw": 5.0
+    },
+    "electrical_storage": {
+      "soc": 0.50
+    },
+    "charging_sessions": {
+      "EVC01": {
+        "power": 0.0,
+        "electric_vehicle": "EV1"
+      }
+    },
+    "electric_vehicles": {
+      "EV1": {
+        "SoC": 0.50,
+        "flexibility": {
+          "estimated_soc_at_departure": -1,
+          "estimated_time_at_departure": ""
+        }
+      }
+    }
+  },
+  {
+    "description": "High PV can push towards export limit",
+    "timestamp": "2026-02-23T12:30:00Z",
+    "non_shiftable_load": 0.7,
+    "solar_generation": 6.0,
+    "electricity_pricing": {
+      "current": 0.12,
+      "h1": 0.16,
+      "h2": 0.20,
+      "h6": 0.24,
+      "h12": 0.19,
+      "h24": 0.14
+    },
+    "grid": {
+      "import_limit_kw": 8.0,
+      "export_limit_kw": 2.0
+    },
+    "electrical_storage": {
+      "soc": 0.40
+    },
+    "cooling": {
+      "temperature": {
+        "current_c": 23.0,
+        "min_c": 21.0,
+        "max_c": 25.0
+      }
+    },
+    "dhw": {
+      "temperature": {
+        "current_c": 53.0,
+        "min_c": 47.0,
+        "max_c": 56.0
+      }
+    },
+    "charging_sessions": {
+      "EVC01": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
+    },
+    "electric_vehicles": {}
+  },
+  {
+    "description": "No EV connected, expensive period should favor battery discharge",
+    "timestamp": "2026-02-23T21:00:00Z",
+    "non_shiftable_load": 2.8,
+    "solar_generation": 0.0,
+    "electricity_pricing": {
+      "current": 0.33,
+      "h1": 0.30,
+      "h2": 0.24,
+      "h6": 0.18,
+      "h12": 0.15,
+      "h24": 0.17
+    },
+    "grid": {
+      "import_limit_kw": 8.0,
+      "export_limit_kw": 5.0
+    },
+    "electrical_storage": {
+      "soc": 0.70
+    },
+    "cooling": {
+      "temperature": {
+        "current_c": 24.0,
+        "min_c": 21.0,
+        "max_c": 25.0
+      }
+    },
+    "dhw": {
+      "temperature": {
+        "current_c": 48.0,
+        "min_c": 47.0,
+        "max_c": 56.0
+      }
+    },
+    "charging_sessions": {
+      "EVC01": {
+        "power": 0.0,
+        "electric_vehicle": ""
+      }
+    },
+    "electric_vehicles": {}
+  }
+]
