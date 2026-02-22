@@ -17,6 +17,8 @@ from app.utils.manifest import load_manifest
 
 ICHARGING_BOARD_LIMIT_KW = 55.0
 BREAKER_ONLY_BASE_BOARD_LIMIT_KW = 55.0
+ICHARGING_BOAVISTA_WITH_FLEX_DIR = Path("examples/icharging_boavista_with_flex")
+ICHARGING_BOAVISTA_WITHOUT_FLEX_DIR = Path("examples/icharging_boavista_without_flex")
 
 
 def _build_rule_based_bundle(tmp_path: Path) -> Path:
@@ -436,8 +438,8 @@ def test_onnx_icharging_sample_bundle():
 def _replay_log_dataset(client_loader, board_limit_fn, line_limit_fn, max_kw_fn):
     client = client_loader()
     dataset_paths = [
-        Path("dados_de_inferência_IC_11.11.2025_a_14.11.2025.json"),
-        Path("dados_de_inferência_IC_14.11.2025_a_18.11.2025.json"),
+        ICHARGING_BOAVISTA_WITH_FLEX_DIR / "datasets" / "dados_de_inferência_IC_11.11.2025_a_14.11.2025.json",
+        ICHARGING_BOAVISTA_WITH_FLEX_DIR / "datasets" / "dados_de_inferência_IC_14.11.2025_a_18.11.2025.json",
     ]
     records = []
     for dataset_path in dataset_paths:
@@ -655,7 +657,7 @@ def test_file_logging_writes_to_disk(tmp_path):
 
 
 def test_breaker_allocation_strategy():
-    manifest_path = Path("examples/ichargingusecase_rule_based/artifact_manifest.json")
+    manifest_path = ICHARGING_BOAVISTA_WITH_FLEX_DIR / "artifact_manifest.json"
     artifacts_dir = manifest_path.parent
     if store.is_configured():
         store.unload()
@@ -772,7 +774,7 @@ def test_breaker_allocation_strategy():
 
 
 def _load_icharging_bundle():
-    manifest_path = Path("examples/ichargingusecase_rule_based/artifact_manifest.json")
+    manifest_path = ICHARGING_BOAVISTA_WITH_FLEX_DIR / "artifact_manifest.json"
     artifacts_dir = manifest_path.parent
     alias_path = artifacts_dir / "aliases.json"
     if store.is_configured():
@@ -782,7 +784,7 @@ def _load_icharging_bundle():
 
 
 def _load_breaker_only_bundle():
-    manifest_path = Path("examples/ichargingusecase_v0/artifact_manifest.json")
+    manifest_path = ICHARGING_BOAVISTA_WITHOUT_FLEX_DIR / "artifact_manifest.json"
     artifacts_dir = manifest_path.parent
     alias_path = artifacts_dir / "aliases.json"
     if store.is_configured():

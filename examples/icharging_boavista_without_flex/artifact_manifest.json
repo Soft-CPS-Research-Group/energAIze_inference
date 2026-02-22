@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "ichargingusecase_breaker_only",
-    "run_name": "breaker_only_v0",
+    "experiment_name": "icharging_boavista_without_flex",
+    "run_name": "icharging_boavista_without_flex_v0",
     "bundle_version": "v0"
   },
   "simulator": {},

@@ -591,19 +591,19 @@
     },
     {
       "key": "ichargingManifestPath",
-      "value": "/data/ichargingusecase_rule_based/artifact_manifest.json"
+      "value": "/data/icharging_boavista_with_flex/artifact_manifest.json"
     },
     {
       "key": "ichargingAliasPath",
-      "value": "/data/ichargingusecase_rule_based/aliases.json"
+      "value": "/data/icharging_boavista_with_flex/aliases.json"
     },
     {
       "key": "breakerOnlyManifestPath",
-      "value": "/data/ichargingusecase_v0/artifact_manifest.json"
+      "value": "/data/icharging_boavista_without_flex/artifact_manifest.json"
     },
     {
       "key": "breakerOnlyAliasPath",
-      "value": "/data/ichargingusecase_v0/aliases.json"
+      "value": "/data/icharging_boavista_without_flex/aliases.json"
     },
     {
       "key": "onnxManifestPath",

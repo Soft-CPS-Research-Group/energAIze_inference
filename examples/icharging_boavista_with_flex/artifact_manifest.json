@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "ichargingusecase_rule_based",
-    "run_name": "icharging_allocation_demo",
+    "experiment_name": "icharging_boavista_with_flex",
+    "run_name": "icharging_boavista_with_flex_v1",
     "alias_mapping_path": "aliases.json",
     "bundle_version": "2024-11-05-v1"
   },
