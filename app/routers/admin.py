@@ -12,7 +12,7 @@ router = APIRouter(prefix="/admin", tags=["admin"], responses={401: {"descriptio
 @router.post("/load")
 async def admin_load(
     manifest_path: Path = Body(..., embed=True),
-    agent_index: int = Body(..., embed=True, ge=0),
+    agent_index: int | None = Body(default=None, embed=True, ge=0),
     artifacts_dir: Path | None = Body(default=None, embed=True),
     alias_mapping_path: Path | None = Body(default=None, embed=True),
 ):
@@ -30,6 +30,8 @@ async def admin_load(
         "status": "loaded",
         "manifest_path": str(record.manifest_path),
         "agent_index": record.agent_index,
+        "default_agent_index": record.default_agent_index,
+        "loaded_agent_indices": record.loaded_agent_indices,
         "loaded_at": record.loaded_at.isoformat() + "Z",
     }
 

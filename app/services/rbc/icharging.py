@@ -146,6 +146,12 @@ class IchargingRuntimeConfig:
     site_available_headroom_key: Optional[str] = None
     site_available_headroom_fallback_kw: float = 0.0
     site_available_headroom_includes_pv: bool = True
+    virtual_battery_action_name: Optional[str] = None
+    virtual_battery_nominal_power_kw: float = 0.0
+    virtual_battery_soc_key: str = "electrical_storage.soc"
+    virtual_battery_setpoint_key: str = "community.virtual_battery.setpoint_kw"
+    virtual_battery_soc_min: float = 0.1
+    virtual_battery_soc_max: float = 0.9
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "IchargingRuntimeConfig":
@@ -162,6 +168,7 @@ class IchargingRuntimeConfig:
         flexibility_fields = data.pop("flexibility_fields", None)
         inactive_value = data.pop("inactive_power_threshold_kw", None)
         site_available_headroom_key = data.pop("site_available_headroom_key", None)
+        virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
         cfg = cls(
             max_board_kw=_safe_float(data.pop("max_board_kw", 0.0)),
             charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 0.0)),
@@ -193,7 +200,32 @@ class IchargingRuntimeConfig:
             site_available_headroom_includes_pv=bool(
                 data.pop("site_available_headroom_includes_pv", True)
             ),
+            virtual_battery_action_name=str(virtual_battery_action_name).strip()
+            if virtual_battery_action_name is not None and str(virtual_battery_action_name).strip()
+            else None,
+            virtual_battery_nominal_power_kw=max(
+                _safe_float(data.pop("virtual_battery_nominal_power_kw", 0.0), 0.0),
+                0.0,
+            ),
+            virtual_battery_soc_key=str(
+                data.pop("virtual_battery_soc_key", "electrical_storage.soc")
+            ),
+            virtual_battery_setpoint_key=str(
+                data.pop("virtual_battery_setpoint_key", "community.virtual_battery.setpoint_kw")
+            ),
+            virtual_battery_soc_min=_clamp(
+                _safe_float(data.pop("virtual_battery_soc_min", 0.1), 0.1),
+                0.0,
+                1.0,
+            ),
+            virtual_battery_soc_max=_clamp(
+                _safe_float(data.pop("virtual_battery_soc_max", 0.9), 0.9),
+                0.0,
+                1.0,
+            ),
         )
+        if cfg.virtual_battery_soc_max < cfg.virtual_battery_soc_min:
+            cfg.virtual_battery_soc_max = cfg.virtual_battery_soc_min
         if inactive_value is None:
             cfg.inactive_power_threshold_kw = max(cfg.min_connected_kw - 0.2, 0.0)
         return cfg
@@ -363,6 +395,15 @@ class IchargingBreakerRuntime:
             q = _clamp(q, min_levels.get(cid, 0.0), max_levels.get(cid, states[cid].max_kw))
             quantized[cid] = float(q)
 
+        if cfg.virtual_battery_action_name:
+            quantized[cfg.virtual_battery_action_name] = self._virtual_battery_dispatch(
+                cfg,
+                payload,
+                quantized,
+                states,
+                effective_board_limit,
+            )
+
         # Runtime summary for debugging
         try:
             log = get_logger()
@@ -450,6 +491,51 @@ class IchargingBreakerRuntime:
             get_logger().exception("rbc.action_logging_failed")
 
         return quantized
+
+    def _virtual_battery_dispatch(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+        charger_actions: Dict[str, float],
+        states: Dict[str, ChargerState],
+        effective_board_limit: float,
+    ) -> float:
+        nominal_power_kw = max(cfg.virtual_battery_nominal_power_kw, 0.0)
+        if nominal_power_kw <= 1e-6:
+            return 0.0
+
+        setpoint_kw = _maybe_float(payload.get(cfg.virtual_battery_setpoint_key))
+        if setpoint_kw is None:
+            return 0.0
+
+        dispatch_kw = _clamp(setpoint_kw, -nominal_power_kw, nominal_power_kw)
+        soc = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
+        if soc is not None:
+            soc = _clamp(soc, 0.0, 1.0)
+            if dispatch_kw < 0.0 and soc <= cfg.virtual_battery_soc_min + 1e-9:
+                dispatch_kw = 0.0
+            elif dispatch_kw > 0.0 and soc >= cfg.virtual_battery_soc_max - 1e-9:
+                dispatch_kw = 0.0
+
+        if dispatch_kw > 0.0:
+            board_total_kw = sum(
+                charger_actions.get(cid, 0.0)
+                for cid, state in states.items()
+                if state.connected
+            )
+            board_headroom_kw = max(effective_board_limit - board_total_kw, 0.0)
+            dispatch_kw = min(dispatch_kw, board_headroom_kw)
+
+        dispatch_kw = _round_down_one_decimal(dispatch_kw)
+        dispatch_kw = _clamp(dispatch_kw, -nominal_power_kw, nominal_power_kw)
+
+        if soc is not None:
+            if dispatch_kw < 0.0 and soc <= cfg.virtual_battery_soc_min + 1e-9:
+                dispatch_kw = 0.0
+            elif dispatch_kw > 0.0 and soc >= cfg.virtual_battery_soc_max - 1e-9:
+                dispatch_kw = 0.0
+
+        return float(dispatch_kw)
 
     def _populate_flexible_state(
         self,

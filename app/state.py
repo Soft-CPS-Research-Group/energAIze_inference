@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from app.services.pipeline import InferencePipeline
 from app.utils.manifest import load_manifest
@@ -14,12 +14,21 @@ from app.logging import get_logger
 class PipelineRecord:
     """Metadata describing the currently loaded pipeline."""
 
-    pipeline: InferencePipeline
+    pipelines: Dict[int, InferencePipeline]
     manifest_path: Path
     artifacts_dir: Path
     agent_index: int
+    loaded_agent_indices: List[int]
     alias_mapping_path: Path | None
     loaded_at: datetime = field(default_factory=datetime.utcnow)
+
+    @property
+    def pipeline(self) -> InferencePipeline:
+        return self.pipelines[self.agent_index]
+
+    @property
+    def default_agent_index(self) -> int:
+        return self.agent_index
 
 
 class PipelineStore:
@@ -32,10 +41,14 @@ class PipelineStore:
     def is_configured(self) -> bool:
         return self._record is not None
 
-    def get_pipeline(self) -> InferencePipeline:
+    def get_pipeline(self, agent_index: int | None = None) -> InferencePipeline:
         if not self._record:
             raise RuntimeError("Model pipeline not configured")
-        return self._record.pipeline
+        target = self._record.agent_index if agent_index is None else int(agent_index)
+        pipeline = self._record.pipelines.get(target)
+        if pipeline is None:
+            raise RuntimeError(f"Agent index {target} not configured")
+        return pipeline
 
     def get_record(self) -> Optional[PipelineRecord]:
         return self._record
@@ -44,31 +57,50 @@ class PipelineStore:
         self,
         manifest_path: Path,
         artifacts_dir: Optional[Path],
-        agent_index: int,
+        agent_index: int | None = None,
         alias_mapping_path: Optional[Path] = None,
     ) -> PipelineRecord:
         manifest_path = manifest_path.expanduser().resolve()
         root = artifacts_dir.expanduser().resolve() if artifacts_dir else manifest_path.parent
+        manifest = load_manifest(manifest_path)
+
+        loaded_agent_indices = sorted({int(artifact.agent_index) for artifact in manifest.agent.artifacts})
+        if not loaded_agent_indices:
+            raise ValueError("Manifest has no agent artifacts")
+
+        default_agent_index = (
+            int(agent_index) if agent_index is not None else loaded_agent_indices[0]
+        )
+        if default_agent_index not in loaded_agent_indices:
+            raise ValueError(
+                f"Default agent_index={default_agent_index} not found in manifest artifacts "
+                f"{loaded_agent_indices}"
+            )
 
         get_logger().info(
             "Loading pipeline",
             manifest_path=str(manifest_path),
             artifacts_dir=str(root),
-            agent_index=agent_index,
+            agent_index=default_agent_index,
+            loaded_agent_indices=loaded_agent_indices,
         )
-        alias_overrides = _load_alias_overrides(alias_mapping_path, agent_index)
-        manifest = load_manifest(manifest_path)
-        pipeline = InferencePipeline(
-            manifest=manifest,
-            artifacts_root=root,
-            agent_index=agent_index,
-            alias_overrides=alias_overrides,
-        )
+
+        pipelines: Dict[int, InferencePipeline] = {}
+        for current_agent_index in loaded_agent_indices:
+            alias_overrides = _load_alias_overrides(alias_mapping_path, current_agent_index)
+            pipelines[current_agent_index] = InferencePipeline(
+                manifest=manifest,
+                artifacts_root=root,
+                agent_index=current_agent_index,
+                alias_overrides=alias_overrides,
+            )
+
         self._record = PipelineRecord(
-            pipeline=pipeline,
+            pipelines=pipelines,
             manifest_path=manifest_path,
             artifacts_dir=root,
-            agent_index=agent_index,
+            agent_index=default_agent_index,
+            loaded_agent_indices=loaded_agent_indices,
             alias_mapping_path=alias_mapping_path,
         )
         return self._record
@@ -79,6 +111,7 @@ class PipelineStore:
                 "Unloading pipeline",
                 manifest_path=str(self._record.manifest_path),
                 agent_index=self._record.agent_index,
+                loaded_agent_indices=self._record.loaded_agent_indices,
             )
         self._record = None
 

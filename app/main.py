@@ -20,8 +20,6 @@ async def lifespan(app: FastAPI):
     """Manage startup and shutdown behaviour for the inference service."""
 
     if settings.manifest_path is not None:
-        if settings.agent_index is None:
-            raise RuntimeError("MODEL_AGENT_INDEX must be set when MODEL_MANIFEST_PATH is provided")
         store.load(
             settings.manifest_path,
             settings.artifacts_dir,
@@ -91,6 +89,8 @@ async def health_check():
         "status": "ok",
         "configured": record is not None,
         "agent_index": record.agent_index if record else None,
+        "default_agent_index": record.default_agent_index if record else None,
+        "loaded_agent_indices": record.loaded_agent_indices if record else [],
         "providers": providers,
         "manifest_path": manifest_path,
         "alias_mapping_path": alias_path,

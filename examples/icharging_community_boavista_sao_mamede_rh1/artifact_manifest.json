@@ -1,0 +1,278 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "icharging_community_boavista_sao_mamede_rh1",
+    "run_name": "icharging_community_boavista_sao_mamede_rh1_v1",
+    "bundle_version": "2026-02-22-v1",
+    "description": "Community scaffold bundle with Boavista (flex) + Sao Mamede + RH1"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 3
+  },
+  "algorithm": {
+    "name": "RuleBasedCommunity",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      ["timestamp"],
+      ["timestamp"],
+      ["timestamp"]
+    ],
+    "encoders": [
+      [{"type": "NoNormalization", "params": {}}],
+      [{"type": "NoNormalization", "params": {}}],
+      [{"type": "NoNormalization", "params": {}}]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+          ],
+          "high": [
+            4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6,
+            4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 10.0
+          ]
+        }
+      ],
+      [
+        {
+          "low": [0.0, -30.0],
+          "high": [50.0, 30.0]
+        }
+      ],
+      [
+        {
+          "low": [0.0, -3.32, 0.0, 0.0],
+          "high": [22.0, 3.32, 4.109619617462158, 4.861171245574951]
+        }
+      ]
+    ],
+    "action_names": [
+      "AC000001_1",
+      "AC000002_1",
+      "AC000003_1",
+      "AC000004_1",
+      "AC000005_1",
+      "AC000006_1",
+      "AC000007_1",
+      "AC000008_1",
+      "AC000009_1",
+      "AC000010_1",
+      "AC000011_1",
+      "AC000012_1",
+      "AC000013_1",
+      "AC000014_1",
+      "ACEXT001_1",
+      "ACEXT002_1",
+      "ACEXT003_1",
+      "ACEXT004_1",
+      "BB000018_1"
+    ],
+    "action_names_by_agent": {
+      "0": [
+        "AC000001_1",
+        "AC000002_1",
+        "AC000003_1",
+        "AC000004_1",
+        "AC000005_1",
+        "AC000006_1",
+        "AC000007_1",
+        "AC000008_1",
+        "AC000009_1",
+        "AC000010_1",
+        "AC000011_1",
+        "AC000012_1",
+        "AC000013_1",
+        "AC000014_1",
+        "ACEXT001_1",
+        "ACEXT002_1",
+        "ACEXT003_1",
+        "ACEXT004_1",
+        "BB000018_1"
+      ],
+      "1": ["BB000SMI", "virtual_battery_kw"],
+      "2": ["ev_charge_kw", "battery_kw", "cooling_kw", "dhw_heater_kw"]
+    },
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "icharging_breaker",
+          "input_site_key": "boavista",
+          "max_board_kw": 55.0,
+          "charger_limit_kw": 4.6,
+          "control_interval_minutes": 0.0833,
+          "default_capacity_kwh": 75.0,
+          "default_departure_buffer_minutes": 60.0,
+          "flexible_urgency_threshold": 0.7,
+          "allow_departure_fallback": false,
+          "min_connected_kw": 1.6,
+          "per_phase_headroom_kw": 0.0,
+          "inactive_power_threshold_kw": 1.4,
+          "solar_generation_key": "solar_generation",
+          "vehicle_capacities": {
+            "2": 50.0,
+            "11823": 77.0
+          },
+          "chargers": {
+            "AC000001_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000003_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000004_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000005_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000006_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000007_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000008_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000009_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000010_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000011_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000012_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000013_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "AC000014_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT003_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "ACEXT004_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
+            "BB000018_1": {"phases": ["L1", "L2", "L3"], "min_kw": 8.0, "max_kw": 10.0, "allow_flex_when_ev": true}
+          },
+          "line_limits": {
+            "L1": {"limit_kw": 18.333},
+            "L2": {"limit_kw": 18.333},
+            "L3": {"limit_kw": 18.333}
+          },
+          "action_order": [
+            "AC000001_1",
+            "AC000002_1",
+            "AC000003_1",
+            "AC000004_1",
+            "AC000005_1",
+            "AC000006_1",
+            "AC000007_1",
+            "AC000008_1",
+            "AC000009_1",
+            "AC000010_1",
+            "AC000011_1",
+            "AC000012_1",
+            "AC000013_1",
+            "AC000014_1",
+            "ACEXT001_1",
+            "ACEXT002_1",
+            "ACEXT003_1",
+            "ACEXT004_1",
+            "BB000018_1"
+          ],
+          "flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          },
+          "non_flex_active_power_kw": 0.05,
+          "drop_inactive_non_flex": true
+        }
+      },
+      {
+        "agent_index": 1,
+        "path": "policy_agent_1.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "icharging_breaker",
+          "input_site_key": "sao_mamede",
+          "max_board_kw": 400.0,
+          "charger_limit_kw": 50.0,
+          "control_interval_minutes": 15.0,
+          "default_capacity_kwh": 60.0,
+          "allow_departure_fallback": false,
+          "min_connected_kw": 0.0,
+          "per_phase_headroom_kw": 0.0,
+          "solar_generation_key": "solar_generation",
+          "site_available_headroom_key": "site.pt_available_kw",
+          "site_available_headroom_fallback_kw": 0.0,
+          "site_available_headroom_includes_pv": true,
+          "virtual_battery_action_name": "virtual_battery_kw",
+          "virtual_battery_nominal_power_kw": 30.0,
+          "virtual_battery_capacity_kwh": 100.0,
+          "virtual_battery_soc_initial": 0.5,
+          "virtual_battery_soc_key": "electrical_storage.soc",
+          "virtual_battery_setpoint_key": "virtual_battery.setpoint_kw",
+          "virtual_battery_soc_min": 0.1,
+          "virtual_battery_soc_max": 0.9,
+          "chargers": {
+            "BB000SMI": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 50.0,
+              "allow_flex_when_ev": true
+            }
+          },
+          "line_limits": {
+            "L1": {
+              "limit_kw": 400.0,
+              "chargers": ["BB000SMI"]
+            }
+          },
+          "action_order": ["BB000SMI"],
+          "flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          }
+        }
+      },
+      {
+        "agent_index": 2,
+        "path": "policy_agent_2.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "rh1_house_rbc_v1",
+          "input_site_key": "rh1",
+          "grid_import_limit_kw": 8.0,
+          "control_interval_minutes": 15,
+          "export_price_factor": 0.8,
+          "ev_min_connected_kw": 0.0,
+          "baseline_price_threshold_eur_kwh": 0.20,
+          "fallback_safe_power_fraction": 0.30,
+          "battery_capacity_kwh": 4.0,
+          "battery_nominal_power_kw": 3.32,
+          "battery_efficiency": 0.95,
+          "battery_soc_min": 0.20,
+          "battery_soc_max": 1.0,
+          "battery_degradation_penalty_eur_per_kwh": 0.01,
+          "ev_default_capacity_kwh": 60.0,
+          "cooling_nominal_power_kw": 4.109619617462158,
+          "dhw_nominal_power_kw": 4.861171245574951,
+          "chargers": {
+            "EVC01": {
+              "min_kw": 0.0,
+              "max_kw": 22.0
+            }
+          },
+          "vehicle_capacities": {
+            "EV1": 60.0
+          },
+          "ev_flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          }
+        }
+      }
+    ]
+  }
+}

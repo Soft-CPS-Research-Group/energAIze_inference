@@ -1,0 +1,82 @@
+[
+  {
+    "description": "Boavista dispatch request",
+    "agent_index": 0,
+    "features": {
+      "timestamp": "2026-02-22T09:00:00Z",
+      "sites": {
+        "boavista": {
+          "non_shiftable_load": 6.0,
+          "solar_generation": 2.0,
+          "energy_price": 0.10,
+          "charging_sessions": {
+            "AC000004_1": {"power": 2.0, "electric_vehicle": "11824"},
+            "AC000007_1": {"power": 2.0, "electric_vehicle": "11823"}
+          },
+          "electric_vehicles": {
+            "11824": {
+              "SoC": 0.25,
+              "flexibility": {
+                "estimated_soc_at_departure": 0.80,
+                "estimated_time_at_departure": "2026-02-22T10:15:00Z"
+              }
+            },
+            "11823": {
+              "SoC": 0.60,
+              "flexibility": {
+                "estimated_soc_at_departure": -1,
+                "estimated_time_at_departure": ""
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "description": "Sao Mamede with virtual battery charge",
+    "agent_index": 1,
+    "features": {
+      "timestamp": "2026-02-22T09:15:00Z",
+      "sites": {
+        "sao_mamede": {
+          "site": {"pt_available_kw": 80.0},
+          "solar_generation": 18.0,
+          "charging_sessions": {
+            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_10"}
+          },
+          "electric_vehicles": {
+            "SM_EV_10": {
+              "SoC": 0.40,
+              "flexibility": {
+                "estimated_soc_at_departure": 0.90,
+                "estimated_time_at_departure": "2026-02-22T13:00:00Z"
+              }
+            }
+          },
+          "electrical_storage": {"soc": 0.50},
+          "virtual_battery": {"setpoint_kw": 25.0}
+        }
+      }
+    }
+  },
+  {
+    "description": "Sao Mamede with virtual battery discharge blocked by low SoC",
+    "agent_index": 1,
+    "features": {
+      "timestamp": "2026-02-22T10:00:00Z",
+      "sites": {
+        "sao_mamede": {
+          "site": {"pt_available_kw": 40.0},
+          "solar_generation": 10.0,
+          "charging_sessions": {
+            "BB000SMI": {"power": 0.0, "electric_vehicle": ""}
+          },
+          "electric_vehicles": {},
+          "electrical_storage": {"soc": 0.08},
+          "virtual_battery": {"setpoint_kw": -10.0}
+        }
+      }
+    }
+  }
+]

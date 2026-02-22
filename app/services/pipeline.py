@@ -171,15 +171,8 @@ class InferencePipeline:
         self._agent = self._build_agent()
 
     def _build_agent(self):
-        env = self.manifest.environment
-        action_names = env.action_names or []
-
-        artifact = next(
-            (art for art in self.manifest.agent.artifacts if art.agent_index == self.agent_index),
-            None,
-        )
-        if artifact is None:
-            raise ValueError(f"Agent index {self.agent_index} not found in manifest")
+        action_names = self.manifest.get_action_names(self.agent_index)
+        artifact = self.manifest.get_artifact(self.agent_index)
 
         get_logger().info(
             "Loading agent",
@@ -188,8 +181,8 @@ class InferencePipeline:
             providers=settings.onnx_execution_providers,
         )
 
-        encoder_specs = env.encoders[artifact.agent_index]
-        observation_names = env.observation_names[artifact.agent_index]
+        encoder_specs = self.manifest.get_encoder_specs(artifact.agent_index)
+        observation_names = self.manifest.get_observation_names(artifact.agent_index)
         encoders = [build_encoder(spec) for spec in encoder_specs]
         preprocessor = AgentPreprocessor(observation_names, encoders)
 
@@ -205,15 +198,7 @@ class InferencePipeline:
                 path_or_bytes=artifact_path.as_posix(),
                 providers=settings.onnx_execution_providers,
             )
-            bounds = None
-            if env.action_bounds:
-                try:
-                    bounds = env.action_bounds[artifact.agent_index][0]
-                except Exception:
-                    try:
-                        bounds = env.action_bounds[0][0]
-                    except Exception:
-                        bounds = None
+            bounds = self.manifest.get_action_bounds(artifact.agent_index)
             return OnnxAgentRuntime(
                 index=artifact.agent_index,
                 session=session,

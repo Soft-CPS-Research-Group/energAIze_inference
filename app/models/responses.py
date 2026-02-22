@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class InferenceResponse(BaseModel):
@@ -17,6 +17,8 @@ class InfoResponse(BaseModel):
     topology: Dict[str, Any]
     service_version: str
     agent_index: int
+    default_agent_index: int | None = None
+    loaded_agent_indices: List[int] = Field(default_factory=list)
     action_names: List[str] | None = None
     uptime_seconds: float
     loaded_at: str | None = None

@@ -1,0 +1,54 @@
+{
+  "agent_index": 1,
+  "features": {
+    "timestamp": "2026-02-22T12:00:00Z",
+    "sites": {
+      "boavista": {
+        "non_shiftable_load": 8.0,
+        "solar_generation": 3.0,
+        "energy_price": 0.12,
+        "charging_sessions": {
+          "AC000004_1": {"power": 2.0, "electric_vehicle": "11824"},
+          "AC000007_1": {"power": 2.0, "electric_vehicle": "11823"}
+        },
+        "electric_vehicles": {
+          "11824": {
+            "SoC": 0.30,
+            "flexibility": {
+              "estimated_soc_at_departure": 0.80,
+              "estimated_time_at_departure": "2026-02-22T14:30:00Z"
+            }
+          },
+          "11823": {
+            "SoC": 0.50,
+            "flexibility": {
+              "estimated_soc_at_departure": -1,
+              "estimated_time_at_departure": ""
+            }
+          }
+        }
+      },
+      "sao_mamede": {
+        "site": {"pt_available_kw": 60.0},
+        "solar_generation": 12.0,
+        "charging_sessions": {
+          "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"}
+        },
+        "electric_vehicles": {
+          "SM_EV_01": {
+            "SoC": 0.35,
+            "flexibility": {
+              "estimated_soc_at_departure": 0.80,
+              "estimated_time_at_departure": "2026-02-22T15:00:00Z"
+            }
+          }
+        },
+        "electrical_storage": {"soc": 0.55},
+        "virtual_battery": {"setpoint_kw": 20.0}
+      }
+    },
+    "community": {
+      "note": "Scaffold payload for community mode"
+    }
+  }
+}
