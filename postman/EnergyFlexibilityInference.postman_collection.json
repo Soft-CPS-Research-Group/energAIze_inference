@@ -5,575 +5,1389 @@
   },
   "item": [
     {
-      "name": "01 - Health Check",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/health",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "health"
-          ]
-        }
-      },
-      "event": [
+      "name": "00 - Service",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Health responds 200', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "pm.test('Health payload includes configured flag', function () {",
-              "  const body = pm.response.json();",
-              "  pm.expect(body).to.have.property('configured');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "02 - Admin Load (RBC)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"manifest_path\": \"{{rbcManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/admin/load",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "load"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('RBC pipeline loaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('loaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "03 - Info (RBC)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/info",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "info"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('RBC info available', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body).to.have.property('algorithm');",
-              "  pm.expect(body.action_names).to.include('hvac');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "04 - Inference (RBC: standby)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"mode\": \"standby\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Standby outputs hvac 0', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.actions['0'].hvac).to.eql(0);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "05 - Inference (RBC: cooling)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"mode\": \"cooling\"\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Cooling outputs hvac 0.5', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.actions['0'].hvac).to.eql(0.5);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "06 - Admin Unload (RBC)",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/admin/unload",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "unload"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('RBC pipeline unloaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('unloaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "07 - Admin Load (iCharging breaker)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"manifest_path\": \"{{ichargingManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingAliasPath}}\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/admin/load",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "load"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('iCharging breaker pipeline loaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('loaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "08 - Inference (iCharging baseline)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
           },
-          {
-            "key": "x-request-id",
-            "value": "{{requestIdExample}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:36:14Z\",\n    \"non_shiftable_load\": 12,\n    \"energy_price\": 0,\n    \"solar_generation\": 2.8,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 4.078, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 4.274, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.724, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.807, \"electric_vehicle\": 11825},\n      \"AC000008_1\": {\"power\": 2.819, \"electric_vehicle\": 11822},\n      \"AC000009_1\": {\"power\": 2.788, \"electric_vehicle\": 11832},\n      \"AC000014_1\": {\"power\": 3.035, \"electric_vehicle\": 11838},\n      \"ACEXT004_1\": {\"power\": 2.979, \"electric_vehicle\": 11821}\n    },\n    \"electric_vehicles\": {\n      \"11824\": {\n        \"SoC\": 0.5,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.95,\n          \"estimated_time_at_departure\": \"2025-11-04T10:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T11:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11833\": {\n        \"SoC\": 0.55,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.7,\n          \"estimated_time_at_departure\": \"2025-11-04T13:00:00Z\"\n        }\n      },\n      \"11825\": {\n        \"SoC\": 0.7,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T12:30:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 2.8}\n    }\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health responds 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Health payload includes configured flag', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('configured');",
+                  "  pm.expect(body).to.have.property('default_agent_index');",
+                  "  pm.expect(body).to.have.property('loaded_agent_indices');",
+                  "});"
+                ]
+              }
+            }
           ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('iCharging baseline inference responds', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "pm.test('iCharging baseline includes expected charger keys', function () {",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
-              "  pm.expect(body.actions['0']).to.have.property('AC000007_1');",
-              "});"
-            ]
-          }
         }
       ]
     },
     {
-      "name": "09 - Inference (iCharging urgent EV)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:00:00Z\",\n    \"non_shiftable_load\": 5,\n    \"energy_price\": 0,\n    \"solar_generation\": 1.5,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 2\n      },\n      \"AC000007_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 11823\n      }\n    },\n    \"electric_vehicles\": {\n      \"2\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.9,\n          \"estimated_time_at_departure\": \"2025-11-04T09:15:00Z\"\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.6,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2025-11-04T11:00:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\n        \"energy\": 2.0\n      }\n    }\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
-          ]
-        }
-      },
-      "event": [
+      "name": "10 - Rule-Based Example",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('iCharging urgent inference responds', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "pm.test('Urgent EV receives maximum allocation', function () {",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.actions['0'].AC000004_1).to.eql(4.6);",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "10 - Admin Unload (iCharging)",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/admin/unload",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "unload"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('iCharging pipeline unloaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('unloaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "11 - Admin Load (breaker-only v0)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"manifest_path\": \"{{breakerOnlyManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{breakerOnlyAliasPath}}\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/admin/load",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "load"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('breaker-only pipeline loaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('loaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "12 - Inference (breaker-only limiter)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-07T08:00:00Z\",\n    \"non_shiftable_load\": 0,\n    \"solar_generation\": 0,\n    \"energy_price\": 0,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 2.4, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 2.6, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.8, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.1, \"electric_vehicle\": 11825}\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 0}\n    }\n  }\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('breaker-only inference responds', function () {",
-              "  pm.response.to.have.status(200);",
-              "});",
-              "pm.test('All active chargers respect min/max and board limit', function () {",
-              "  const body = pm.response.json();",
-              "  const actions = body.actions['0'];",
-              "  ['AC000004_1','AC000007_1','AC000005_1','AC000006_1'].forEach(function (cid) {",
-              "    pm.expect(actions[cid]).to.be.above(1.59);",
-              "    pm.expect(actions[cid]).to.be.below(4.61);",
-              "  });",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "13 - Admin Unload (breaker-only)",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/admin/unload",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "unload"
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('breaker-only pipeline unloaded', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const body = pm.response.json();",
-              "  pm.expect(body.status).to.eql('unloaded');",
-              "});"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "14 - Admin Load (ONNX iCharging sample)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"manifest_path\": \"{{onnxManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{onnxAliasPath}}\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/admin/load",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "load"
-          ]
-        }
-      }
-    },
-    {
-      "name": "15 - Inference (ONNX iCharging sample)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{rbcManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
           },
-          {
-            "key": "x-request-id",
-            "value": "{{requestIdExample}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"features\": {\n    \"charging_sessions\": {\n      \"AC000001_1\": {\"power\": 1.0, \"electric_vehicle\": 1},\n      \"AC000002_1\": {\"power\": 2.0, \"electric_vehicle\": 2},\n      \"AC000003_1\": {\"power\": 3.0, \"electric_vehicle\": 3},\n      \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000005_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000006_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000007_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000008_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000009_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000010_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000011_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000012_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000013_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000014_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT001_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT002_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT003_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"BB000018_1\": {\"power\": 0, \"electric_vehicle\": \"\"}\n    }\n  }\n}"
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RBC pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
         },
-        "url": {
-          "raw": "{{baseUrl}}/inference",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "inference"
+        {
+          "name": "Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "info"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RBC info available', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('algorithm');",
+                  "  pm.expect(body.action_names).to.include('hvac');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: standby",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"mode\": \"standby\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Standby outputs hvac 0', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0'].hvac).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: cooling",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"mode\": \"cooling\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cooling outputs hvac 0.5', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0'].hvac).to.eql(0.5);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RBC pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
           ]
         }
-      }
+      ]
     },
     {
-      "name": "16 - Admin Unload (ONNX)",
-      "request": {
-        "method": "POST",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/admin/unload",
-          "host": [
-            "{{baseUrl}}"
-          ],
-          "path": [
-            "admin",
-            "unload"
+      "name": "20 - iCharging Boavista (with flex)",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{ichargingBoavistaWithFlexManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingBoavistaWithFlexAliasPath}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('iCharging Boavista with flex pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: baseline",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-request-id",
+                "value": "{{requestIdExample}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:36:14Z\",\n    \"non_shiftable_load\": 12,\n    \"energy_price\": 0,\n    \"solar_generation\": 2.8,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 4.078, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 4.274, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.724, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.807, \"electric_vehicle\": 11825},\n      \"AC000008_1\": {\"power\": 2.819, \"electric_vehicle\": 11822},\n      \"AC000009_1\": {\"power\": 2.788, \"electric_vehicle\": 11832},\n      \"AC000014_1\": {\"power\": 3.035, \"electric_vehicle\": 11838},\n      \"ACEXT004_1\": {\"power\": 2.979, \"electric_vehicle\": 11821}\n    },\n    \"electric_vehicles\": {\n      \"11824\": {\n        \"SoC\": 0.5,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.95,\n          \"estimated_time_at_departure\": \"2025-11-04T10:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T11:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11833\": {\n        \"SoC\": 0.55,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.7,\n          \"estimated_time_at_departure\": \"2025-11-04T13:00:00Z\"\n        }\n      },\n      \"11825\": {\n        \"SoC\": 0.7,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T12:30:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 2.8}\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('iCharging baseline inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('iCharging baseline includes expected charger keys', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000007_1');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: urgent EV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:00:00Z\",\n    \"non_shiftable_load\": 5,\n    \"energy_price\": 0,\n    \"solar_generation\": 1.5,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 2\n      },\n      \"AC000007_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 11823\n      }\n    },\n    \"electric_vehicles\": {\n      \"2\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.9,\n          \"estimated_time_at_departure\": \"2025-11-04T09:15:00Z\"\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.6,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2025-11-04T11:00:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\n        \"energy\": 2.0\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('iCharging urgent inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Urgent EV receives maximum allocation', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0'].AC000004_1).to.eql(4.6);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('iCharging pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
           ]
         }
-      }
+      ]
+    },
+    {
+      "name": "21 - iCharging Boavista (without flex)",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{ichargingBoavistaWithoutFlexManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingBoavistaWithoutFlexAliasPath}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('breaker-only pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: limiter",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-07T08:00:00Z\",\n    \"non_shiftable_load\": 0,\n    \"solar_generation\": 0,\n    \"energy_price\": 0,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 2.4, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 2.6, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.8, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.1, \"electric_vehicle\": 11825}\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 0}\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('breaker-only inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('All active chargers respect min/max and board limit', function () {",
+                  "  const body = pm.response.json();",
+                  "  const actions = body.actions['0'];",
+                  "  ['AC000004_1','AC000007_1','AC000005_1','AC000006_1'].forEach(function (cid) {",
+                  "    pm.expect(actions[cid]).to.be.above(1.59);",
+                  "    pm.expect(actions[cid]).to.be.below(4.61);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('breaker-only pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "22 - iCharging Sao Mamede",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{ichargingSaoMamedeManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingSaoMamedeAliasPath}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: EV + PT headroom",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"site\": {\n      \"pt_available_kw\": 47.5\n    },\n    \"solar_generation\": 17.1,\n    \"charging_sessions\": {\n      \"BB000SMI\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"SM_EV_01\"\n      },\n      \"M1123089-5\": {\n        \"power\": 6.2,\n        \"electric_vehicle\": \"\"\n      },\n      \"M1123089-6\": {\n        \"power\": 3.4,\n        \"electric_vehicle\": \"\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"SM_EV_01\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T13:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Sao Mamede response includes BB000SMI action', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI');",
+                  "  pm.expect(body.actions['0'].BB000SMI).to.be.within(0, 50);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: missing PT headroom fail-safe",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"solar_generation\": 17.1,\n    \"charging_sessions\": {\n      \"BB000SMI\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"SM_EV_02\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"SM_EV_02\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T13:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede fail-safe with missing PT headroom returns 0 kW', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0'].BB000SMI).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "30 - RH1 House",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{rh1ManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{rh1AliasPath}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RH1 pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: house dispatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"non_shiftable_load\": 2.2,\n    \"solar_generation\": 1.8,\n    \"electricity_pricing\": {\n      \"current\": 0.14,\n      \"h1\": 0.17,\n      \"h2\": 0.22,\n      \"h6\": 0.26,\n      \"h12\": 0.23,\n      \"h24\": 0.18\n    },\n    \"grid\": {\n      \"import_limit_kw\": 8.0,\n      \"export_limit_kw\": 5.0\n    },\n    \"electrical_storage\": {\n      \"soc\": 0.45\n    },\n    \"cooling\": {\n      \"temperature\": {\n        \"current_c\": 24.5,\n        \"min_c\": 21.0,\n        \"max_c\": 25.0\n      }\n    },\n    \"dhw\": {\n      \"temperature\": {\n        \"current_c\": 49.0,\n        \"min_c\": 47.0,\n        \"max_c\": 56.0\n      }\n    },\n    \"charging_sessions\": {\n      \"EVC01\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"EV1\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"EV1\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T14:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RH1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('RH1 response includes expected action contract', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  ['ev_charge_kw', 'battery_kw', 'cooling_kw', 'dhw_heater_kw'].forEach(function (key) {",
+                  "    pm.expect(body.actions['0']).to.have.property(key);",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RH1 pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "40 - ONNX Sample",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{onnxManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{onnxAliasPath}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ONNX pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-request-id",
+                "value": "{{requestIdExample}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"charging_sessions\": {\n      \"AC000001_1\": {\"power\": 1.0, \"electric_vehicle\": 1},\n      \"AC000002_1\": {\"power\": 2.0, \"electric_vehicle\": 2},\n      \"AC000003_1\": {\"power\": 3.0, \"electric_vehicle\": 3},\n      \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000005_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000006_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000007_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000008_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000009_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000010_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000011_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000012_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000013_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000014_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT001_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT002_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT003_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"BB000018_1\": {\"power\": 0, \"electric_vehicle\": \"\"}\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ONNX inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('ONNX inference returns actions for agent 0', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('ONNX pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "50 - Community Boavista + Sao Mamede",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community 2-site pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 0 (Boavista)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": {{communityAgentBoavista}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community agent 0 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 1 (Sao Mamede + virtual battery)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": {{communityAgentSaoMamede}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community agent 1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI');",
+                  "  pm.expect(body.actions['1']).to.have.property('virtual_battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: default agent (without agent_index)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community default agent inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  const idx = String(pm.variables.get('communityDefaultAgentIndex'));",
+                  "  pm.expect(body.actions).to.have.property(idx);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "info"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community info exposes multi-agent metadata', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('default_agent_index');",
+                  "  pm.expect(body).to.have.property('loaded_agent_indices');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community health exposes multi-agent metadata', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('default_agent_index');",
+                  "  pm.expect(body).to.have.property('loaded_agent_indices');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "51 - Community Boavista + Sao Mamede + RH1",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeRh1ManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community 3-site pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(1);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 2 (RH1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": {{communityAgentRh1}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community RH1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('2');",
+                  "  pm.expect(body.actions['2']).to.have.property('ev_charge_kw');",
+                  "  pm.expect(body.actions['2']).to.have.property('battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 1 (Sao Mamede + virtual battery)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": {{communityAgentSaoMamede}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community Sao Mamede inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('1');",
+                  "  pm.expect(body.actions['1']).to.have.property('virtual_battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 0 (Boavista)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": {{communityAgentBoavista}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community Boavista inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          }
+        }
+      ]
     }
   ],
   "variable": [
@@ -586,8 +1400,76 @@
       "value": "0"
     },
     {
+      "key": "communityDefaultAgentIndex",
+      "value": "0"
+    },
+    {
+      "key": "communityAgentBoavista",
+      "value": "0"
+    },
+    {
+      "key": "communityAgentSaoMamede",
+      "value": "1"
+    },
+    {
+      "key": "communityAgentRh1",
+      "value": "2"
+    },
+    {
       "key": "rbcManifestPath",
       "value": "/data/rule_based/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingBoavistaWithFlexManifestPath",
+      "value": "/data/icharging_boavista_with_flex/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingBoavistaWithFlexAliasPath",
+      "value": "/data/icharging_boavista_with_flex/aliases.json"
+    },
+    {
+      "key": "ichargingBoavistaWithoutFlexManifestPath",
+      "value": "/data/icharging_boavista_without_flex/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingBoavistaWithoutFlexAliasPath",
+      "value": "/data/icharging_boavista_without_flex/aliases.json"
+    },
+    {
+      "key": "ichargingSaoMamedeManifestPath",
+      "value": "/data/icharging_sao_mamede/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingSaoMamedeAliasPath",
+      "value": "/data/icharging_sao_mamede/aliases.json"
+    },
+    {
+      "key": "rh1ManifestPath",
+      "value": "/data/rh1_bundle/artifact_manifest.json"
+    },
+    {
+      "key": "rh1AliasPath",
+      "value": "/data/rh1_bundle/aliases.json"
+    },
+    {
+      "key": "onnxManifestPath",
+      "value": "/data/ichargingusecase_onnx/artifact_manifest.json"
+    },
+    {
+      "key": "onnxAliasPath",
+      "value": "/data/ichargingusecase_onnx/aliases.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede/artifact_manifest.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeRh1ManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede_rh1/artifact_manifest.json"
+    },
+    {
+      "key": "requestIdExample",
+      "value": "test-request-123"
     },
     {
       "key": "ichargingManifestPath",
@@ -604,18 +1486,6 @@
     {
       "key": "breakerOnlyAliasPath",
       "value": "/data/icharging_boavista_without_flex/aliases.json"
-    },
-    {
-      "key": "onnxManifestPath",
-      "value": "/data/ichargingusecase_onnx/artifact_manifest.json"
-    },
-    {
-      "key": "onnxAliasPath",
-      "value": "/data/ichargingusecase_onnx/aliases.json"
-    },
-    {
-      "key": "requestIdExample",
-      "value": "test-request-123"
     }
   ]
 }
