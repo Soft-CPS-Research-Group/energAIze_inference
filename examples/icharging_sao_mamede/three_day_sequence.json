@@ -1,0 +1,93 @@
+[
+  {
+    "description": "High PT headroom with connected EV should saturate BB at 50 kW",
+    "timestamp": "2026-02-22T08:00:00Z",
+    "site": {"pt_available_kw": 120.0},
+    "solar_generation": 12.0,
+    "charging_sessions": {
+      "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
+      "M1123089-5": {"power": 7.4, "electric_vehicle": ""},
+      "M1123089-6": {"power": 5.1, "electric_vehicle": ""}
+    },
+    "electric_vehicles": {
+      "SM_EV_01": {
+        "SoC": 0.40,
+        "flexibility": {
+          "estimated_soc_at_departure": -1,
+          "estimated_time_at_departure": ""
+        }
+      }
+    }
+  },
+  {
+    "description": "Low PT headroom should cap BB power",
+    "timestamp": "2026-02-22T09:00:00Z",
+    "site": {"pt_available_kw": 18.0},
+    "solar_generation": 16.0,
+    "charging_sessions": {
+      "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
+      "M1123089-5": {"power": 2.0, "electric_vehicle": ""},
+      "M1123089-6": {"power": 1.0, "electric_vehicle": ""}
+    },
+    "electric_vehicles": {
+      "SM_EV_01": {
+        "SoC": 0.41,
+        "flexibility": {
+          "estimated_soc_at_departure": -1,
+          "estimated_time_at_departure": ""
+        }
+      }
+    }
+  },
+  {
+    "description": "Missing PT headroom triggers fail-safe fallback to 0",
+    "timestamp": "2026-02-22T10:00:00Z",
+    "solar_generation": 15.0,
+    "charging_sessions": {
+      "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
+      "M1123089-5": {"power": 3.0, "electric_vehicle": ""},
+      "M1123089-6": {"power": 2.0, "electric_vehicle": ""}
+    },
+    "electric_vehicles": {
+      "SM_EV_01": {
+        "SoC": 0.42,
+        "flexibility": {
+          "estimated_soc_at_departure": -1,
+          "estimated_time_at_departure": ""
+        }
+      }
+    }
+  },
+  {
+    "description": "Valid flexibility and sufficient headroom",
+    "timestamp": "2026-02-22T11:30:00Z",
+    "site": {"pt_available_kw": 35.0},
+    "solar_generation": 17.5,
+    "charging_sessions": {
+      "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_02"},
+      "M1123089-5": {"power": 0.0, "electric_vehicle": ""},
+      "M1123089-6": {"power": 0.0, "electric_vehicle": ""}
+    },
+    "electric_vehicles": {
+      "SM_EV_02": {
+        "SoC": 0.25,
+        "flexibility": {
+          "estimated_soc_at_departure": 0.80,
+          "estimated_time_at_departure": "2026-02-22T14:30:00Z"
+        }
+      }
+    }
+  },
+  {
+    "description": "No EV connected should produce zero action",
+    "timestamp": "2026-02-23T07:00:00Z",
+    "site": {"pt_available_kw": 70.0},
+    "solar_generation": 0.0,
+    "charging_sessions": {
+      "BB000SMI": {"power": 0.0, "electric_vehicle": ""},
+      "M1123089-5": {"power": 4.0, "electric_vehicle": ""},
+      "M1123089-6": {"power": 6.0, "electric_vehicle": ""}
+    },
+    "electric_vehicles": {}
+  }
+]

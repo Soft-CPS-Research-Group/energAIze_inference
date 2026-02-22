@@ -1,0 +1,4 @@
+{
+  "meters.PT.available_kw": "site.pt_available_kw",
+  "pv_panels.PV01.energy": "solar_generation"
+}

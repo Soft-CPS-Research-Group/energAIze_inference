@@ -143,6 +143,9 @@ class IchargingRuntimeConfig:
     allow_departure_fallback: bool = False
     flexibility_fields: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_FLEX_FIELDS))
     inactive_power_threshold_kw: float = 0.5
+    site_available_headroom_key: Optional[str] = None
+    site_available_headroom_fallback_kw: float = 0.0
+    site_available_headroom_includes_pv: bool = True
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "IchargingRuntimeConfig":
@@ -158,6 +161,7 @@ class IchargingRuntimeConfig:
         )
         flexibility_fields = data.pop("flexibility_fields", None)
         inactive_value = data.pop("inactive_power_threshold_kw", None)
+        site_available_headroom_key = data.pop("site_available_headroom_key", None)
         cfg = cls(
             max_board_kw=_safe_float(data.pop("max_board_kw", 0.0)),
             charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 0.0)),
@@ -179,6 +183,16 @@ class IchargingRuntimeConfig:
             inactive_power_threshold_kw=_safe_float(inactive_value, 0.0)
             if inactive_value is not None
             else 0.0,
+            site_available_headroom_key=str(site_available_headroom_key).strip()
+            if site_available_headroom_key is not None and str(site_available_headroom_key).strip()
+            else None,
+            site_available_headroom_fallback_kw=max(
+                _safe_float(data.pop("site_available_headroom_fallback_kw", 0.0), 0.0),
+                0.0,
+            ),
+            site_available_headroom_includes_pv=bool(
+                data.pop("site_available_headroom_includes_pv", True)
+            ),
         )
         if inactive_value is None:
             cfg.inactive_power_threshold_kw = max(cfg.min_connected_kw - 0.2, 0.0)
@@ -216,7 +230,23 @@ class IchargingBreakerRuntime:
         control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         min_minutes = control_minutes
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
-        effective_board_limit = cfg.max_board_kw + solar_kw
+        if cfg.site_available_headroom_key:
+            headroom_raw = _maybe_float(payload.get(cfg.site_available_headroom_key))
+            if headroom_raw is None or headroom_raw < 0.0:
+                effective_board_limit = max(cfg.site_available_headroom_fallback_kw, 0.0)
+                get_logger().warning(
+                    "rbc.site_headroom_fallback",
+                    strategy="icharging_breaker",
+                    key=cfg.site_available_headroom_key,
+                    fallback_kw=effective_board_limit,
+                )
+            else:
+                effective_board_limit = headroom_raw
+            if not cfg.site_available_headroom_includes_pv:
+                effective_board_limit += solar_kw
+        else:
+            effective_board_limit = cfg.max_board_kw + solar_kw
+        effective_board_limit = max(effective_board_limit, 0.0)
         per_phase_limit = (
             effective_board_limit / max(len(cfg.line_limits), 1)
             if cfg.line_limits

@@ -1,0 +1,98 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "icharging_sao_mamede",
+    "run_name": "icharging_sao_mamede_v1",
+    "alias_mapping_path": "aliases.json",
+    "bundle_version": "2026-02-22-v1"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "RuleBasedBreaker",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "timestamp",
+        "site.pt_available_kw",
+        "solar_generation",
+        "charging_sessions.BB000SMI.power",
+        "charging_sessions.M1123089-5.power",
+        "charging_sessions.M1123089-6.power"
+      ]
+    ],
+    "encoders": [
+      [
+        {"type": "NoNormalization", "params": {}},
+        {"type": "NoNormalization", "params": {}},
+        {"type": "NoNormalization", "params": {}},
+        {"type": "NoNormalization", "params": {}},
+        {"type": "NoNormalization", "params": {}},
+        {"type": "NoNormalization", "params": {}}
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [0.0],
+          "high": [50.0]
+        }
+      ]
+    ],
+    "action_names": ["BB000SMI"],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "icharging_breaker",
+          "max_board_kw": 400.0,
+          "charger_limit_kw": 50.0,
+          "control_interval_minutes": 15.0,
+          "default_capacity_kwh": 60.0,
+          "allow_departure_fallback": false,
+          "min_connected_kw": 0.0,
+          "per_phase_headroom_kw": 0.0,
+          "solar_generation_key": "solar_generation",
+          "site_available_headroom_key": "site.pt_available_kw",
+          "site_available_headroom_fallback_kw": 0.0,
+          "site_available_headroom_includes_pv": true,
+          "chargers": {
+            "BB000SMI": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 50.0,
+              "allow_flex_when_ev": true
+            }
+          },
+          "line_limits": {
+            "L1": {
+              "limit_kw": 400.0,
+              "chargers": ["BB000SMI"]
+            }
+          },
+          "action_order": ["BB000SMI"],
+          "flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          }
+        }
+      }
+    ]
+  }
+}
