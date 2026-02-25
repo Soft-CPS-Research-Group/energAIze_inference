@@ -6,7 +6,7 @@ Serve inference decisions for any algorithm (rule-based policies, ONNX models, o
 ## Design Decisions
 - Bundle-driven configuration: a manifest plus artifacts define features, encoders, actions, and runtime behavior.
 - Stateless requests: each `/inference` call is self-contained.
-- Single pipeline: one execution path for both rule-based and model-backed inference.
+- Single deployment runtime: one execution path for both rule-based and model-backed inference, one agent decision per request.
 - Flat feature keys: nested input is flattened into dot notation for consistent access.
 - Observability-first: request IDs, structured logs, and optional file sink.
 - Safe outputs: actions are clamped and rounded as configured by the bundle.
@@ -76,25 +76,53 @@ Request
 Explanation: every inference call is normalized into flat feature keys, optionally remapped via aliases, transformed by encoders, executed by the selected runtime, then post-processed before returning action values per agent.
 
 ## API
-- `POST /inference` – payload `{"features": {...}}` → `{"actions": {"0": {...}}, "request_id": "..."}`
-- `GET /info` – manifest metadata for the loaded bundle.
-- `GET /health` – readiness and environment checks (includes GPU availability).
-- `POST /admin/load` – load a bundle by path.
-- `POST /admin/unload` – unload the current bundle.
+- `POST /admin/load` – load manifest and artifacts; can select default agent.
+- `POST /admin/unload` – unload current runtime state.
+- `POST /inference` – payload includes `features` and optional `agent_index`.
+- `GET /info` – metadata for loaded runtime and default agent context.
+- `GET /health` – service readiness and loaded-model diagnostics.
+
+Full request/response contracts and error semantics:
+
+- `docs/api_contract.md`
 
 ## Payload Contract
-- Wrap input in `{"features": {...}}`.
+- Wrap input in `{"features": {...}}` and optionally include `agent_index`.
 - Nested objects are flattened using dot notation: `a.b.c`.
 - Arrays use indices: `list[0]`, `list[1]`.
 - Aliases can map external field names to internal ones.
+- Two request modes are supported:
+  - Single-agent mode: `features` contains direct feature fields.
+  - Community mode: `features.sites.<input_site_key>` is selected for the target agent.
 
 Example:
 ```json
 {
+  "agent_index": 0,
   "features": {
     "timestamp": "2026-01-01T12:00:00Z",
     "sensor": {"temperature": 22.4},
     "meters": [{"power": 1.2}]
+  }
+}
+```
+
+Community example:
+```json
+{
+  "agent_index": 1,
+  "features": {
+    "timestamp": "2026-02-22T12:00:00Z",
+    "sites": {
+      "boavista": {
+        "non_shiftable_load": 7.0,
+        "solar_generation": 2.0
+      },
+      "sao_mamede": {
+        "site": {"pt_available_kw": 80.0},
+        "solar_generation": 12.0
+      }
+    }
   }
 }
 ```
@@ -111,16 +139,16 @@ uvicorn app.main:app --reload
 ```bash
 export BUNDLE_PATH="$PWD/examples"
 export MODEL_MANIFEST_PATH="/data/your_bundle/artifact_manifest.json"
-export MODEL_AGENT_INDEX=0
+export MODEL_AGENT_INDEX=0  # optional default agent
 export FEATURE_ALIAS_PATH="/data/your_bundle/aliases.json"  # optional
 
 docker compose up --build
 ```
 
 ## Environment Variables
-- `MODEL_MANIFEST_PATH` (required to auto-load on startup)
+- `MODEL_MANIFEST_PATH` (optional; if missing, load via `/admin/load`)
 - `MODEL_ARTIFACTS_DIR` (optional base path for artifacts)
-- `MODEL_AGENT_INDEX` (agent to serve)
+- `MODEL_AGENT_INDEX` (optional default agent index)
 - `FEATURE_ALIAS_PATH` (optional aliases file)
 - `LOG_LEVEL` (INFO/DEBUG)
 - `LOG_JSON` (true/false)
@@ -138,9 +166,21 @@ docker compose up --build
 
 ## Tests
 ```bash
-pytest tests/test_api_inference.py
+./.venv/bin/python -m pytest -q tests/test_api_inference.py
 ```
 The test suite covers pipeline loading, API inference behavior, and example bundle scenarios. Use `-k` to run a focused test.
+
+Bundle and multi-agent suite example:
+```bash
+./.venv/bin/python -m pytest -q \
+  tests/test_multi_agent_store_api.py \
+  tests/bundles/test_community_boavista_sao_mamede_bundle.py \
+  tests/bundles/test_community_boavista_sao_mamede_rh1_bundle.py \
+  tests/bundles/test_icharging_boavista_with_flex_bundle.py \
+  tests/bundles/test_icharging_boavista_without_flex_bundle.py \
+  tests/bundles/test_icharging_sao_mamede_bundle.py \
+  tests/bundles/test_rh1_bundle.py
+```
 
 ## Postman
 Collection: `postman/EnergyFlexibilityInference.postman_collection.json`.
