@@ -37,7 +37,7 @@ BOAVISTA_ACTIONS = {
     "BB000018_1",
 }
 SAO_MAMEDE_ACTIONS = {"BB000SMI", "virtual_battery_kw"}
-RH1_ACTIONS = {"ev_charge_kw", "battery_kw", "cooling_kw", "dhw_heater_kw"}
+RH1_ACTIONS = {"ev_charge_kw", "battery_kw"}
 
 
 @pytest.fixture

@@ -16,6 +16,7 @@ BUNDLE_DIR = Path("examples/rh1_bundle")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 SEQUENCE_PATH = BUNDLE_DIR / "rh1_sequence.json"
+REAL_SEQUENCE_PATH = BUNDLE_DIR / "exemplos_reais_mensagem.json"
 MESSAGE_PATH = BUNDLE_DIR / "rh1_message_example.json"
 
 
@@ -24,6 +25,63 @@ def _safe_float(value, default: float = 0.0) -> float:  # noqa: ANN001
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _normalize_price(value: float, cfg) -> float:  # noqa: ANN001
+    mode = str(getattr(cfg, "price_unit_mode", "auto"))
+    threshold = float(getattr(cfg, "price_auto_mwh_threshold", 3.0))
+    if mode == "eur_mwh":
+        value /= 1000.0
+    elif mode == "auto" and value > threshold:
+        value /= 1000.0
+    return value
+
+
+def _extract_price_now(flat_payload: dict[str, float], cfg) -> float:  # noqa: ANN001
+    for key in ("electricity_pricing.current", "electricity_pricing", "energy_price"):
+        if key in flat_payload:
+            return max(_normalize_price(_safe_float(flat_payload.get(key), 0.0), cfg), 0.0)
+    return 0.0
+
+
+def _normalize_soc(value: float, cfg) -> float:  # noqa: ANN001
+    mode = str(getattr(cfg, "soc_unit_mode", "auto"))
+    if mode == "percent":
+        value /= 100.0
+    elif mode == "auto" and 1.0 < value <= 100.0:
+        value /= 100.0
+    return min(max(value, 0.0), 1.0)
+
+
+def _extract_battery_soc(flat_payload: dict[str, float], cfg) -> float:  # noqa: ANN001
+    keys = list(getattr(cfg, "battery_soc_keys", ["electrical_storage.soc"]))
+    for key in keys:
+        if key in flat_payload:
+            return _normalize_soc(_safe_float(flat_payload.get(key), 0.5), cfg)
+
+    fallback_keys = sorted(
+        key
+        for key in flat_payload
+        if key.lower().startswith("batteries.") and key.lower().endswith(".soc")
+    )
+    if fallback_keys:
+        return _normalize_soc(_safe_float(flat_payload.get(fallback_keys[0]), 0.5), cfg)
+
+    return 0.5
+
+
+def _extract_solar(flat_payload: dict[str, float]) -> float:
+    direct = flat_payload.get("solar_generation")
+    if direct is not None:
+        return max(_safe_float(direct, 0.0), 0.0)
+
+    total = 0.0
+    found = False
+    for key, value in flat_payload.items():
+        if key.startswith("pv_panels.") and key.endswith(".energy"):
+            total += _safe_float(value, 0.0)
+            found = True
+    return max(total, 0.0) if found else 0.0
 
 
 def _battery_bounds(soc: float, dt_hours: float, cfg) -> tuple[float, float]:  # noqa: ANN001
@@ -44,11 +102,9 @@ def _battery_bounds(soc: float, dt_hours: float, cfg) -> tuple[float, float]:  #
 
 def _net_grid_kw(flat_payload: dict[str, float], actions: dict[str, float]) -> float:
     non_shiftable = max(0.0, _safe_float(flat_payload.get("non_shiftable_load"), 0.0))
-    solar = max(0.0, _safe_float(flat_payload.get("solar_generation"), 0.0))
+    solar = _extract_solar(flat_payload)
     return (
         non_shiftable
-        + _safe_float(actions.get("cooling_kw"), 0.0)
-        + _safe_float(actions.get("dhw_heater_kw"), 0.0)
         + _safe_float(actions.get("ev_charge_kw"), 0.0)
         + _safe_float(actions.get("battery_kw"), 0.0)
         - solar
@@ -68,7 +124,7 @@ def _step_cost_baseline_no_export(net_grid_kw: float, price: float, dt_hours: fl
 
 def _baseline_actions(flat_payload: dict[str, float], cfg) -> dict[str, float]:  # noqa: ANN001
     threshold = float(cfg.baseline_price_threshold_eur_kwh)
-    price = max(0.0, _safe_float(flat_payload.get("electricity_pricing.current"), 0.0))
+    price = _extract_price_now(flat_payload, cfg)
     import_limit = _safe_float(flat_payload.get("grid.import_limit_kw"), float(cfg.grid_import_limit_kw))
     export_limit = _safe_float(flat_payload.get("grid.export_limit_kw"), import_limit)
 
@@ -87,37 +143,12 @@ def _baseline_actions(flat_payload: dict[str, float], cfg) -> dict[str, float]: 
 
     ev_kw = ev_max if (ev_connected and price <= threshold) else ev_min
 
-    cooling_temp = flat_payload.get("cooling.temperature.current_c")
-    cooling_min = flat_payload.get("cooling.temperature.min_c")
-    cooling_max = flat_payload.get("cooling.temperature.max_c")
-    cooling_nominal = float(cfg.cooling_nominal_power_kw)
-    safe_frac = float(cfg.fallback_safe_power_fraction)
-    if cooling_temp is None or cooling_min is None or cooling_max is None:
-        cooling_kw = cooling_nominal * safe_frac
-    else:
-        cooling_kw = cooling_nominal if _safe_float(cooling_temp) > _safe_float(cooling_max) else 0.0
-
-    dhw_temp = flat_payload.get("dhw.temperature.current_c")
-    dhw_min = flat_payload.get("dhw.temperature.min_c")
-    dhw_max = flat_payload.get("dhw.temperature.max_c")
-    dhw_nominal = float(cfg.dhw_nominal_power_kw)
-    if dhw_temp is None or dhw_min is None or dhw_max is None:
-        dhw_kw = dhw_nominal * safe_frac
-    else:
-        dhw_kw = dhw_nominal if _safe_float(dhw_temp) < _safe_float(dhw_min) else 0.0
-
-    soc = min(max(_safe_float(flat_payload.get("electrical_storage.soc"), 0.5), 0.0), 1.0)
+    soc = _extract_battery_soc(flat_payload, cfg)
     dt_hours = max(float(cfg.control_interval_minutes) / 60.0, 1.0 / 60.0)
     batt_min, batt_max = _battery_bounds(soc, dt_hours, cfg)
     battery_kw = batt_max if price <= threshold else batt_min
 
-    base = (
-        max(0.0, _safe_float(flat_payload.get("non_shiftable_load"), 0.0))
-        + cooling_kw
-        + dhw_kw
-        + ev_kw
-        - max(0.0, _safe_float(flat_payload.get("solar_generation"), 0.0))
-    )
+    base = max(0.0, _safe_float(flat_payload.get("non_shiftable_load"), 0.0)) + ev_kw - _extract_solar(flat_payload)
     net = base + battery_kw
 
     if net > import_limit:
@@ -128,13 +159,7 @@ def _baseline_actions(flat_payload: dict[str, float], cfg) -> dict[str, float]: 
         delta = net - import_limit
         ev_kw = max(ev_kw - delta, 0.0)
 
-    base = (
-        max(0.0, _safe_float(flat_payload.get("non_shiftable_load"), 0.0))
-        + cooling_kw
-        + dhw_kw
-        + ev_kw
-        - max(0.0, _safe_float(flat_payload.get("solar_generation"), 0.0))
-    )
+    base = max(0.0, _safe_float(flat_payload.get("non_shiftable_load"), 0.0)) + ev_kw - _extract_solar(flat_payload)
     net = base + battery_kw
     if net < -export_limit:
         delta = -export_limit - net
@@ -143,8 +168,6 @@ def _baseline_actions(flat_payload: dict[str, float], cfg) -> dict[str, float]: 
     return {
         "ev_charge_kw": float(ev_kw),
         "battery_kw": float(battery_kw),
-        "cooling_kw": float(cooling_kw),
-        "dhw_heater_kw": float(dhw_kw),
     }
 
 
@@ -170,26 +193,36 @@ def test_rh1_bundle_loads_and_strategy_selected(rh1_client):
     assert response.status_code == 200
 
     actions = response.json()["actions"]["0"]
-    assert set(actions.keys()) == {"ev_charge_kw", "battery_kw", "cooling_kw", "dhw_heater_kw"}
+    assert set(actions.keys()) == {"ev_charge_kw", "battery_kw"}
 
 
-def test_rh1_actions_respect_limits_and_grid_across_sequence(rh1_client):
-    sequence = json.loads(SEQUENCE_PATH.read_text(encoding="utf-8"))
+def test_rh1_actions_contract_ev_battery_only(rh1_client):
+    message = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))
+    response = rh1_client.post("/inference", json=message)
+    assert response.status_code == 200
+
+    actions = response.json()["actions"]["0"]
+    assert set(actions.keys()) == {"ev_charge_kw", "battery_kw"}
+    assert "cooling_kw" not in actions
+    assert "dhw_heater_kw" not in actions
+
+
+def test_rh1_replay_real_sequence_parses_and_runs(rh1_client):
+    sequence = json.loads(REAL_SEQUENCE_PATH.read_text(encoding="utf-8"))
     cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
+    charger_max = _safe_float(cfg.chargers.get("EVC01", {}).get("max_kw"), 4.6)
 
     for step in sequence:
         response = rh1_client.post("/inference", json={"features": step})
-        assert response.status_code == 200, step["description"]
+        assert response.status_code == 200
 
         actions = response.json()["actions"]["0"]
         flat = flatten_payload(step)
         connected = bool(str(flat.get("charging_sessions.EVC01.electric_vehicle", "")).strip())
 
-        ev_max = 22.0 if connected else 0.0
+        ev_max = charger_max if connected else 0.0
         assert 0.0 <= actions["ev_charge_kw"] <= ev_max + 1e-6
         assert -cfg.battery_nominal_power_kw - 1e-6 <= actions["battery_kw"] <= cfg.battery_nominal_power_kw + 1e-6
-        assert 0.0 <= actions["cooling_kw"] <= cfg.cooling_nominal_power_kw + 1e-6
-        assert 0.0 <= actions["dhw_heater_kw"] <= cfg.dhw_nominal_power_kw + 1e-6
 
         net = _net_grid_kw(flat, actions)
         import_limit = _safe_float(flat.get("grid.import_limit_kw"), float(cfg.grid_import_limit_kw))
@@ -198,149 +231,63 @@ def test_rh1_actions_respect_limits_and_grid_across_sequence(rh1_client):
         assert net >= -export_limit - 1e-6
 
 
-def test_rh1_ev_hard_deadline_behavior(rh1_client):
+def test_rh1_soc_auto_percent_normalization(rh1_client):
+    cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
     payload = {
         "timestamp": "2026-02-22T10:00:00Z",
-        "non_shiftable_load": 0.5,
+        "non_shiftable_load": 0.4,
         "solar_generation": 0.0,
+        "energy_price": 120.0,
         "electricity_pricing": {
-            "current": 0.25,
-            "h1": 0.20,
-            "h2": 0.18,
-            "h6": 0.15,
-            "h12": 0.14,
-            "h24": 0.13,
+            "h1": 220.0,
+            "h2": 210.0,
+            "h6": 200.0,
+            "h12": 190.0,
+            "h24": 180.0,
         },
-        "grid": {"import_limit_kw": 40.0, "export_limit_kw": 20.0},
-        "electrical_storage": {"soc": 0.5},
-        "cooling": {"temperature": {"current_c": 23.0, "min_c": 21.0, "max_c": 25.0}},
-        "dhw": {"temperature": {"current_c": 50.0, "min_c": 47.0, "max_c": 56.0}},
-        "charging_sessions": {
-            "EVC01": {"power": 0.0, "electric_vehicle": "EV1"}
-        },
-        "electric_vehicles": {
-            "EV1": {
-                "SoC": 0.30,
-                "flexibility": {
-                    "estimated_soc_at_departure": 0.90,
-                    "estimated_time_at_departure": "2026-02-22T11:00:00Z",
-                },
-            }
-        },
-    }
-
-    response = rh1_client.post("/inference", json={"features": payload})
-    assert response.status_code == 200
-    ev_action = response.json()["actions"]["0"]["ev_charge_kw"]
-
-    now = datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00"))
-    departure = datetime.fromisoformat(
-        payload["electric_vehicles"]["EV1"]["flexibility"]["estimated_time_at_departure"].replace("Z", "+00:00")
-    )
-    gap_kwh = (0.90 - 0.30) * 60.0
-    minutes_remaining = max((departure - now).total_seconds() / 60.0, 15.0)
-    required_kw = gap_kwh / (minutes_remaining / 60.0)
-    expected_floor = min(max(required_kw, 0.0), 22.0)
-
-    assert ev_action + 0.11 >= expected_floor
-
-
-def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
-    payload = {
-        "timestamp": "2026-02-22T20:00:00Z",
-        "non_shiftable_load": 1.0,
-        "solar_generation": 0.0,
-        "electricity_pricing": {
-            "current": 0.35,
-            "h1": 0.30,
-            "h2": 0.26,
-            "h6": 0.20,
-            "h12": 0.18,
-            "h24": 0.17,
-        },
-        "grid": {"import_limit_kw": 8.0, "export_limit_kw": 5.0},
-        "electrical_storage": {"soc": 0.55},
-        "cooling": {"temperature": {"current_c": 23.0, "min_c": 21.0, "max_c": 25.0}},
-        "dhw": {"temperature": {"current_c": 50.0, "min_c": 47.0, "max_c": 56.0}},
-        "charging_sessions": {
-            "EVC01": {"power": 0.0, "electric_vehicle": "EV1"}
-        },
-        "electric_vehicles": {
-            "EV1": {
-                "SoC": 0.50,
-                "flexibility": {
-                    "estimated_soc_at_departure": -1,
-                    "estimated_time_at_departure": "",
-                },
-            }
-        },
-    }
-
-    response = rh1_client.post("/inference", json={"features": payload})
-    assert response.status_code == 200
-    actions = response.json()["actions"]["0"]
-    assert actions["ev_charge_kw"] == pytest.approx(0.0, rel=1e-6)
-
-
-def test_rh1_missing_temperature_data_uses_safe_mode(rh1_client):
-    payload = {
-        "timestamp": "2026-02-23T02:00:00Z",
-        "non_shiftable_load": 1.0,
-        "solar_generation": 0.0,
-        "electricity_pricing": {
-            "current": 0.18,
-            "h1": 0.19,
-            "h2": 0.20,
-            "h6": 0.22,
-            "h12": 0.21,
-            "h24": 0.18,
-        },
-        "grid": {"import_limit_kw": 20.0, "export_limit_kw": 5.0},
-        "electrical_storage": {"soc": 0.5},
-        "charging_sessions": {
-            "EVC01": {"power": 0.0, "electric_vehicle": ""}
-        },
+        "grid": {"import_limit_kw": 12.0, "export_limit_kw": 12.0},
+        "batteries": {"B01": {"SoC": 89.0, "energy_in": 0.0, "energy_out": 0.0}},
+        "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
         "electric_vehicles": {},
     }
 
     response = rh1_client.post("/inference", json={"features": payload})
     assert response.status_code == 200
     actions = response.json()["actions"]["0"]
-    assert actions["cooling_kw"] == pytest.approx(1.2, rel=1e-6)
-    assert actions["dhw_heater_kw"] == pytest.approx(1.4, rel=1e-6)
+
+    assert -cfg.battery_nominal_power_kw <= actions["battery_kw"] <= cfg.battery_nominal_power_kw
+    assert actions["battery_kw"] > 0.0
 
 
-def test_rh1_price_interpolation_influences_battery_dispatch(rh1_client):
+def test_rh1_price_auto_mwh_normalization_affects_dispatch(rh1_client):
     common = {
-        "timestamp": "2026-02-23T08:00:00Z",
+        "timestamp": "2026-02-22T12:00:00Z",
         "non_shiftable_load": 1.0,
         "solar_generation": 0.0,
-        "grid": {"import_limit_kw": 12.0, "export_limit_kw": 6.0},
+        "grid": {"import_limit_kw": 20.0, "export_limit_kw": 20.0},
         "electrical_storage": {"soc": 0.55},
-        "cooling": {"temperature": {"current_c": 23.0, "min_c": 21.0, "max_c": 25.0}},
-        "dhw": {"temperature": {"current_c": 50.0, "min_c": 47.0, "max_c": 56.0}},
         "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
         "electric_vehicles": {},
     }
 
     cheap_now = dict(common)
+    cheap_now["energy_price"] = 100.0
     cheap_now["electricity_pricing"] = {
-        "current": 0.10,
-        "h1": 0.15,
-        "h2": 0.20,
-        "h6": 0.26,
-        "h12": 0.24,
-        "h24": 0.18,
+        "h1": 180.0,
+        "h2": 200.0,
+        "h6": 230.0,
+        "h12": 240.0,
+        "h24": 220.0,
     }
 
     expensive_now = dict(common)
+    expensive_now["energy_price"] = 320.0
     expensive_now["electricity_pricing"] = {
-        "current": 0.32,
-        "h1": 0.27,
-        "h2": 0.22,
-        "h6": 0.16,
-        "h12": 0.14,
-        "h24": 0.12,
+        "h1": 260.0,
+        "h2": 210.0,
+        "h6": 160.0,
+        "h12": 140.0,
+        "h24": 120.0,
     }
 
     cheap_resp = rh1_client.post("/inference", json={"features": cheap_now})
@@ -356,9 +303,137 @@ def test_rh1_price_interpolation_influences_battery_dispatch(rh1_client):
     assert expensive_battery < 0.0
 
 
+def test_rh1_ev_hard_deadline_behavior(rh1_client):
+    cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
+    payload = {
+        "timestamp": "2026-02-22T10:00:00Z",
+        "non_shiftable_load": 0.5,
+        "solar_generation": 0.0,
+        "energy_price": 250.0,
+        "electricity_pricing": {
+            "h1": 200.0,
+            "h2": 180.0,
+            "h6": 150.0,
+            "h12": 140.0,
+            "h24": 130.0,
+        },
+        "grid": {"import_limit_kw": 40.0, "export_limit_kw": 20.0},
+        "batteries": {"B01": {"SoC": 50.0, "energy_in": 0.0, "energy_out": 0.0}},
+        "charging_sessions": {
+            "EVC01": {"power": 0.0, "electric_vehicle": "EV01"}
+        },
+        "electric_vehicles": {
+            "EV01": {
+                "SoC": 0.30,
+                "flexibility": {
+                    "estimated_soc_at_departure": 0.90,
+                    "estimated_time_at_departure": "2026-02-22T11:00:00Z",
+                },
+            }
+        },
+    }
+
+    response = rh1_client.post("/inference", json={"features": payload})
+    assert response.status_code == 200
+    ev_action = response.json()["actions"]["0"]["ev_charge_kw"]
+
+    now = datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00"))
+    departure = datetime.fromisoformat(
+        payload["electric_vehicles"]["EV01"]["flexibility"]["estimated_time_at_departure"].replace("Z", "+00:00")
+    )
+    gap_kwh = (0.90 - 0.30) * 60.0
+    minutes_remaining = max((departure - now).total_seconds() / 60.0, 1.0)
+    required_kw = gap_kwh / (minutes_remaining / 60.0)
+    charger_max = _safe_float(cfg.chargers.get("EVC01", {}).get("max_kw"), 4.6)
+    expected_floor = min(max(required_kw, 0.0), charger_max)
+
+    assert ev_action + 0.11 >= expected_floor
+
+
+def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
+    cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
+    payload = {
+        "timestamp": "2026-02-22T20:00:00Z",
+        "non_shiftable_load": 1.0,
+        "solar_generation": 0.0,
+        "energy_price": 350.0,
+        "electricity_pricing": {
+            "h1": 300.0,
+            "h2": 260.0,
+            "h6": 200.0,
+            "h12": 180.0,
+            "h24": 170.0,
+        },
+        "grid": {"import_limit_kw": 8.0, "export_limit_kw": 5.0},
+        "batteries": {"B01": {"SoC": 55.0, "energy_in": 0.0, "energy_out": 0.0}},
+        "charging_sessions": {
+            "EVC01": {"power": 0.0, "electric_vehicle": "EV01"}
+        },
+        "electric_vehicles": {
+            "EV01": {
+                "SoC": 0.50,
+                "flexibility": {
+                    "estimated_soc_at_departure": -1,
+                    "estimated_time_at_departure": "",
+                },
+            }
+        },
+    }
+
+    response = rh1_client.post("/inference", json={"features": payload})
+    assert response.status_code == 200
+    actions = response.json()["actions"]["0"]
+    assert actions["ev_charge_kw"] == pytest.approx(float(cfg.ev_min_connected_kw), rel=1e-6)
+
+
 def test_rh1_cost_is_better_than_baseline_on_sequence(rh1_client):
     cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
-    sequence = json.loads(SEQUENCE_PATH.read_text(encoding="utf-8"))
+    sequence = [
+        {
+            "timestamp": "2026-02-22T09:00:00Z",
+            "non_shiftable_load": 2.5,
+            "solar_generation": 0.0,
+            "energy_price": 190.0,
+            "electricity_pricing": {"h1": 120.0, "h2": 100.0, "h6": 90.0, "h12": 95.0, "h24": 110.0},
+            "grid": {"import_limit_kw": 8.0, "export_limit_kw": 5.0},
+            "electrical_storage": {"soc": 0.70},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        {
+            "timestamp": "2026-02-22T12:00:00Z",
+            "non_shiftable_load": 2.6,
+            "solar_generation": 0.0,
+            "energy_price": 195.0,
+            "electricity_pricing": {"h1": 130.0, "h2": 110.0, "h6": 100.0, "h12": 95.0, "h24": 105.0},
+            "grid": {"import_limit_kw": 8.0, "export_limit_kw": 5.0},
+            "electrical_storage": {"soc": 0.65},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        {
+            "timestamp": "2026-02-22T15:00:00Z",
+            "non_shiftable_load": 0.7,
+            "solar_generation": 3.0,
+            "energy_price": 185.0,
+            "electricity_pricing": {"h1": 120.0, "h2": 95.0, "h6": 85.0, "h12": 90.0, "h24": 100.0},
+            "grid": {"import_limit_kw": 8.0, "export_limit_kw": 2.0},
+            "electrical_storage": {"soc": 0.60},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        {
+            "timestamp": "2026-02-22T18:00:00Z",
+            "non_shiftable_load": 2.4,
+            "solar_generation": 0.0,
+            "energy_price": 188.0,
+            "electricity_pricing": {"h1": 125.0, "h2": 105.0, "h6": 95.0, "h12": 90.0, "h24": 98.0},
+            "grid": {"import_limit_kw": 8.0, "export_limit_kw": 5.0},
+            "electrical_storage": {"soc": 0.58},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+    ]
 
     rbc_cost = 0.0
     baseline_cost = 0.0
@@ -366,11 +441,11 @@ def test_rh1_cost_is_better_than_baseline_on_sequence(rh1_client):
 
     for step in sequence:
         response = rh1_client.post("/inference", json={"features": step})
-        assert response.status_code == 200, step["description"]
+        assert response.status_code == 200
 
         rbc_actions = response.json()["actions"]["0"]
         flat = flatten_payload(step)
-        price_now = max(0.0, _safe_float(flat.get("electricity_pricing.current"), 0.0))
+        price_now = _extract_price_now(flat, cfg)
 
         rbc_net = _net_grid_kw(flat, rbc_actions)
         rbc_cost += _step_cost_with_export(

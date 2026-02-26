@@ -17,38 +17,105 @@
   },
   "environment": {
     "observation_names": [
-      ["timestamp"],
-      ["timestamp"],
-      ["timestamp"]
+      [
+        "timestamp"
+      ],
+      [
+        "timestamp"
+      ],
+      [
+        "timestamp"
+      ]
     ],
     "encoders": [
-      [{"type": "NoNormalization", "params": {}}],
-      [{"type": "NoNormalization", "params": {}}],
-      [{"type": "NoNormalization", "params": {}}]
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ],
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ],
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
     ],
     "action_bounds": [
       [
         {
           "low": [
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
           ],
           "high": [
-            4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6,
-            4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 4.6, 10.0
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            10.0
           ]
         }
       ],
       [
         {
-          "low": [0.0, -30.0],
-          "high": [50.0, 30.0]
+          "low": [
+            0.0,
+            -30.0
+          ],
+          "high": [
+            50.0,
+            30.0
+          ]
         }
       ],
       [
         {
-          "low": [0.0, -3.32, 0.0, 0.0],
-          "high": [22.0, 3.32, 4.109619617462158, 4.861171245574951]
+          "low": [
+            0.0,
+            -4.8
+          ],
+          "high": [
+            4.6,
+            4.8
+          ]
         }
       ]
     ],
@@ -95,8 +162,14 @@
         "ACEXT004_1",
         "BB000018_1"
       ],
-      "1": ["BB000SMI", "virtual_battery_kw"],
-      "2": ["ev_charge_kw", "battery_kw", "cooling_kw", "dhw_heater_kw"]
+      "1": [
+        "BB000SMI",
+        "virtual_battery_kw"
+      ],
+      "2": [
+        "ev_charge_kw",
+        "battery_kw"
+      ]
     },
     "reward_function": {
       "name": "RewardFunction",
@@ -130,30 +203,135 @@
             "11823": 77.0
           },
           "chargers": {
-            "AC000001_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000003_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000004_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000005_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000006_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000007_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000008_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000009_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000010_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000011_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000012_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000013_1": {"line": "L3", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "AC000014_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "ACEXT001_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "ACEXT002_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "ACEXT003_1": {"line": "L1", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "ACEXT004_1": {"line": "L2", "min_kw": 0.0, "max_kw": 4.6, "allow_flex_when_ev": true},
-            "BB000018_1": {"phases": ["L1", "L2", "L3"], "min_kw": 8.0, "max_kw": 10.0, "allow_flex_when_ev": true}
+            "AC000001_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000003_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000004_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000005_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000006_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000007_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000008_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000009_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000010_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000011_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000012_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000013_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000014_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT001_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT003_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT004_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "BB000018_1": {
+              "phases": [
+                "L1",
+                "L2",
+                "L3"
+              ],
+              "min_kw": 8.0,
+              "max_kw": 10.0,
+              "allow_flex_when_ev": true
+            }
           },
           "line_limits": {
-            "L1": {"limit_kw": 18.333},
-            "L2": {"limit_kw": 18.333},
-            "L3": {"limit_kw": 18.333}
+            "L1": {
+              "limit_kw": 18.333
+            },
+            "L2": {
+              "limit_kw": 18.333
+            },
+            "L3": {
+              "limit_kw": 18.333
+            }
           },
           "action_order": [
             "AC000001_1",
@@ -223,10 +401,14 @@
           "line_limits": {
             "L1": {
               "limit_kw": 400.0,
-              "chargers": ["BB000SMI"]
+              "chargers": [
+                "BB000SMI"
+              ]
             }
           },
-          "action_order": ["BB000SMI"],
+          "action_order": [
+            "BB000SMI"
+          ],
           "flexibility_fields": {
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
@@ -243,34 +425,37 @@
           "strategy": "rh1_house_rbc_v1",
           "input_site_key": "rh1",
           "grid_import_limit_kw": 8.0,
-          "control_interval_minutes": 15,
+          "control_interval_minutes": 1.0,
           "export_price_factor": 0.8,
-          "ev_min_connected_kw": 0.0,
-          "baseline_price_threshold_eur_kwh": 0.20,
-          "fallback_safe_power_fraction": 0.30,
+          "ev_min_connected_kw": 1.6,
+          "baseline_price_threshold_eur_kwh": 0.2,
           "battery_capacity_kwh": 4.0,
-          "battery_nominal_power_kw": 3.32,
+          "battery_nominal_power_kw": 4.8,
           "battery_efficiency": 0.95,
-          "battery_soc_min": 0.20,
-          "battery_soc_max": 1.0,
+          "battery_soc_min": 0.2,
+          "battery_soc_max": 0.9,
           "battery_degradation_penalty_eur_per_kwh": 0.01,
           "ev_default_capacity_kwh": 60.0,
-          "cooling_nominal_power_kw": 4.109619617462158,
-          "dhw_nominal_power_kw": 4.861171245574951,
           "chargers": {
             "EVC01": {
-              "min_kw": 0.0,
-              "max_kw": 22.0
+              "min_kw": 1.6,
+              "max_kw": 4.6
             }
           },
           "vehicle_capacities": {
-            "EV1": 60.0
+            "EV01": 60.0
           },
           "ev_flexibility_fields": {
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
-          }
+          },
+          "price_unit_mode": "auto",
+          "price_auto_mwh_threshold": 3.0,
+          "soc_unit_mode": "auto",
+          "battery_soc_keys": [
+            "electrical_storage.soc"
+          ]
         }
       }
     ]

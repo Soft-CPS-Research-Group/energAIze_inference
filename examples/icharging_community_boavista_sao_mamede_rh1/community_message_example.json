@@ -8,77 +8,79 @@
         "solar_generation": 2.2,
         "energy_price": 0.11,
         "charging_sessions": {
-          "AC000004_1": {"power": 2.0, "electric_vehicle": "11824"}
+          "AC000004_1": {
+            "power": 2.0,
+            "electric_vehicle": "11824"
+          }
         },
         "electric_vehicles": {
           "11824": {
             "SoC": 0.35,
             "flexibility": {
-              "estimated_soc_at_departure": 0.80,
+              "estimated_soc_at_departure": 0.8,
               "estimated_time_at_departure": "2026-02-22T15:00:00Z"
             }
           }
         }
       },
       "sao_mamede": {
-        "site": {"pt_available_kw": 75.0},
+        "site": {
+          "pt_available_kw": 75.0
+        },
         "solar_generation": 10.0,
         "charging_sessions": {
-          "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_20"}
+          "BB000SMI": {
+            "power": 0.0,
+            "electric_vehicle": "SM_EV_20"
+          }
         },
         "electric_vehicles": {
           "SM_EV_20": {
-            "SoC": 0.30,
+            "SoC": 0.3,
             "flexibility": {
               "estimated_soc_at_departure": 0.85,
               "estimated_time_at_departure": "2026-02-22T16:00:00Z"
             }
           }
         },
-        "electrical_storage": {"soc": 0.55},
-        "virtual_battery": {"setpoint_kw": 15.0}
+        "electrical_storage": {
+          "soc": 0.55
+        },
+        "virtual_battery": {
+          "setpoint_kw": 15.0
+        }
       },
       "rh1": {
         "non_shiftable_load": 1.8,
         "solar_generation": 1.2,
-        "electricity_pricing": {
-          "current": 0.18,
-          "h1": 0.17,
-          "h2": 0.16,
-          "h6": 0.22,
-          "h12": 0.24,
-          "h24": 0.19
-        },
+        "energy_price": 104.7,
         "grid": {
           "import_limit_kw": 8.0,
           "export_limit_kw": 8.0
         },
-        "electrical_storage": {"soc": 0.45},
-        "cooling": {
-          "temperature": {
-            "current_c": 25.0,
-            "min_c": 22.0,
-            "max_c": 26.0
+        "batteries": {
+          "B01": {
+            "energy_in": 0.0,
+            "energy_out": 0.0,
+            "SoC": 89.0
           }
         },
-        "dhw": {
-          "temperature": {
-            "current_c": 45.0,
-            "min_c": 43.0,
-            "max_c": 52.0
+        "pv_panels": {
+          "PV01": {
+            "energy": 1.2
           }
         },
         "charging_sessions": {
           "EVC01": {
             "power": 0.0,
-            "electric_vehicle": "EV1"
+            "electric_vehicle": "EV01"
           }
         },
         "electric_vehicles": {
-          "EV1": {
-            "SoC": 0.30,
+          "EV01": {
+            "SoC": 0.33,
             "flexibility": {
-              "estimated_soc_at_departure": 0.80,
+              "estimated_soc_at_departure": 0.8,
               "estimated_time_at_departure": "2026-02-22T18:00:00Z"
             }
           }

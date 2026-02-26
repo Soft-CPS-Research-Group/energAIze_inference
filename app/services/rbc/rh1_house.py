@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import math
 from typing import Any, Dict, List
 
@@ -9,6 +9,8 @@ from app.logging import get_logger
 
 
 PRICE_POINTS_HOURS = (0.0, 1.0, 2.0, 6.0, 12.0, 24.0)
+VALID_PRICE_UNIT_MODES = {"auto", "eur_kwh", "eur_mwh"}
+VALID_SOC_UNIT_MODES = {"auto", "fraction", "percent"}
 DEFAULT_EV_FLEX_FIELDS = {
     "soc": "electric_vehicles.{ev_id}.SoC",
     "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
@@ -84,10 +86,9 @@ def _round_one_decimal_towards_zero(value: float) -> float:
 @dataclass
 class Rh1HouseConfig:
     grid_import_limit_kw: float
-    control_interval_minutes: float = 15.0
+    control_interval_minutes: float = 1.0
     export_price_factor: float = 0.8
     ev_min_connected_kw: float = 0.0
-    fallback_safe_power_fraction: float = 0.30
     baseline_price_threshold_eur_kwh: float = 0.20
     battery_capacity_kwh: float = 4.0
     battery_nominal_power_kw: float = 3.32
@@ -96,11 +97,13 @@ class Rh1HouseConfig:
     battery_soc_max: float = 1.0
     battery_degradation_penalty_eur_per_kwh: float = 0.01
     ev_default_capacity_kwh: float = 60.0
-    cooling_nominal_power_kw: float = 4.109619617462158
-    dhw_nominal_power_kw: float = 4.861171245574951
     chargers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     vehicle_capacities: Dict[str, float] = field(default_factory=dict)
     ev_flexibility_fields: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_EV_FLEX_FIELDS))
+    price_unit_mode: str = "auto"
+    price_auto_mwh_threshold: float = 3.0
+    soc_unit_mode: str = "auto"
+    battery_soc_keys: List[str] = field(default_factory=lambda: ["electrical_storage.soc"])
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "Rh1HouseConfig":
@@ -114,27 +117,44 @@ class Rh1HouseConfig:
             for k, v in (data.pop("vehicle_capacities", {}) or {}).items()
             if _safe_float(v, 0.0) > 0.0
         }
+
         chargers_raw = dict(data.pop("chargers", {}) or {})
         chargers: Dict[str, Dict[str, Any]] = {}
         for cid, meta in chargers_raw.items():
-            if not isinstance(meta, dict):
-                continue
-            chargers[str(cid)] = dict(meta)
+            if isinstance(meta, dict):
+                chargers[str(cid)] = dict(meta)
         if not chargers:
             chargers = {"EVC01": {"min_kw": 0.0, "max_kw": 22.0}}
 
         flex_fields = dict(data.pop("ev_flexibility_fields", {}) or DEFAULT_EV_FLEX_FIELDS)
 
+        price_unit_mode = str(data.pop("price_unit_mode", "auto")).strip().lower() or "auto"
+        if price_unit_mode not in VALID_PRICE_UNIT_MODES:
+            price_unit_mode = "auto"
+
+        soc_unit_mode = str(data.pop("soc_unit_mode", "auto")).strip().lower() or "auto"
+        if soc_unit_mode not in VALID_SOC_UNIT_MODES:
+            soc_unit_mode = "auto"
+
+        battery_soc_keys_raw = data.pop("battery_soc_keys", ["electrical_storage.soc"])
+        battery_soc_keys: List[str] = []
+        if isinstance(battery_soc_keys_raw, list):
+            battery_soc_keys = [str(item) for item in battery_soc_keys_raw if str(item).strip()]
+        elif battery_soc_keys_raw is not None:
+            value = str(battery_soc_keys_raw).strip()
+            if value:
+                battery_soc_keys = [value]
+        if not battery_soc_keys:
+            battery_soc_keys = ["electrical_storage.soc"]
+
         return cls(
             grid_import_limit_kw=grid_import_limit_kw,
-            control_interval_minutes=max(_safe_float(data.pop("control_interval_minutes", 15.0), 15.0), 1.0),
+            control_interval_minutes=max(
+                _safe_float(data.pop("control_interval_minutes", 1.0), 1.0),
+                1.0 / 60.0,
+            ),
             export_price_factor=_clamp(_safe_float(data.pop("export_price_factor", 0.8), 0.8), 0.0, 1.0),
             ev_min_connected_kw=max(_safe_float(data.pop("ev_min_connected_kw", 0.0), 0.0), 0.0),
-            fallback_safe_power_fraction=_clamp(
-                _safe_float(data.pop("fallback_safe_power_fraction", 0.30), 0.30),
-                0.0,
-                1.0,
-            ),
             baseline_price_threshold_eur_kwh=max(
                 _safe_float(data.pop("baseline_price_threshold_eur_kwh", 0.20), 0.20),
                 0.0,
@@ -152,17 +172,16 @@ class Rh1HouseConfig:
                 0.0,
             ),
             ev_default_capacity_kwh=max(_safe_float(data.pop("ev_default_capacity_kwh", 60.0), 60.0), 5.0),
-            cooling_nominal_power_kw=max(
-                _safe_float(data.pop("cooling_nominal_power_kw", 4.109619617462158), 4.109619617462158),
-                0.0,
-            ),
-            dhw_nominal_power_kw=max(
-                _safe_float(data.pop("dhw_nominal_power_kw", 4.861171245574951), 4.861171245574951),
-                0.0,
-            ),
             chargers=chargers,
             vehicle_capacities=vehicle_capacities,
             ev_flexibility_fields=flex_fields,
+            price_unit_mode=price_unit_mode,
+            price_auto_mwh_threshold=max(
+                _safe_float(data.pop("price_auto_mwh_threshold", 3.0), 3.0),
+                0.0,
+            ),
+            soc_unit_mode=soc_unit_mode,
+            battery_soc_keys=battery_soc_keys,
         )
 
     def resolve_ev_field(self, key: str, ev_id: str) -> str:
@@ -199,11 +218,11 @@ class Rh1HouseRuntime:
         now = _now_from_payload(payload)
 
         prices = self._extract_price_points(payload, warnings)
-        price_now = prices[0]
+        price_now = prices[0.0]
         future_avg_price = self._average_interpolated_price(prices)
 
         non_shiftable_load = max(0.0, _safe_float(payload.get("non_shiftable_load"), 0.0))
-        solar_generation = max(0.0, _safe_float(payload.get("solar_generation"), 0.0))
+        solar_generation = self._extract_solar_generation(payload, warnings)
 
         grid_import_limit_kw = _safe_float(
             payload.get("grid.import_limit_kw"),
@@ -219,14 +238,7 @@ class Rh1HouseRuntime:
         )
         grid_export_limit_kw = max(grid_export_limit_kw, 0.0)
 
-        battery_soc = _maybe_float(payload.get("electrical_storage.soc"))
-        if battery_soc is None:
-            warnings.append("missing_battery_soc_defaulted")
-            battery_soc = 0.5
-        battery_soc = _clamp(battery_soc, 0.0, 1.0)
-
-        cooling_kw, cooling_forced = self._cooling_action(payload, warnings)
-        dhw_kw, dhw_forced = self._dhw_action(payload, warnings)
+        battery_soc = self._extract_battery_soc(payload, warnings)
 
         ev = self._ev_action_bounds(payload, now, dt_hours)
         ev_kw = ev.hard_min_kw
@@ -234,7 +246,7 @@ class Rh1HouseRuntime:
             ev_kw = ev.max_kw
         ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
 
-        base_without_battery = non_shiftable_load + cooling_kw + dhw_kw + ev_kw - solar_generation
+        base_without_battery = non_shiftable_load + ev_kw - solar_generation
 
         battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
         battery_kw = self._battery_dispatch(
@@ -245,7 +257,6 @@ class Rh1HouseRuntime:
         )
 
         battery_kw = _clamp(battery_kw, battery_bounds.min_kw, battery_bounds.max_kw)
-
         battery_kw = self._fit_battery_to_grid(
             base_without_battery,
             battery_kw,
@@ -264,21 +275,7 @@ class Rh1HouseRuntime:
             if ev_kw + 1e-6 < ev.hard_min_kw:
                 local_constraint_flags["ev_hard_min_unmet"] = True
 
-            if shortfall > 1e-6:
-                reduced = min(shortfall, cooling_kw)
-                cooling_kw -= reduced
-                shortfall -= reduced
-                if cooling_forced and cooling_kw < cfg.cooling_nominal_power_kw - 1e-6:
-                    local_constraint_flags["cooling_band_unmet"] = True
-
-            if shortfall > 1e-6:
-                reduced = min(shortfall, dhw_kw)
-                dhw_kw -= reduced
-                shortfall -= reduced
-                if dhw_forced and dhw_kw < cfg.dhw_nominal_power_kw - 1e-6:
-                    local_constraint_flags["dhw_band_unmet"] = True
-
-            base_without_battery = non_shiftable_load + cooling_kw + dhw_kw + ev_kw - solar_generation
+            base_without_battery = non_shiftable_load + ev_kw - solar_generation
             battery_kw = self._fit_battery_to_grid(
                 base_without_battery,
                 battery_kw,
@@ -296,21 +293,8 @@ class Rh1HouseRuntime:
             ev_room = max(ev.max_kw - ev_kw, 0.0)
             increased = min(excess_export, ev_room)
             ev_kw += increased
-            excess_export -= increased
 
-            if excess_export > 1e-6:
-                dhw_room = max(cfg.dhw_nominal_power_kw - dhw_kw, 0.0)
-                increased = min(excess_export, dhw_room)
-                dhw_kw += increased
-                excess_export -= increased
-
-            if excess_export > 1e-6:
-                cooling_room = max(cfg.cooling_nominal_power_kw - cooling_kw, 0.0)
-                increased = min(excess_export, cooling_room)
-                cooling_kw += increased
-                excess_export -= increased
-
-            base_without_battery = non_shiftable_load + cooling_kw + dhw_kw + ev_kw - solar_generation
+            base_without_battery = non_shiftable_load + ev_kw - solar_generation
             battery_kw = self._fit_battery_to_grid(
                 base_without_battery,
                 battery_kw,
@@ -323,41 +307,20 @@ class Rh1HouseRuntime:
                 local_constraint_flags["grid_export_limit_unmet"] = True
 
         ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
-        cooling_kw = _clamp(cooling_kw, 0.0, cfg.cooling_nominal_power_kw)
-        dhw_kw = _clamp(dhw_kw, 0.0, cfg.dhw_nominal_power_kw)
         battery_kw = _clamp(battery_kw, battery_bounds.min_kw, battery_bounds.max_kw)
 
         actions = {
             "ev_charge_kw": ev_kw,
             "battery_kw": battery_kw,
-            "cooling_kw": cooling_kw,
-            "dhw_heater_kw": dhw_kw,
         }
 
-        quantized = {
-            key: float(_round_one_decimal_towards_zero(value))
-            for key, value in actions.items()
-        }
-
+        quantized = {key: float(_round_one_decimal_towards_zero(value)) for key, value in actions.items()}
         quantized["ev_charge_kw"] = float(_clamp(quantized["ev_charge_kw"], 0.0, ev.max_kw))
-        quantized["cooling_kw"] = float(
-            _clamp(quantized["cooling_kw"], 0.0, cfg.cooling_nominal_power_kw)
-        )
-        quantized["dhw_heater_kw"] = float(
-            _clamp(quantized["dhw_heater_kw"], 0.0, cfg.dhw_nominal_power_kw)
-        )
         quantized["battery_kw"] = float(
             _clamp(quantized["battery_kw"], battery_bounds.min_kw, battery_bounds.max_kw)
         )
 
-        net_grid_kw = (
-            non_shiftable_load
-            + quantized["cooling_kw"]
-            + quantized["dhw_heater_kw"]
-            + quantized["ev_charge_kw"]
-            + quantized["battery_kw"]
-            - solar_generation
-        )
+        net_grid_kw = non_shiftable_load + quantized["ev_charge_kw"] + quantized["battery_kw"] - solar_generation
 
         log.info(
             "rbc.actions",
@@ -375,21 +338,25 @@ class Rh1HouseRuntime:
         return quantized
 
     def _extract_price_points(self, payload: Dict[str, Any], warnings: List[str]) -> Dict[float, float]:
+        current = None
         current_candidates = [
             payload.get("electricity_pricing.current"),
             payload.get("electricity_pricing"),
             payload.get("energy_price"),
         ]
-        current = None
         for candidate in current_candidates:
-            current = _maybe_float(candidate)
-            if current is not None:
+            numeric = _maybe_float(candidate)
+            if numeric is not None:
+                current = numeric
                 break
+
         if current is None:
             warnings.append("missing_price_current_defaulted")
             current = 0.0
 
+        current = self._normalize_price(current)
         points = {0.0: max(current, 0.0)}
+
         key_by_hour = {
             1.0: "electricity_pricing.h1",
             2.0: "electricity_pricing.h2",
@@ -401,9 +368,78 @@ class Rh1HouseRuntime:
             value = _maybe_float(payload.get(key))
             if value is None:
                 warnings.append(f"missing_price_{int(hour)}h_defaulted")
-                value = current
-            points[hour] = max(value, 0.0)
+                points[hour] = max(current, 0.0)
+                continue
+            points[hour] = max(self._normalize_price(value), 0.0)
         return points
+
+    def _normalize_price(self, value: float) -> float:
+        cfg = self.config
+        mode = cfg.price_unit_mode
+        normalized = value
+        if mode == "eur_mwh":
+            normalized = value / 1000.0
+        elif mode == "auto" and value > cfg.price_auto_mwh_threshold:
+            normalized = value / 1000.0
+        return normalized
+
+    def _normalize_soc(self, value: float) -> float:
+        mode = self.config.soc_unit_mode
+        normalized = value
+        if mode == "percent":
+            normalized = value / 100.0
+        elif mode == "auto" and 1.0 < value <= 100.0:
+            normalized = value / 100.0
+        return _clamp(normalized, 0.0, 1.0)
+
+    def _extract_solar_generation(self, payload: Dict[str, Any], warnings: List[str]) -> float:
+        direct = _maybe_float(payload.get("solar_generation"))
+        if direct is not None:
+            return max(direct, 0.0)
+
+        total = 0.0
+        found = False
+        for key, raw in payload.items():
+            if not isinstance(key, str):
+                continue
+            if not key.startswith("pv_panels.") or not key.endswith(".energy"):
+                continue
+            numeric = _maybe_float(raw)
+            if numeric is None:
+                continue
+            found = True
+            total += numeric
+
+        if found:
+            return max(total, 0.0)
+
+        warnings.append("missing_solar_generation_defaulted")
+        return 0.0
+
+    def _extract_battery_soc(self, payload: Dict[str, Any], warnings: List[str]) -> float:
+        for key in self.config.battery_soc_keys:
+            numeric = _maybe_float(payload.get(key))
+            if numeric is not None:
+                return self._normalize_soc(numeric)
+
+        fallback_key = self._find_battery_soc_fallback_key(payload)
+        if fallback_key:
+            numeric = _maybe_float(payload.get(fallback_key))
+            if numeric is not None:
+                warnings.append("battery_soc_from_fallback_key")
+                return self._normalize_soc(numeric)
+
+        warnings.append("missing_battery_soc_defaulted")
+        return 0.5
+
+    def _find_battery_soc_fallback_key(self, payload: Dict[str, Any]) -> str | None:
+        for key in sorted(payload.keys()):
+            if not isinstance(key, str):
+                continue
+            lowered = key.lower()
+            if lowered.startswith("batteries.") and lowered.endswith(".soc"):
+                return key
+        return None
 
     def _interpolate_price(self, hour: float, points: Dict[float, float]) -> float:
         if hour <= 0.0:
@@ -427,36 +463,6 @@ class Rh1HouseRuntime:
         if not samples:
             return points[0.0]
         return float(sum(samples) / len(samples))
-
-    def _cooling_action(self, payload: Dict[str, Any], warnings: List[str]) -> tuple[float, bool]:
-        cfg = self.config
-        temp = _maybe_float(payload.get("cooling.temperature.current_c"))
-        min_c = _maybe_float(payload.get("cooling.temperature.min_c"))
-        max_c = _maybe_float(payload.get("cooling.temperature.max_c"))
-        safe_kw = cfg.cooling_nominal_power_kw * cfg.fallback_safe_power_fraction
-
-        if temp is None or min_c is None or max_c is None:
-            warnings.append("missing_cooling_temperature_data_safe_mode")
-            return safe_kw, False
-
-        if temp > max_c + 1e-6:
-            return cfg.cooling_nominal_power_kw, True
-        return 0.0, False
-
-    def _dhw_action(self, payload: Dict[str, Any], warnings: List[str]) -> tuple[float, bool]:
-        cfg = self.config
-        temp = _maybe_float(payload.get("dhw.temperature.current_c"))
-        min_c = _maybe_float(payload.get("dhw.temperature.min_c"))
-        max_c = _maybe_float(payload.get("dhw.temperature.max_c"))
-        safe_kw = cfg.dhw_nominal_power_kw * cfg.fallback_safe_power_fraction
-
-        if temp is None or min_c is None or max_c is None:
-            warnings.append("missing_dhw_temperature_data_safe_mode")
-            return safe_kw, False
-
-        if temp < min_c - 1e-6:
-            return cfg.dhw_nominal_power_kw, True
-        return 0.0, False
 
     def _ev_action_bounds(self, payload: Dict[str, Any], now: datetime, dt_hours: float) -> EvAggregate:
         cfg = self.config
@@ -515,7 +521,8 @@ class Rh1HouseRuntime:
         if soc is None or target_soc is None or departure is None or target_soc <= 0.0:
             return cfg.ev_min_connected_kw
 
-        soc = _clamp(soc, 0.0, 1.0)
+        soc = self._normalize_soc(soc)
+        target_soc = self._normalize_soc(target_soc)
         target_soc = _clamp(target_soc, soc, 1.0)
         if target_soc <= soc + 1e-6:
             return cfg.ev_min_connected_kw
