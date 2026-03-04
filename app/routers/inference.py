@@ -33,6 +33,9 @@ def _select_agent_features(features: Dict[str, Any], pipeline) -> Dict[str, Any]
         raise KeyError(f"Missing required object 'features.sites.{site_key}' for agent_index {pipeline.agent_index}")
 
     selected = dict(site_payload)
+    top_community = features.get("community")
+    if isinstance(top_community, dict) and "community" not in selected:
+        selected["community"] = dict(top_community)
     top_timestamp = features.get("timestamp")
     if "timestamp" not in selected and top_timestamp is not None:
         selected["timestamp"] = top_timestamp
@@ -46,6 +49,30 @@ def _select_agent_features(features: Dict[str, Any], pipeline) -> Dict[str, Any]
     return selected
 
 
+def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[str, Any]:
+    artifact_cfg = pipeline.manifest.get_artifact(pipeline.agent_index).config or {}
+    require_observations = bool(artifact_cfg.get("require_observations_envelope", False))
+    if not require_observations:
+        return dict(selected_features)
+
+    observations = selected_features.get("observations")
+    if not isinstance(observations, dict):
+        raise KeyError("Missing required object 'observations' for this bundle")
+
+    normalized = dict(observations)
+    top_timestamp = selected_features.get("timestamp")
+    if "timestamp" not in normalized and top_timestamp is not None:
+        normalized["timestamp"] = top_timestamp
+    top_timestamp_date = selected_features.get("timestamp.$date")
+    if (
+        "timestamp" not in normalized
+        and "timestamp.$date" not in normalized
+        and top_timestamp_date is not None
+    ):
+        normalized["timestamp.$date"] = top_timestamp_date
+    return normalized
+
+
 @router.post("", response_model=InferenceResponse)
 async def run_inference(payload: InferenceRequest, request: Request, _ = Depends(_ensure_configured)):
     """Run inference for the configured agent using the supplied feature dict."""
@@ -56,7 +83,8 @@ async def run_inference(payload: InferenceRequest, request: Request, _ = Depends
     try:
         pipeline = store.get_pipeline(payload.agent_index)
         selected_features = _select_agent_features(payload.features, pipeline)
-        flattened = flatten_payload(selected_features)
+        runtime_features = _normalize_agent_input(selected_features, pipeline)
+        flattened = flatten_payload(runtime_features)
         actions = pipeline.inference(flattened)
     except KeyError as exc:
         log.warning("Inference payload missing data", missing=str(exc))

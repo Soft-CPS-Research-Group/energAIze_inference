@@ -338,6 +338,10 @@ class Rh1HouseRuntime:
         return quantized
 
     def _extract_price_points(self, payload: Dict[str, Any], warnings: List[str]) -> Dict[float, float]:
+        vector_points = self._extract_price_points_from_vector(payload, warnings)
+        if vector_points is not None:
+            return vector_points
+
         current = None
         current_candidates = [
             payload.get("electricity_pricing.current"),
@@ -373,12 +377,83 @@ class Rh1HouseRuntime:
             points[hour] = max(self._normalize_price(value), 0.0)
         return points
 
-    def _normalize_price(self, value: float) -> float:
+    def _extract_price_points_from_vector(
+        self, payload: Dict[str, Any], warnings: List[str]
+    ) -> Dict[float, float] | None:
+        indexed_values: Dict[int, float] = {}
+        for key, raw in payload.items():
+            if not isinstance(key, str):
+                continue
+            if not key.startswith("energy_price.values[") or not key.endswith("]"):
+                continue
+            idx_raw = key[len("energy_price.values[") : -1]
+            if not idx_raw.isdigit():
+                continue
+            numeric = _maybe_float(raw)
+            if numeric is None:
+                continue
+            indexed_values[int(idx_raw)] = numeric
+
+        if not indexed_values:
+            return None
+
+        freq_seconds = _maybe_float(payload.get("energy_price.frequency_seconds"))
+        if freq_seconds is None or freq_seconds <= 0.0:
+            warnings.append("missing_energy_price_frequency_defaulted")
+            freq_seconds = 900.0
+
+        unit_hint = payload.get("energy_price.measurement_unit")
+        current_value = indexed_values.get(0)
+        if current_value is None:
+            first_idx = min(indexed_values)
+            current_value = indexed_values[first_idx]
+            warnings.append("missing_energy_price_index_0_defaulted")
+
+        points: Dict[float, float] = {
+            0.0: max(self._normalize_price(current_value, unit_hint=unit_hint), 0.0)
+        }
+        for hour in (1.0, 2.0, 6.0, 12.0, 24.0):
+            target_idx = int(round((hour * 3600.0) / freq_seconds))
+            sampled = self._sample_indexed_price(indexed_values, target_idx)
+            if sampled is None:
+                warnings.append(f"missing_energy_price_index_{target_idx}_defaulted")
+                sampled = current_value
+            points[hour] = max(self._normalize_price(sampled, unit_hint=unit_hint), 0.0)
+
+        return points
+
+    def _sample_indexed_price(self, values: Dict[int, float], target_idx: int) -> float | None:
+        if not values:
+            return None
+        if target_idx in values:
+            return values[target_idx]
+        ordered = sorted(values.items())
+        first_idx, first_value = ordered[0]
+        last_idx, last_value = ordered[-1]
+        if target_idx <= first_idx:
+            return first_value
+        if target_idx >= last_idx:
+            return last_value
+        for i in range(1, len(ordered)):
+            left_idx, left_val = ordered[i - 1]
+            right_idx, right_val = ordered[i]
+            if left_idx <= target_idx <= right_idx:
+                if right_idx == left_idx:
+                    return right_val
+                alpha = (target_idx - left_idx) / float(right_idx - left_idx)
+                return left_val + alpha * (right_val - left_val)
+        return None
+
+    def _normalize_price(self, value: float, unit_hint: Any = None) -> float:
         cfg = self.config
         mode = cfg.price_unit_mode
         normalized = value
+        normalized_unit = str(unit_hint).strip().lower()
         if mode == "eur_mwh":
             normalized = value / 1000.0
+        elif mode == "auto" and normalized_unit:
+            if "mwh" in normalized_unit:
+                normalized = value / 1000.0
         elif mode == "auto" and value > cfg.price_auto_mwh_threshold:
             normalized = value / 1000.0
         return normalized

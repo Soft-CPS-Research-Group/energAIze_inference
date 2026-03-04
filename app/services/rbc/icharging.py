@@ -45,6 +45,26 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
     return numeric
 
 
+def _normalize_ev_id(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if numeric != numeric or abs(numeric) <= 1e-9:
+            return ""
+        if float(int(numeric)) == numeric:
+            return str(int(numeric))
+        return str(numeric)
+    text = str(value).strip()
+    if not text:
+        return ""
+    if text.lower() in {"none", "nan", "null"}:
+        return ""
+    if text in {"0", "0.0"}:
+        return ""
+    return text
+
+
 def _clamp(value: float, lower: float, upper: float) -> float:
     return max(min(value, upper), lower)
 
@@ -147,11 +167,28 @@ class IchargingRuntimeConfig:
     site_available_headroom_fallback_kw: float = 0.0
     site_available_headroom_includes_pv: bool = True
     virtual_battery_action_name: Optional[str] = None
-    virtual_battery_nominal_power_kw: float = 0.0
-    virtual_battery_soc_key: str = "electrical_storage.soc"
-    virtual_battery_setpoint_key: str = "community.virtual_battery.setpoint_kw"
+    virtual_battery_nominal_power_kw: float = 15.0
+    virtual_battery_capacity_kwh: float = 20.0
+    virtual_battery_capacity_min_kwh: float = 20.0
+    virtual_battery_capacity_max_kwh: float = 20.0
+    virtual_battery_charge_power_max_kw: float = 15.0
+    virtual_battery_discharge_power_max_kw: float = 15.0
+    virtual_battery_soc_key: str = "virtual_battery.soc"
+    virtual_battery_soc_fallback_key: str = "electrical_storage.soc"
+    virtual_battery_setpoint_key: str = "virtual_battery.setpoint_kw"
+    virtual_battery_use_setpoint: bool = False
+    virtual_battery_use_community_signals: bool = True
+    virtual_battery_community_target_import_key: str = "community.target_net_import_kw"
+    virtual_battery_community_current_import_key: str = "community.current_net_import_kw"
+    virtual_battery_community_price_prefix: str = "community.price_signal"
+    virtual_battery_local_price_prefix: str = "energy_price"
     virtual_battery_soc_min: float = 0.1
-    virtual_battery_soc_max: float = 0.9
+    virtual_battery_soc_max: float = 1.0
+    session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
+    session_merge_power_key: str = "power"
+    session_merge_ev_key: str = "electric_vehicle"
+    exclusive_charger_groups: List[List[str]] = field(default_factory=list)
+    exclusive_group_strategy: str = "highest_power"
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "IchargingRuntimeConfig":
@@ -169,6 +206,35 @@ class IchargingRuntimeConfig:
         inactive_value = data.pop("inactive_power_threshold_kw", None)
         site_available_headroom_key = data.pop("site_available_headroom_key", None)
         virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
+        session_merge_map_raw = data.pop("session_merge_map", {}) or {}
+        session_merge_map: Dict[str, List[str]] = {}
+        if isinstance(session_merge_map_raw, dict):
+            for key, value in session_merge_map_raw.items():
+                target = str(key).strip()
+                if not target:
+                    continue
+                if isinstance(value, list):
+                    sources = [str(item).strip() for item in value if str(item).strip()]
+                else:
+                    source = str(value).strip()
+                    sources = [source] if source else []
+                if sources:
+                    session_merge_map[target] = sources
+        exclusive_groups_raw = data.pop("exclusive_charger_groups", []) or []
+        exclusive_charger_groups: List[List[str]] = []
+        if isinstance(exclusive_groups_raw, list):
+            for group in exclusive_groups_raw:
+                if not isinstance(group, list):
+                    continue
+                ids = [str(item).strip() for item in group if str(item).strip()]
+                if len(ids) >= 2:
+                    exclusive_charger_groups.append(ids)
+        exclusive_group_strategy = (
+            str(data.pop("exclusive_group_strategy", "highest_power")).strip().lower()
+            or "highest_power"
+        )
+        if exclusive_group_strategy != "highest_power":
+            exclusive_group_strategy = "highest_power"
         cfg = cls(
             max_board_kw=_safe_float(data.pop("max_board_kw", 0.0)),
             charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 0.0)),
@@ -204,14 +270,55 @@ class IchargingRuntimeConfig:
             if virtual_battery_action_name is not None and str(virtual_battery_action_name).strip()
             else None,
             virtual_battery_nominal_power_kw=max(
-                _safe_float(data.pop("virtual_battery_nominal_power_kw", 0.0), 0.0),
+                _safe_float(data.pop("virtual_battery_nominal_power_kw", 15.0), 15.0),
+                0.0,
+            ),
+            virtual_battery_capacity_kwh=max(
+                _safe_float(data.pop("virtual_battery_capacity_kwh", 20.0), 20.0),
+                0.0,
+            ),
+            virtual_battery_capacity_min_kwh=max(
+                _safe_float(data.pop("virtual_battery_capacity_min_kwh", 20.0), 20.0),
+                0.0,
+            ),
+            virtual_battery_capacity_max_kwh=max(
+                _safe_float(data.pop("virtual_battery_capacity_max_kwh", 20.0), 20.0),
+                0.0,
+            ),
+            virtual_battery_charge_power_max_kw=max(
+                _safe_float(data.pop("virtual_battery_charge_power_max_kw", 15.0), 15.0),
+                0.0,
+            ),
+            virtual_battery_discharge_power_max_kw=max(
+                _safe_float(data.pop("virtual_battery_discharge_power_max_kw", 15.0), 15.0),
                 0.0,
             ),
             virtual_battery_soc_key=str(
-                data.pop("virtual_battery_soc_key", "electrical_storage.soc")
+                data.pop("virtual_battery_soc_key", "virtual_battery.soc")
+            ),
+            virtual_battery_soc_fallback_key=str(
+                data.pop("virtual_battery_soc_fallback_key", "electrical_storage.soc")
             ),
             virtual_battery_setpoint_key=str(
-                data.pop("virtual_battery_setpoint_key", "community.virtual_battery.setpoint_kw")
+                data.pop("virtual_battery_setpoint_key", "virtual_battery.setpoint_kw")
+            ),
+            virtual_battery_use_setpoint=bool(
+                data.pop("virtual_battery_use_setpoint", False)
+            ),
+            virtual_battery_use_community_signals=bool(
+                data.pop("virtual_battery_use_community_signals", True)
+            ),
+            virtual_battery_community_target_import_key=str(
+                data.pop("virtual_battery_community_target_import_key", "community.target_net_import_kw")
+            ),
+            virtual_battery_community_current_import_key=str(
+                data.pop("virtual_battery_community_current_import_key", "community.current_net_import_kw")
+            ),
+            virtual_battery_community_price_prefix=str(
+                data.pop("virtual_battery_community_price_prefix", "community.price_signal")
+            ),
+            virtual_battery_local_price_prefix=str(
+                data.pop("virtual_battery_local_price_prefix", "energy_price")
             ),
             virtual_battery_soc_min=_clamp(
                 _safe_float(data.pop("virtual_battery_soc_min", 0.1), 0.1),
@@ -219,13 +326,24 @@ class IchargingRuntimeConfig:
                 1.0,
             ),
             virtual_battery_soc_max=_clamp(
-                _safe_float(data.pop("virtual_battery_soc_max", 0.9), 0.9),
+                _safe_float(data.pop("virtual_battery_soc_max", 1.0), 1.0),
                 0.0,
                 1.0,
             ),
+            session_merge_map=session_merge_map,
+            session_merge_power_key=str(data.pop("session_merge_power_key", "power") or "power"),
+            session_merge_ev_key=str(data.pop("session_merge_ev_key", "electric_vehicle") or "electric_vehicle"),
+            exclusive_charger_groups=exclusive_charger_groups,
+            exclusive_group_strategy=exclusive_group_strategy,
         )
         if cfg.virtual_battery_soc_max < cfg.virtual_battery_soc_min:
             cfg.virtual_battery_soc_max = cfg.virtual_battery_soc_min
+        if cfg.virtual_battery_capacity_max_kwh < cfg.virtual_battery_capacity_min_kwh:
+            cfg.virtual_battery_capacity_max_kwh = cfg.virtual_battery_capacity_min_kwh
+        if cfg.virtual_battery_charge_power_max_kw <= 0.0 and cfg.virtual_battery_nominal_power_kw > 0.0:
+            cfg.virtual_battery_charge_power_max_kw = cfg.virtual_battery_nominal_power_kw
+        if cfg.virtual_battery_discharge_power_max_kw <= 0.0 and cfg.virtual_battery_nominal_power_kw > 0.0:
+            cfg.virtual_battery_discharge_power_max_kw = cfg.virtual_battery_nominal_power_kw
         if inactive_value is None:
             cfg.inactive_power_threshold_kw = max(cfg.min_connected_kw - 0.2, 0.0)
         return cfg
@@ -256,6 +374,72 @@ class ChargerState:
 class IchargingBreakerRuntime:
     def __init__(self, config: IchargingRuntimeConfig):
         self.config = config
+
+    def _effective_session_state(self, payload: Dict[str, Any], charger_id: str) -> tuple[str, float]:
+        cfg = self.config
+        sources = cfg.session_merge_map.get(charger_id) or [charger_id]
+        session_rows: List[tuple[str, str, float]] = []
+        for source_id in sources:
+            ev_key = f"charging_sessions.{source_id}.{cfg.session_merge_ev_key}"
+            power_key = f"charging_sessions.{source_id}.{cfg.session_merge_power_key}"
+            ev_id = _normalize_ev_id(payload.get(ev_key))
+            power = max(_safe_float(payload.get(power_key), 0.0), 0.0)
+            session_rows.append((source_id, ev_id, power))
+
+        if not session_rows:
+            return "", 0.0
+
+        max_power = max(row[2] for row in session_rows)
+        candidates = [row for row in session_rows if abs(row[2] - max_power) <= 1e-9]
+        with_ev = [row for row in candidates if row[1]]
+        chosen = with_ev[0] if with_ev else candidates[0]
+        return chosen[1], chosen[2]
+
+    def _apply_exclusive_groups(self, states: Dict[str, ChargerState]) -> None:
+        cfg = self.config
+        if not cfg.exclusive_charger_groups:
+            return
+
+        log = get_logger()
+        for group in cfg.exclusive_charger_groups:
+            group_ids = [cid for cid in group if cid in states]
+            if len(group_ids) < 2:
+                continue
+
+            connected_ids = [cid for cid in group_ids if states[cid].connected]
+            if len(connected_ids) <= 1:
+                continue
+
+            ranked = sorted(
+                connected_ids,
+                key=lambda cid: (
+                    -states[cid].session_power,
+                    0 if states[cid].ev_id else 1,
+                    group_ids.index(cid),
+                ),
+            )
+            winner = ranked[0]
+            for cid in connected_ids:
+                if cid == winner:
+                    continue
+                st = states[cid]
+                st.connected = False
+                st.ev_id = ""
+                st.flexible = False
+                st.required_kw = 0.0
+                st.priority = 0.0
+                st.is_active_nonflex = False
+
+            log.warning(
+                "rbc.exclusive_group_conflict",
+                strategy="icharging_breaker",
+                group=group_ids,
+                winner=winner,
+                connected_candidates=[
+                    {"charger": cid, "power_kw": states[cid].session_power}
+                    for cid in connected_ids
+                ],
+            )
 
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
@@ -313,9 +497,7 @@ class IchargingBreakerRuntime:
                 _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
             )
             line = meta.get("line") or line_map.get(charger_id)
-            ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
-            ev_id = str(ev_raw).strip() if ev_raw is not None else ""
-            session_power = _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0)
+            ev_id, session_power = self._effective_session_state(payload, charger_id)
             session_power = _clamp(session_power, 0.0, max_kw)
             connected = bool(ev_id)
             min_kw = max(base_min_kw, cfg.min_connected_kw * (max(n_phases, 1) if connected else 1))
@@ -336,6 +518,13 @@ class IchargingBreakerRuntime:
             max_levels[charger_id] = max_kw
             actions[charger_id] = min_kw
             charger_priority[charger_id] = 0.0
+
+        self._apply_exclusive_groups(states)
+
+        for charger_id in cfg.chargers.keys():
+            state = states[charger_id]
+            min_levels[charger_id] = state.min_kw
+            actions[charger_id] = state.min_kw
 
             if not state.connected:
                 continue
@@ -492,6 +681,63 @@ class IchargingBreakerRuntime:
 
         return quantized
 
+    def _extract_price_series(self, payload: Dict[str, Any], prefix: str) -> List[float]:
+        values: List[tuple[int, float]] = []
+        values_prefix = f"{prefix}.values["
+        for key, raw in payload.items():
+            if not key.startswith(values_prefix):
+                continue
+            idx_text = key[len(values_prefix) : -1] if key.endswith("]") else ""
+            if not idx_text.isdigit():
+                continue
+            value = _maybe_float(raw)
+            if value is None:
+                continue
+            values.append((int(idx_text), value))
+        if values:
+            return [value for _, value in sorted(values, key=lambda pair: pair[0])]
+
+        scalar = _maybe_float(payload.get(prefix))
+        if scalar is not None:
+            return [scalar]
+
+        current = _maybe_float(payload.get(f"{prefix}.current"))
+        if current is not None:
+            return [current]
+        return []
+
+    def _price_based_virtual_battery_dispatch(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+        charge_limit_kw: float,
+        discharge_limit_kw: float,
+    ) -> float:
+        if charge_limit_kw <= 1e-6 and discharge_limit_kw <= 1e-6:
+            return 0.0
+
+        series: List[float] = []
+        if cfg.virtual_battery_use_community_signals:
+            series = self._extract_price_series(payload, cfg.virtual_battery_community_price_prefix)
+        if not series:
+            series = self._extract_price_series(payload, cfg.virtual_battery_local_price_prefix)
+        if not series:
+            return 0.0
+
+        current = series[0]
+        if len(series) > 1:
+            horizon = series[1 : min(len(series), 25)]
+            future_avg = sum(horizon) / max(len(horizon), 1)
+        else:
+            future_avg = current
+        delta = future_avg - current
+        threshold = max(abs(current) * 0.05, 0.01)
+        if delta > threshold:
+            return charge_limit_kw
+        if delta < -threshold:
+            return -discharge_limit_kw
+        return 0.0
+
     def _virtual_battery_dispatch(
         self,
         cfg: IchargingRuntimeConfig,
@@ -500,40 +746,80 @@ class IchargingBreakerRuntime:
         states: Dict[str, ChargerState],
         effective_board_limit: float,
     ) -> float:
-        nominal_power_kw = max(cfg.virtual_battery_nominal_power_kw, 0.0)
-        if nominal_power_kw <= 1e-6:
+        charge_cap_kw = max(cfg.virtual_battery_charge_power_max_kw, 0.0)
+        discharge_cap_kw = max(cfg.virtual_battery_discharge_power_max_kw, 0.0)
+        if charge_cap_kw <= 1e-6 and discharge_cap_kw <= 1e-6:
             return 0.0
 
-        setpoint_kw = _maybe_float(payload.get(cfg.virtual_battery_setpoint_key))
-        if setpoint_kw is None:
-            return 0.0
-
-        dispatch_kw = _clamp(setpoint_kw, -nominal_power_kw, nominal_power_kw)
         soc = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
-        if soc is not None:
-            soc = _clamp(soc, 0.0, 1.0)
-            if dispatch_kw < 0.0 and soc <= cfg.virtual_battery_soc_min + 1e-9:
-                dispatch_kw = 0.0
-            elif dispatch_kw > 0.0 and soc >= cfg.virtual_battery_soc_max - 1e-9:
-                dispatch_kw = 0.0
+        if soc is None:
+            soc = _maybe_float(payload.get(cfg.virtual_battery_soc_fallback_key))
+        if soc is None:
+            soc = 0.5
+        if soc > 1.0 and soc <= 100.0:
+            soc = soc / 100.0
+        soc = _clamp(soc, 0.0, 1.0)
+
+        capacity_kwh = _clamp(
+            cfg.virtual_battery_capacity_kwh,
+            cfg.virtual_battery_capacity_min_kwh,
+            cfg.virtual_battery_capacity_max_kwh,
+        )
+        if capacity_kwh <= 1e-6:
+            return 0.0
+
+        dt_hours = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
+        charge_soc_cap = max((cfg.virtual_battery_soc_max - soc) * capacity_kwh / dt_hours, 0.0)
+        discharge_soc_cap = max((soc - cfg.virtual_battery_soc_min) * capacity_kwh / dt_hours, 0.0)
+        charge_limit_kw = min(charge_cap_kw, charge_soc_cap)
+        discharge_limit_kw = min(discharge_cap_kw, discharge_soc_cap)
+
+        board_total_kw = sum(
+            charger_actions.get(cid, 0.0)
+            for cid, state in states.items()
+            if state.connected
+        )
+        board_headroom_kw = max(effective_board_limit - board_total_kw, 0.0)
+        charge_limit_kw = min(charge_limit_kw, board_headroom_kw)
+
+        target_dispatch_kw: Optional[float] = None
+        if cfg.virtual_battery_use_community_signals:
+            target_import = _maybe_float(payload.get(cfg.virtual_battery_community_target_import_key))
+            current_import = _maybe_float(payload.get(cfg.virtual_battery_community_current_import_key))
+            if target_import is not None and current_import is not None:
+                target_dispatch_kw = -(current_import - target_import)
+
+        price_dispatch_kw = self._price_based_virtual_battery_dispatch(
+            cfg,
+            payload,
+            charge_limit_kw,
+            discharge_limit_kw,
+        )
+
+        setpoint_dispatch_kw: Optional[float] = None
+        if cfg.virtual_battery_use_setpoint:
+            setpoint_kw = _maybe_float(payload.get(cfg.virtual_battery_setpoint_key))
+            if setpoint_kw is not None:
+                setpoint_dispatch_kw = setpoint_kw
+
+        dispatch_kw = (
+            setpoint_dispatch_kw
+            if setpoint_dispatch_kw is not None
+            else (target_dispatch_kw if target_dispatch_kw is not None else price_dispatch_kw)
+        )
+        if target_dispatch_kw is not None and abs(dispatch_kw) < 0.5:
+            dispatch_kw = price_dispatch_kw
 
         if dispatch_kw > 0.0:
-            board_total_kw = sum(
-                charger_actions.get(cid, 0.0)
-                for cid, state in states.items()
-                if state.connected
-            )
-            board_headroom_kw = max(effective_board_limit - board_total_kw, 0.0)
-            dispatch_kw = min(dispatch_kw, board_headroom_kw)
+            dispatch_kw = min(dispatch_kw, charge_limit_kw)
+        elif dispatch_kw < 0.0:
+            dispatch_kw = max(dispatch_kw, -discharge_limit_kw)
 
         dispatch_kw = _round_down_one_decimal(dispatch_kw)
-        dispatch_kw = _clamp(dispatch_kw, -nominal_power_kw, nominal_power_kw)
-
-        if soc is not None:
-            if dispatch_kw < 0.0 and soc <= cfg.virtual_battery_soc_min + 1e-9:
-                dispatch_kw = 0.0
-            elif dispatch_kw > 0.0 and soc >= cfg.virtual_battery_soc_max - 1e-9:
-                dispatch_kw = 0.0
+        if dispatch_kw > 0.0:
+            dispatch_kw = min(dispatch_kw, charge_limit_kw)
+        elif dispatch_kw < 0.0:
+            dispatch_kw = max(dispatch_kw, -discharge_limit_kw)
 
         return float(dispatch_kw)
 
