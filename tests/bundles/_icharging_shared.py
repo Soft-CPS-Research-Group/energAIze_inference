@@ -31,7 +31,7 @@ def post_inference(client: Any, payload: dict[str, Any]) -> dict[str, float]:
 
 
 def connected_chargers(payload: dict[str, Any]) -> set[str]:
-    sessions = payload.get("charging_sessions", {})
+    sessions = payload.get("observations", {}).get("charging_sessions", {})
     return {
         charger_id
         for charger_id, data in sessions.items()
@@ -77,13 +77,6 @@ def load_json(path: Path) -> Any:
 def normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "timestamp": record.get("timestamp") or record.get("timestamp.$date"),
-        "non_shiftable_load": record.get("non_shiftable_load", 0.0),
-        "solar_generation": record.get("solar_generation", 0.0),
-        "energy_price": record.get("energy_price", 0.0),
-        "charging_sessions": record.get("charging_sessions", {}),
-        "electric_vehicles": record.get("electric_vehicles", {}),
-        "pv_panels": record.get(
-            "pv_panels",
-            {"PV01": {"energy": record.get("solar_generation", 0.0)}},
-        ),
+        "observations": dict(record.get("observations", {})),
+        "forecasts": dict(record.get("forecasts", {})),
     }

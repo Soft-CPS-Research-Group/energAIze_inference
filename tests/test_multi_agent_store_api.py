@@ -21,50 +21,77 @@ def _community_features() -> dict:
         "timestamp": "2026-02-22T12:00:00Z",
         "sites": {
             "boavista": {
-                "non_shiftable_load": 7.0,
-                "solar_generation": 2.0,
-                "energy_price": 0.11,
-                "charging_sessions": {
-                    "AC000004_1": {"power": 2.0, "electric_vehicle": "11824"},
-                    "AC000007_1": {"power": 2.0, "electric_vehicle": "11823"},
-                },
-                "electric_vehicles": {
-                    "11824": {
-                        "SoC": 0.3,
-                        "flexibility": {
-                            "estimated_soc_at_departure": 0.8,
-                            "estimated_time_at_departure": "2026-02-22T15:00:00Z",
+                "timestamp": "2026-02-22T12:00:00Z",
+                "observations": {
+                    "non_shiftable_load": 7.0,
+                    "solar_generation": 2.0,
+                    "energy_price": {
+                        "values": [0.11] * 96,
+                        "measurement_unit": "€/kWh",
+                        "frequency_seconds": 900,
+                        "horizon_seconds": 86400,
+                    },
+                    "charging_sessions": {
+                        "AC000004_1": {"power": 2.0, "electric_vehicle": "11824"},
+                        "AC000007_1": {"power": 2.0, "electric_vehicle": "11823"},
+                    },
+                    "electric_vehicles": {
+                        "11824": {
+                            "SoC": 0.3,
+                            "flexibility": {
+                                "estimated_soc_at_departure": 0.8,
+                                "estimated_time_at_departure": "2026-02-22T15:00:00Z",
+                            },
+                        },
+                        "11823": {
+                            "SoC": 0.6,
+                            "flexibility": {
+                                "estimated_soc_at_departure": -1,
+                                "estimated_time_at_departure": "",
+                            },
                         },
                     },
-                    "11823": {
-                        "SoC": 0.6,
-                        "flexibility": {
-                            "estimated_soc_at_departure": -1,
-                            "estimated_time_at_departure": "",
-                        },
-                    },
                 },
+                "forecasts": {},
             },
             "sao_mamede": {
-                "site": {"pt_available_kw": 80.0},
-                "solar_generation": 12.0,
-                "charging_sessions": {
-                    "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"}
-                },
-                "electric_vehicles": {
-                    "SM_EV_01": {
-                        "SoC": 0.35,
-                        "flexibility": {
-                            "estimated_soc_at_departure": 0.8,
-                            "estimated_time_at_departure": "2026-02-22T16:00:00Z",
+                "timestamp": "2026-02-22T12:00:00Z",
+                "observations": {
+                    "solar_generation": 12.0,
+                    "energy_price": {
+                        "values": [0.12] * 96,
+                        "measurement_unit": "€/kWh",
+                        "frequency_seconds": 900,
+                        "horizon_seconds": 86400,
+                    },
+                    "charging_sessions": {
+                        "BB000SMI_1": {"power": 0.0, "electric_vehicle": ""},
+                        "BB000SMI_2": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
+                    },
+                    "electric_vehicles": {
+                        "SM_EV_01": {
+                            "SoC": 0.35,
+                            "flexibility": {
+                                "estimated_soc_at_departure": 0.8,
+                                "estimated_time_at_departure": "2026-02-22T16:00:00Z",
+                            },
                         },
-                    }
+                    },
+                    "virtual_battery": {"soc": 0.5},
                 },
-                "electrical_storage": {"soc": 0.5},
-                "virtual_battery": {"setpoint_kw": 18.0},
+                "forecasts": {},
             },
         },
-        "community": {"price_signal": 0.2},
+        "community": {
+            "target_net_import_kw": 100.0,
+            "current_net_import_kw": 140.0,
+            "price_signal": {
+                "values": [0.2] * 96,
+                "measurement_unit": "€/kWh",
+                "frequency_seconds": 900,
+                "horizon_seconds": 86400,
+            },
+        },
     }
 
 
@@ -123,7 +150,7 @@ def test_inference_selects_agent_by_body_index(api_client):
     assert sm_resp.status_code == 200
     sm_actions = sm_resp.json()["actions"]
     assert set(sm_actions.keys()) == {"1"}
-    assert set(sm_actions["1"].keys()) == {"BB000SMI", "virtual_battery_kw"}
+    assert set(sm_actions["1"].keys()) == {"BB000SMI_1", "BB000SMI_2", "virtual_battery_kw"}
 
     bv_resp = api_client.post(
         "/inference",
@@ -176,21 +203,29 @@ def test_single_agent_bundle_still_works_without_agent_index(api_client):
         json={
             "features": {
                 "timestamp": "2026-02-22T12:00:00Z",
-                "non_shiftable_load": 4.0,
-                "solar_generation": 1.5,
-                "energy_price": 0.1,
-                "charging_sessions": {
-                    "AC000004_1": {"power": 1.8, "electric_vehicle": "11824"}
-                },
-                "electric_vehicles": {
-                    "11824": {
-                        "SoC": 0.3,
-                        "flexibility": {
-                            "estimated_soc_at_departure": 0.8,
-                            "estimated_time_at_departure": "2026-02-22T14:00:00Z",
+                "observations": {
+                    "non_shiftable_load": 4.0,
+                    "solar_generation": 1.5,
+                    "energy_price": {
+                        "values": [0.1] * 96,
+                        "measurement_unit": "€/kWh",
+                        "frequency_seconds": 900,
+                        "horizon_seconds": 86400,
+                    },
+                    "charging_sessions": {
+                        "AC000004_1": {"power": 1.8, "electric_vehicle": "11824"}
+                    },
+                    "electric_vehicles": {
+                        "11824": {
+                            "SoC": 0.3,
+                            "flexibility": {
+                                "estimated_soc_at_departure": 0.8,
+                                "estimated_time_at_departure": "2026-02-22T14:00:00Z",
+                            },
                         },
-                    }
+                    },
                 },
+                "forecasts": {},
             }
         },
     )

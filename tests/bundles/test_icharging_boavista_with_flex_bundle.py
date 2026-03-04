@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,11 +21,7 @@ from tests.bundles._icharging_shared import (
 BUNDLE_DIR = Path("examples/icharging_boavista_with_flex")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-SEQUENCE_PATH = BUNDLE_DIR / "three_day_sequence.json"
-DATASET_PATHS = [
-    BUNDLE_DIR / "datasets" / "dados_de_inferência_IC_11.11.2025_a_14.11.2025.json",
-    BUNDLE_DIR / "datasets" / "dados_de_inferência_IC_14.11.2025_a_18.11.2025.json",
-]
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_i-charging_headquarters.json"
 
 
 @pytest.fixture
@@ -46,30 +43,26 @@ def test_bundle_loads_boavista_with_flex(boavista_with_flex_client):
     assert pipeline.agent._icharging_runtime is not None  # noqa: SLF001
 
 
-def test_sequence_replay_boavista_with_flex(boavista_with_flex_client):
-    scenarios = load_json(SEQUENCE_PATH)
+def test_replay_new_headquarters_messages(boavista_with_flex_client):
+    scenarios = load_json(MESSAGE_PATH)
     assert scenarios
-
     for scenario in scenarios:
         payload = normalize_record(scenario)
         actions = post_inference(boavista_with_flex_client, payload)
-        board_limit = BASE_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
+        board_limit = BASE_BOARD_LIMIT_KW + float(
+            payload.get("observations", {}).get("solar_generation", 0.0)
+        )
         assert_board_and_phase_limits(actions, payload, board_limit_kw=board_limit)
         assert_connected_charger_action_bounds(actions, payload)
 
 
-def test_dataset_replay_sample_uses_bundle_data(boavista_with_flex_client):
-    for dataset_path in DATASET_PATHS:
-        assert dataset_path.exists()
+def test_price_vector_does_not_change_dispatch(boavista_with_flex_client):
+    record = load_json(MESSAGE_PATH)[0]
+    payload_a = normalize_record(record)
+    payload_b = json.loads(json.dumps(payload_a))
+    payload_b["observations"]["energy_price"]["values"] = [9.99] * 96
+    payload_b["observations"]["energy_price"]["measurement_unit"] = "€/kWh"
 
-    sample_records = []
-    for dataset_path in DATASET_PATHS:
-        sample_records.extend(load_json(dataset_path)[:15])
-
-    assert sample_records
-    for record in sample_records:
-        payload = normalize_record(record)
-        actions = post_inference(boavista_with_flex_client, payload)
-        board_limit = BASE_BOARD_LIMIT_KW + payload.get("solar_generation", 0.0)
-        assert_board_and_phase_limits(actions, payload, board_limit_kw=board_limit)
-        assert_connected_charger_action_bounds(actions, payload)
+    actions_a = post_inference(boavista_with_flex_client, payload_a)
+    actions_b = post_inference(boavista_with_flex_client, payload_b)
+    assert actions_a == actions_b

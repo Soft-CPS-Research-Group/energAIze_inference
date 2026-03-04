@@ -21,6 +21,38 @@ ICHARGING_BOAVISTA_WITH_FLEX_DIR = Path("examples/icharging_boavista_with_flex")
 ICHARGING_BOAVISTA_WITHOUT_FLEX_DIR = Path("examples/icharging_boavista_without_flex")
 
 
+def _to_bundle_features(payload: dict) -> dict:
+    if isinstance(payload.get("observations"), dict):
+        return payload
+
+    require_observations = False
+    if store.is_configured():
+        try:
+            pipeline = store.get_pipeline()
+            artifact_cfg = pipeline.manifest.get_artifact(pipeline.agent_index).config or {}
+            require_observations = bool(artifact_cfg.get("require_observations_envelope", False))
+        except Exception:  # noqa: BLE001
+            require_observations = False
+
+    if not require_observations:
+        return payload
+
+    features = {"observations": dict(payload), "forecasts": {}}
+    timestamp = payload.get("timestamp")
+    timestamp_date = payload.get("timestamp.$date")
+    features["observations"].pop("timestamp", None)
+    features["observations"].pop("timestamp.$date", None)
+    if timestamp is not None:
+        features["timestamp"] = timestamp
+    elif timestamp_date is not None:
+        features["timestamp.$date"] = timestamp_date
+    return features
+
+
+def _post_payload(client: TestClient, payload: dict):
+    return client.post("/inference", json={"features": _to_bundle_features(payload)})
+
+
 def _build_rule_based_bundle(tmp_path: Path) -> Path:
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
@@ -428,7 +460,7 @@ def test_onnx_icharging_sample_bundle():
     charging_sessions["AC000003_1"]["electric_vehicle"] = 3
     payload = {"charging_sessions": charging_sessions}
     try:
-        response = client.post("/inference", json={"features": payload})
+        response = _post_payload(client, payload)
         assert response.status_code == 200
         body = response.json()
         assert "actions" in body and "0" in body["actions"]
@@ -463,7 +495,7 @@ def _replay_log_dataset(client_loader, board_limit_fn, line_limit_fn, max_kw_fn)
                 "electric_vehicles": record.get("electric_vehicles", {}),
                 "pv_panels": record.get("pv_panels", {"PV01": {"energy": record.get("solar_generation", 0.0)}}),
             }
-            resp = client.post("/inference", json={"features": payload})
+            resp = _post_payload(client, payload)
             assert resp.status_code == 200
             actions = resp.json()["actions"]["0"]
             connected = {
@@ -743,7 +775,7 @@ def test_breaker_allocation_strategy():
     }
 
     try:
-        response = client.post("/inference", json={"features": payload})
+        response = _post_payload(client, payload)
         assert response.status_code == 200
         actions = response.json()["actions"]["0"]
 
@@ -827,7 +859,7 @@ def test_breaker_allocation_prioritises_urgent_ev():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["AC000004_1"] == pytest.approx(4.6, rel=1e-6)
@@ -879,7 +911,7 @@ def test_nonflex_distribution_balances_phase():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         total_l3 = (
@@ -923,7 +955,7 @@ def test_flexible_ev_consumes_solar_headroom():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["AC000004_1"] > 4.0
@@ -967,7 +999,7 @@ def test_nonflex_minimum_power_enforced():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["AC000005_1"] >= 1.6 - 1e-6
@@ -1001,7 +1033,7 @@ def test_breaker_only_enforces_limits_and_minimums():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         for cid in charging_sessions:
@@ -1029,7 +1061,7 @@ def test_breaker_only_skips_idle_sessions():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["AC000004_1"] >= 1.6 - 1e-6
@@ -1054,13 +1086,13 @@ def test_breaker_only_bb_tri_phase_limits():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["BB000018_1"] == pytest.approx(8.0, rel=1e-6)
 
         payload["charging_sessions"]["BB000018_1"]["electric_vehicle"] = 9001
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["BB000018_1"] >= 8.0 - 1e-6
@@ -1084,13 +1116,13 @@ def test_icharging_bb_tri_phase_limits():
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["BB000018_1"] == pytest.approx(8.0, rel=1e-6)
 
         payload["charging_sessions"]["BB000018_1"]["electric_vehicle"] = 9001
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["BB000018_1"] >= 8.0 - 1e-6
@@ -1172,7 +1204,7 @@ def test_breaker_only_phase_headroom_respects_pv(tmp_path):
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         total = sum(actions.values())
@@ -1205,7 +1237,7 @@ def test_icharging_phase_headroom_respects_pv(tmp_path):
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         total = sum(actions.values())
@@ -1244,7 +1276,7 @@ def test_icharging_pv_increases_flex_capacity(tmp_path):
             "charging_sessions": charging_sessions,
             "electric_vehicles": electric_vehicles,
         }
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         return actions.get("AC000001_1", 0.0)
@@ -1319,7 +1351,7 @@ def test_subminute_control_interval_allows_lower_required_kw(tmp_path):
     }
 
     try:
-        resp = client.post("/inference", json={"features": payload})
+        resp = _post_payload(client, payload)
         assert resp.status_code == 200
         actions = resp.json()["actions"]["0"]
         assert actions["AC000004_1"] < 4.6 - 1e-6
@@ -1554,7 +1586,7 @@ def test_icharging_multi_step_sequence():
                 "electric_vehicles": scenario["electric_vehicles"],
                 "pv_panels": {"PV01": {"energy": scenario["solar_generation"]}},
             }
-            resp = client.post("/inference", json={"features": payload})
+            resp = _post_payload(client, payload)
             assert resp.status_code == 200, scenario["description"]
             actions = resp.json()["actions"]["0"]
 

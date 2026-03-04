@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+import copy
 import json
-from datetime import datetime
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services.rbc.icharging import IchargingBreakerRuntime, IchargingRuntimeConfig
 from app.state import store
 
 
-BUNDLE_DIR = Path("examples/icharging_sao_mamede")
+BUNDLE_DIR = Path("examples/icharging_sao_mamede_without_virtual_battery")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-SEQUENCE_PATH = BUNDLE_DIR / "three_day_sequence.json"
-MESSAGE_PATH = BUNDLE_DIR / "message_example.json"
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede.json"
+
+
+MIN_TECHNICAL_KW = 8.0
+MAX_BB_KW = 50.0
 
 
 def _run(client: TestClient, payload: dict) -> dict[str, float]:
@@ -38,213 +40,156 @@ def sao_mamede_client():
             store.unload()
 
 
+def _base_payload() -> dict:
+    payload = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))[0]
+    payload = copy.deepcopy(payload)
+    payload["timestamp"] = "2026-03-01T10:00:00Z"
+    payload["observations"]["charging_sessions"] = {
+        "BB000SMI_1": {"power": 0.0, "electric_vehicle": ""},
+        "BB000SMI_2": {"power": 0.0, "electric_vehicle": ""},
+        "M1123089-5_1": {"power": 0.0, "electric_vehicle": ""},
+        "M1123089-5_2": {"power": 0.0, "electric_vehicle": ""},
+        "M1123089-6_1": {"power": 0.0, "electric_vehicle": ""},
+        "M1123089-6_2": {"power": 0.0, "electric_vehicle": ""},
+    }
+    payload["observations"]["electric_vehicles"] = {}
+    payload["forecasts"] = {}
+    return payload
+
+
 def test_bundle_loads_sao_mamede(sao_mamede_client):
     pipeline = store.get_pipeline()
     assert pipeline.agent.strategy == "icharging_breaker"
     assert pipeline.agent._icharging_runtime is not None  # noqa: SLF001
 
 
-def test_actions_contract_only_bb000smi(sao_mamede_client):
-    payload = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))["features"]
+def test_actions_contract_per_real_plug(sao_mamede_client):
+    payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert set(actions.keys()) == {"BB000SMI"}
+    assert set(actions.keys()) == {"BB000SMI_1", "BB000SMI_2"}
 
 
-def test_respects_pt_available_headroom(sao_mamede_client):
-    payload = {
-        "timestamp": "2026-02-22T09:00:00Z",
-        "site": {"pt_available_kw": 18.0},
-        "solar_generation": 10.0,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
-            "M1123089-5": {"power": 4.0, "electric_vehicle": ""},
-            "M1123089-6": {"power": 1.0, "electric_vehicle": ""},
-        },
-        "electric_vehicles": {
-            "SM_EV_01": {
-                "SoC": 0.40,
-                "flexibility": {
-                    "estimated_soc_at_departure": -1,
-                    "estimated_time_at_departure": "",
-                },
-            }
-        },
+def test_idle_plug_outputs_min_technical_kw(sao_mamede_client):
+    payload = _base_payload()
+    payload["observations"]["charging_sessions"]["BB000SMI_1"] = {
+        "power": 20.0,
+        "electric_vehicle": "SM_EV_01",
     }
-    actions = _run(sao_mamede_client, payload)
-    assert 0.0 <= actions["BB000SMI"] <= 18.0 + 1e-6
-
-
-def test_missing_pt_headroom_fails_safe_to_zero(sao_mamede_client):
-    payload = {
-        "timestamp": "2026-02-22T10:00:00Z",
-        "solar_generation": 14.0,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_01"},
-            "M1123089-5": {"power": 7.0, "electric_vehicle": ""},
-            "M1123089-6": {"power": 3.0, "electric_vehicle": ""},
-        },
-        "electric_vehicles": {
-            "SM_EV_01": {
-                "SoC": 0.38,
-                "flexibility": {
-                    "estimated_soc_at_departure": -1,
-                    "estimated_time_at_departure": "",
-                },
-            }
-        },
-    }
-    actions = _run(sao_mamede_client, payload)
-    assert actions["BB000SMI"] == pytest.approx(0.0, rel=1e-6)
-
-
-def test_no_ev_connected_returns_zero(sao_mamede_client):
-    payload = {
-        "timestamp": "2026-02-23T07:00:00Z",
-        "site": {"pt_available_kw": 70.0},
-        "solar_generation": 0.0,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": ""},
-            "M1123089-5": {"power": 4.0, "electric_vehicle": ""},
-            "M1123089-6": {"power": 6.0, "electric_vehicle": ""},
-        },
-        "electric_vehicles": {},
-    }
-    actions = _run(sao_mamede_client, payload)
-    assert actions["BB000SMI"] == pytest.approx(0.0, rel=1e-6)
-
-
-def test_flexibility_is_applied_with_deadline(sao_mamede_client):
-    payload = {
-        "timestamp": "2026-02-22T11:30:00Z",
-        "site": {"pt_available_kw": 35.0},
-        "solar_generation": 17.5,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_02"},
-            "M1123089-5": {"power": 0.0, "electric_vehicle": ""},
-            "M1123089-6": {"power": 0.0, "electric_vehicle": ""},
-        },
-        "electric_vehicles": {
-            "SM_EV_02": {
-                "SoC": 0.25,
-                "flexibility": {
-                    "estimated_soc_at_departure": 0.80,
-                    "estimated_time_at_departure": "2026-02-22T14:30:00Z",
-                },
-            }
-        },
+    payload["observations"]["electric_vehicles"] = {
+        "SM_EV_01": {
+            "SoC": 0.40,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.80,
+                "estimated_time_at_departure": "2026-03-01T14:00:00Z",
+            },
+        }
     }
 
     actions = _run(sao_mamede_client, payload)
-
-    now = datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00"))
-    departure = datetime.fromisoformat(
-        payload["electric_vehicles"]["SM_EV_02"]["flexibility"]["estimated_time_at_departure"].replace(
-            "Z", "+00:00"
-        )
-    )
-    minutes_remaining = max((departure - now).total_seconds() / 60.0, 15.0)
-    energy_gap_kwh = max(0.80 - 0.25, 0.0) * 60.0
-    required_kw = min(50.0, energy_gap_kwh / (minutes_remaining / 60.0))
-
-    assert actions["BB000SMI"] + 0.11 >= required_kw
+    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
 
 
-def test_non_controllable_m_chargers_are_observational_only(sao_mamede_client):
-    payload_a = {
-        "timestamp": "2026-02-22T12:00:00Z",
-        "site": {"pt_available_kw": 25.0},
-        "solar_generation": 8.0,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_03"},
-            "M1123089-5": {"power": 0.0, "electric_vehicle": ""},
-            "M1123089-6": {"power": 0.0, "electric_vehicle": ""},
+def test_both_idle_output_minimum(sao_mamede_client):
+    payload = _base_payload()
+    actions = _run(sao_mamede_client, payload)
+    assert actions["BB000SMI_1"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+
+
+def test_active_plug_is_optimized(sao_mamede_client):
+    payload = _base_payload()
+    payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
+        "power": 18.0,
+        "electric_vehicle": "SM_EV_02",
+    }
+    payload["observations"]["electric_vehicles"] = {
+        "SM_EV_02": {
+            "SoC": 0.30,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.90,
+                "estimated_time_at_departure": "2026-03-01T13:00:00Z",
+            },
+        }
+    }
+
+    actions = _run(sao_mamede_client, payload)
+    assert MIN_TECHNICAL_KW <= actions["BB000SMI_2"] <= MAX_BB_KW
+    assert actions["BB000SMI_1"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+
+
+def test_ambiguous_dual_ev_prioritizes_highest_power_with_warning(
+    sao_mamede_client,
+    monkeypatch,
+):
+    warnings: list[tuple[str, dict]] = []
+
+    class _DummyLogger:
+        def warning(self, message, *args, **kwargs):  # noqa: ANN001
+            warnings.append((str(message), dict(kwargs)))
+
+        def debug(self, *args, **kwargs):  # noqa: ANN001
+            return None
+
+        def info(self, *args, **kwargs):  # noqa: ANN001
+            return None
+
+        def exception(self, *args, **kwargs):  # noqa: ANN001
+            return None
+
+    monkeypatch.setattr("app.services.rbc.icharging.get_logger", lambda: _DummyLogger())
+
+    payload = _base_payload()
+    payload["observations"]["charging_sessions"]["BB000SMI_1"] = {
+        "power": 35.0,
+        "electric_vehicle": "SM_EV_11",
+    }
+    payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
+        "power": 10.0,
+        "electric_vehicle": "SM_EV_22",
+    }
+    payload["observations"]["electric_vehicles"] = {
+        "SM_EV_11": {
+            "SoC": 0.20,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.90,
+                "estimated_time_at_departure": "2026-03-01T12:00:00Z",
+            },
         },
-        "electric_vehicles": {
-            "SM_EV_03": {
-                "SoC": 0.40,
-                "flexibility": {
-                    "estimated_soc_at_departure": -1,
-                    "estimated_time_at_departure": "",
-                },
-            }
+        "SM_EV_22": {
+            "SoC": 0.55,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.70,
+                "estimated_time_at_departure": "2026-03-01T16:00:00Z",
+            },
         },
     }
-    payload_b = {
-        "timestamp": "2026-02-22T12:00:00Z",
-        "site": {"pt_available_kw": 25.0},
-        "solar_generation": 8.0,
-        "charging_sessions": {
-            "BB000SMI": {"power": 0.0, "electric_vehicle": "SM_EV_03"},
-            "M1123089-5": {"power": 7.4, "electric_vehicle": ""},
-            "M1123089-6": {"power": 7.4, "electric_vehicle": ""},
-        },
-        "electric_vehicles": {
-            "SM_EV_03": {
-                "SoC": 0.40,
-                "flexibility": {
-                    "estimated_soc_at_departure": -1,
-                    "estimated_time_at_departure": "",
-                },
-            }
-        },
+
+    actions = _run(sao_mamede_client, payload)
+    assert MIN_TECHNICAL_KW <= actions["BB000SMI_1"] <= MAX_BB_KW
+    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    assert any(msg == "rbc.exclusive_group_conflict" for msg, _ in warnings)
+
+
+def test_price_forecast_do_not_change_dispatch(sao_mamede_client):
+    payload_a = _base_payload()
+    payload_a["observations"]["charging_sessions"]["BB000SMI_1"] = {
+        "power": 25.0,
+        "electric_vehicle": "SM_EV_03",
     }
+    payload_a["observations"]["electric_vehicles"] = {
+        "SM_EV_03": {
+            "SoC": 0.35,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.85,
+                "estimated_time_at_departure": "2026-03-01T15:00:00Z",
+            },
+        }
+    }
+
+    payload_b = copy.deepcopy(payload_a)
+    payload_b["observations"]["energy_price"]["values"] = [9.0] * 96
+    payload_b["forecasts"] = {"dummy": {"values": [123.0, 456.0]}}
 
     actions_a = _run(sao_mamede_client, payload_a)
     actions_b = _run(sao_mamede_client, payload_b)
-    assert actions_a["BB000SMI"] == pytest.approx(actions_b["BB000SMI"], rel=1e-6)
-
-
-def test_replay_sequence_sao_mamede(sao_mamede_client):
-    scenarios = json.loads(SEQUENCE_PATH.read_text(encoding="utf-8"))
-
-    for scenario in scenarios:
-        actions = _run(sao_mamede_client, scenario)
-        action_value = actions["BB000SMI"]
-
-        pt_available = scenario.get("site", {}).get("pt_available_kw", 0.0)
-        ev_connected = bool(
-            str(scenario.get("charging_sessions", {}).get("BB000SMI", {}).get("electric_vehicle", "")).strip()
-        )
-
-        if not ev_connected:
-            assert action_value == pytest.approx(0.0, rel=1e-6), scenario["description"]
-            continue
-
-        assert 0.0 <= action_value <= 50.0 + 1e-6, scenario["description"]
-        assert action_value <= float(pt_available) + 1e-6, scenario["description"]
-
-
-def test_legacy_behavior_without_site_headroom_key():
-    cfg = IchargingRuntimeConfig.from_dict(
-        {
-            "max_board_kw": 10.0,
-            "charger_limit_kw": 50.0,
-            "min_connected_kw": 0.0,
-            "control_interval_minutes": 15.0,
-            "chargers": {
-                "BB000SMI": {
-                    "line": "L1",
-                    "min_kw": 0.0,
-                    "max_kw": 50.0,
-                    "allow_flex_when_ev": True
-                }
-            },
-            "line_limits": {
-                "L1": {"limit_kw": 10.0}
-            }
-        }
-    )
-    runtime = IchargingBreakerRuntime(cfg)
-
-    payload = {
-        "timestamp": "2026-02-22T12:00:00Z",
-        "solar_generation": 5.0,
-        "charging_sessions.BB000SMI.electric_vehicle": "SM_EV_99",
-        "charging_sessions.BB000SMI.power": 0.0,
-        "electric_vehicles.SM_EV_99.SoC": 0.40,
-        "electric_vehicles.SM_EV_99.flexibility.estimated_soc_at_departure": -1,
-        "electric_vehicles.SM_EV_99.flexibility.estimated_time_at_departure": "",
-    }
-
-    actions = runtime.allocate(payload)
-    assert actions["BB000SMI"] == pytest.approx(15.0, rel=1e-6)
+    assert actions_a == actions_b
