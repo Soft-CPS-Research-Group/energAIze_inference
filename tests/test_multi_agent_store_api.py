@@ -9,7 +9,7 @@ from app.main import app
 from app.state import store
 
 
-COMMUNITY_BUNDLE_DIR = Path("examples/icharging_community_boavista_sao_mamede")
+COMMUNITY_BUNDLE_DIR = Path("examples/icharging_community_boavista_sao_mamede_with_virtual_battery")
 COMMUNITY_MANIFEST_PATH = COMMUNITY_BUNDLE_DIR / "artifact_manifest.json"
 SINGLE_AGENT_BUNDLE_DIR = Path("examples/icharging_boavista_with_flex")
 SINGLE_AGENT_MANIFEST_PATH = SINGLE_AGENT_BUNDLE_DIR / "artifact_manifest.json"
@@ -149,8 +149,9 @@ def test_inference_selects_agent_by_body_index(api_client):
     )
     assert sm_resp.status_code == 200
     sm_actions = sm_resp.json()["actions"]
-    assert set(sm_actions.keys()) == {"1"}
+    assert set(sm_actions.keys()) == {"0", "1"}
     assert set(sm_actions["1"].keys()) == {"BB000SMI_1", "BB000SMI_2", "virtual_battery_kw"}
+    assert "AC000004_1" in sm_actions["0"]
 
     bv_resp = api_client.post(
         "/inference",
@@ -161,8 +162,9 @@ def test_inference_selects_agent_by_body_index(api_client):
     )
     assert bv_resp.status_code == 200
     bv_actions = bv_resp.json()["actions"]
-    assert set(bv_actions.keys()) == {"0"}
+    assert set(bv_actions.keys()) == {"0", "1"}
     assert "AC000004_1" in bv_actions["0"]
+    assert set(bv_actions["1"].keys()) == {"BB000SMI_1", "BB000SMI_2", "virtual_battery_kw"}
 
 
 def test_inference_defaults_to_default_agent_when_missing_agent_index(api_client):
@@ -184,7 +186,7 @@ def test_inference_defaults_to_default_agent_when_missing_agent_index(api_client
     )
     assert response.status_code == 200
     actions = response.json()["actions"]
-    assert set(actions.keys()) == {"1"}
+    assert set(actions.keys()) == {"0", "1"}
 
 
 def test_single_agent_bundle_still_works_without_agent_index(api_client):

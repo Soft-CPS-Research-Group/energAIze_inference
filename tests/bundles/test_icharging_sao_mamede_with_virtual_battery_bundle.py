@@ -59,16 +59,35 @@ def test_actions_contract_includes_virtual_battery(sao_mamede_with_battery_clien
     assert set(actions.keys()) == {"BB000SMI_1", "BB000SMI_2", "virtual_battery_kw"}
 
 
-def test_virtual_battery_price_arbitrage_direction(sao_mamede_with_battery_client):
-    charge_case = _base_payload()
-    charge_case["observations"]["energy_price"]["values"] = [0.08] + [0.22] * 95
-    charge_actions = _run(sao_mamede_with_battery_client, charge_case)
-    assert 0.0 <= charge_actions["virtual_battery_kw"] <= 15.0
+def test_virtual_battery_solar_first_charge(sao_mamede_with_battery_client):
+    payload = _base_payload()
+    payload["observations"]["solar_generation"] = 20.0
+    payload["observations"]["non_shiftable_load"] = 0.0
+    payload["observations"]["energy_price"]["values"] = [0.20] + [0.10] * 95
+    actions = _run(sao_mamede_with_battery_client, payload)
+    assert 0.0 <= actions["virtual_battery_kw"] <= 15.0
 
-    discharge_case = _base_payload()
-    discharge_case["observations"]["energy_price"]["values"] = [0.25] + [0.08] * 95
-    discharge_actions = _run(sao_mamede_with_battery_client, discharge_case)
-    assert -15.0 <= discharge_actions["virtual_battery_kw"] <= 0.0
+
+def test_virtual_battery_can_discharge_when_no_solar_and_price_unfavorable(
+    sao_mamede_with_battery_client,
+):
+    payload = _base_payload()
+    payload["observations"]["solar_generation"] = 0.0
+    payload["observations"]["non_shiftable_load"] = 0.0
+    payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
+        "power": 8.0,
+        "electric_vehicle": "SM_EV_1",
+    }
+    payload["observations"]["electric_vehicles"]["SM_EV_1"] = {
+        "SoC": 0.5,
+        "flexibility": {
+            "estimated_soc_at_departure": 0.8,
+            "estimated_time_at_departure": "2026-03-01T12:00:00Z",
+        },
+    }
+    payload["observations"]["energy_price"]["values"] = [0.25] + [0.08] * 95
+    actions = _run(sao_mamede_with_battery_client, payload)
+    assert -15.0 <= actions["virtual_battery_kw"] <= 0.0
 
 
 def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):
@@ -80,6 +99,8 @@ def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):
 
     low_soc = _base_payload()
     low_soc["observations"]["virtual_battery"]["soc"] = 0.05
+    low_soc["observations"]["solar_generation"] = 0.0
+    low_soc["observations"]["non_shiftable_load"] = 0.0
     low_soc["observations"]["energy_price"]["values"] = [0.25] + [0.08] * 95
     low_actions = _run(sao_mamede_with_battery_client, low_soc)
-    assert low_actions["virtual_battery_kw"] == pytest.approx(0.0, rel=1e-6)
+    assert low_actions["virtual_battery_kw"] >= 0.0

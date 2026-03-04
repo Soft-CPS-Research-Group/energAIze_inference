@@ -2067,11 +2067,11 @@
     },
     {
       "key": "ichargingSaoMamedeManifestPath",
-      "value": "/data/icharging_sao_mamede/artifact_manifest.json"
+      "value": "/data/icharging_sao_mamede_without_virtual_battery/artifact_manifest.json"
     },
     {
       "key": "ichargingSaoMamedeAliasPath",
-      "value": "/data/icharging_sao_mamede/aliases.json"
+      "value": "/data/icharging_sao_mamede_without_virtual_battery/aliases.json"
     },
     {
       "key": "rh1ManifestPath",
@@ -2091,11 +2091,11 @@
     },
     {
       "key": "communityBoavistaSaoMamedeManifestPath",
-      "value": "/data/icharging_community_boavista_sao_mamede/artifact_manifest.json"
+      "value": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery/artifact_manifest.json"
     },
     {
       "key": "communityBoavistaSaoMamedeRh1ManifestPath",
-      "value": "/data/icharging_community_boavista_sao_mamede_rh1/artifact_manifest.json"
+      "value": "/data/icharging_community_boavista_sao_mamede_rh1_with_virtual_battery/artifact_manifest.json"
     },
     {
       "key": "requestIdExample",

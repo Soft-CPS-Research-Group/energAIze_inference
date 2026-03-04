@@ -63,19 +63,14 @@ def test_bundle_loads_community_boavista_sao_mamede(community_client):
 def test_action_contract_per_agent(community_client):
     message = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))
 
-    response_boavista = community_client.post(
+    response = community_client.post(
         "/inference", json={"agent_index": 0, "features": message["features"]}
     )
-    assert response_boavista.status_code == 200
-    actions_0 = response_boavista.json()["actions"]["0"]
-    assert set(actions_0.keys()) == BOAVISTA_ACTIONS
-
-    response_sao_mamede = community_client.post(
-        "/inference", json={"agent_index": 1, "features": message["features"]}
-    )
-    assert response_sao_mamede.status_code == 200
-    actions_1 = response_sao_mamede.json()["actions"]["1"]
-    assert set(actions_1.keys()) == SAO_MAMEDE_ACTIONS
+    assert response.status_code == 200
+    actions = response.json()["actions"]
+    assert set(actions.keys()) == {"0", "1"}
+    assert set(actions["0"].keys()) == BOAVISTA_ACTIONS
+    assert set(actions["1"].keys()) == SAO_MAMEDE_ACTIONS
 
 
 def test_missing_site_payload_returns_400(community_client):
@@ -119,8 +114,11 @@ def test_virtual_battery_action_limits_and_soc_guard(community_client):
     features["sites"]["sao_mamede"]["observations"]["virtual_battery"] = {"soc": 0.5}
 
     discharge_case = copy.deepcopy(features)
-    discharge_case["community"]["target_net_import_kw"] = 100.0
-    discharge_case["community"]["current_net_import_kw"] = 145.0
+    discharge_case["sites"]["boavista"]["observations"]["solar_generation"] = 0.0
+    discharge_case["sites"]["boavista"]["observations"]["non_shiftable_load"] = 14.0
+    discharge_case["sites"]["sao_mamede"]["observations"]["solar_generation"] = 0.0
+    discharge_case["sites"]["sao_mamede"]["observations"]["non_shiftable_load"] = 6.0
+    discharge_case["community"]["price_signal"]["values"] = [0.24] + [0.10] * 95
     discharge_resp = community_client.post(
         "/inference", json={"agent_index": 1, "features": discharge_case}
     )
@@ -130,8 +128,13 @@ def test_virtual_battery_action_limits_and_soc_guard(community_client):
     assert discharge_kw <= 0.0
 
     charge_case = copy.deepcopy(features)
-    charge_case["community"]["target_net_import_kw"] = 120.0
-    charge_case["community"]["current_net_import_kw"] = 80.0
+    charge_case["sites"]["sao_mamede"]["observations"]["solar_generation"] = 35.0
+    charge_case["sites"]["sao_mamede"]["observations"]["non_shiftable_load"] = 0.0
+    charge_case["sites"]["boavista"]["observations"]["solar_generation"] = 35.0
+    charge_case["sites"]["boavista"]["observations"]["non_shiftable_load"] = 0.0
+    charge_case["sites"]["boavista"]["observations"]["charging_sessions"] = {}
+    charge_case["sites"]["boavista"]["observations"]["electric_vehicles"] = {}
+    charge_case["community"]["price_signal"]["values"] = [0.08] + [0.20] * 95
     charge_resp = community_client.post(
         "/inference", json={"agent_index": 1, "features": charge_case}
     )
@@ -142,18 +145,18 @@ def test_virtual_battery_action_limits_and_soc_guard(community_client):
 
     high_soc = copy.deepcopy(features)
     high_soc["sites"]["sao_mamede"]["observations"]["virtual_battery"]["soc"] = 1.0
-    high_soc["community"]["target_net_import_kw"] = 120.0
-    high_soc["community"]["current_net_import_kw"] = 80.0
+    high_soc["sites"]["sao_mamede"]["observations"]["solar_generation"] = 35.0
     high_resp = community_client.post(
         "/inference", json={"agent_index": 1, "features": high_soc}
     )
     assert high_resp.status_code == 200
-    assert high_resp.json()["actions"]["1"]["virtual_battery_kw"] == pytest.approx(0.0, rel=1e-6)
+    assert -15.0 <= high_resp.json()["actions"]["1"]["virtual_battery_kw"] <= 0.0
 
     low_soc = copy.deepcopy(features)
     low_soc["sites"]["sao_mamede"]["observations"]["virtual_battery"]["soc"] = 0.05
-    low_soc["community"]["target_net_import_kw"] = 100.0
-    low_soc["community"]["current_net_import_kw"] = 150.0
+    low_soc["sites"]["boavista"]["observations"]["solar_generation"] = 0.0
+    low_soc["sites"]["boavista"]["observations"]["non_shiftable_load"] = 18.0
+    low_soc["community"]["price_signal"]["values"] = [0.24] + [0.10] * 95
     low_resp = community_client.post(
         "/inference", json={"agent_index": 1, "features": low_soc}
     )
@@ -164,13 +167,26 @@ def test_virtual_battery_action_limits_and_soc_guard(community_client):
 def test_sequence_smoke_replay(community_client):
     sequence = json.loads(SEQUENCE_PATH.read_text(encoding="utf-8"))
     assert sequence
+    base_features = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))["features"]
 
     for step in sequence:
+        features = copy.deepcopy(base_features)
+        step_features = step.get("features", {})
+        step_sites = step_features.get("sites", {})
+        if isinstance(step_sites, dict):
+            for site_key, site_payload in step_sites.items():
+                if isinstance(site_payload, dict):
+                    features.setdefault("sites", {})[site_key] = copy.deepcopy(site_payload)
+        if isinstance(step_features.get("community"), dict):
+            features["community"] = copy.deepcopy(step_features["community"])
+        if step_features.get("timestamp") is not None:
+            features["timestamp"] = step_features["timestamp"]
         response = community_client.post(
             "/inference",
             json={
                 "agent_index": step["agent_index"],
-                "features": step["features"],
+                "features": features,
             },
         )
         assert response.status_code == 200
+        assert set(response.json()["actions"].keys()) == {"0", "1"}

@@ -42,9 +42,9 @@ Multi-agent example with explicit default:
 
 ```json
 {
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede/artifact_manifest.json",
+  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
   "agent_index": 1,
-  "artifacts_dir": "/data/icharging_community_boavista_sao_mamede",
+  "artifacts_dir": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery",
   "alias_mapping_path": null
 }
 ```
@@ -54,7 +54,7 @@ Success response (`200`):
 ```json
 {
   "status": "loaded",
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede/artifact_manifest.json",
+  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
   "agent_index": 1,
   "default_agent_index": 1,
   "loaded_agent_indices": [0, 1],
@@ -230,7 +230,7 @@ Success response (`200`) example:
   "algorithm": "RuleBasedCommunity",
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "icharging_community_boavista_sao_mamede"
+    "experiment_name": "icharging_community_boavista_sao_mamede_with_virtual_battery"
   },
   "topology": {
     "num_agents": 2
@@ -265,7 +265,7 @@ Example:
   "default_agent_index": 1,
   "loaded_agent_indices": [0, 1],
   "providers": ["rule_based"],
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede/artifact_manifest.json",
+  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
   "alias_mapping_path": null,
   "gpu_available": false
 }

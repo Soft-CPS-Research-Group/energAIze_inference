@@ -361,7 +361,11 @@
           },
           "non_flex_active_power_kw": 0.05,
           "drop_inactive_non_flex": true,
-          "require_observations_envelope": true
+          "require_observations_envelope": true,
+          "community_optimization_enabled": true,
+          "community_price_signal_key": "community.price_signal",
+          "community_trade_factor": 0.8,
+          "community_export_factor": 0.8
         }
       },
       {
@@ -419,7 +423,11 @@
               "BB000SMI_2"
             ]
           ],
-          "exclusive_group_strategy": "highest_power"
+          "exclusive_group_strategy": "highest_power",
+          "community_optimization_enabled": true,
+          "community_price_signal_key": "community.price_signal",
+          "community_trade_factor": 0.8,
+          "community_export_factor": 0.8
         }
       },
       {
@@ -462,7 +470,11 @@
           "battery_soc_keys": [
             "electrical_storage.soc"
           ],
-          "require_observations_envelope": true
+          "require_observations_envelope": true,
+          "community_optimization_enabled": true,
+          "community_price_signal_key": "community.price_signal",
+          "community_trade_factor": 0.8,
+          "community_export_factor": 0.8
         }
       }
     ]

@@ -339,7 +339,11 @@
           },
           "non_flex_active_power_kw": 0.05,
           "drop_inactive_non_flex": true,
-          "require_observations_envelope": true
+          "require_observations_envelope": true,
+          "community_optimization_enabled": true,
+          "community_price_signal_key": "community.price_signal",
+          "community_trade_factor": 0.8,
+          "community_export_factor": 0.8
         }
       },
       {
@@ -414,7 +418,11 @@
           "virtual_battery_community_target_import_key": "community.target_net_import_kw",
           "virtual_battery_community_current_import_key": "community.current_net_import_kw",
           "virtual_battery_community_price_prefix": "community.price_signal",
-          "virtual_battery_local_price_prefix": "energy_price"
+          "virtual_battery_local_price_prefix": "energy_price",
+          "community_optimization_enabled": true,
+          "community_price_signal_key": "community.price_signal",
+          "community_trade_factor": 0.8,
+          "community_export_factor": 0.8
         }
       }
     ]

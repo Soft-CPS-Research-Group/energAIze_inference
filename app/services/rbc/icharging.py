@@ -782,6 +782,10 @@ class IchargingBreakerRuntime:
         board_headroom_kw = max(effective_board_limit - board_total_kw, 0.0)
         charge_limit_kw = min(charge_limit_kw, board_headroom_kw)
 
+        non_shiftable_load_kw = _safe_float(payload.get("non_shiftable_load"), 0.0)
+        solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
+        local_net_without_battery_kw = non_shiftable_load_kw + board_total_kw - solar_kw
+
         target_dispatch_kw: Optional[float] = None
         if cfg.virtual_battery_use_community_signals:
             target_import = _maybe_float(payload.get(cfg.virtual_battery_community_target_import_key))
@@ -802,13 +806,23 @@ class IchargingBreakerRuntime:
             if setpoint_kw is not None:
                 setpoint_dispatch_kw = setpoint_kw
 
+        # Solar-first local policy:
+        # 1) absorb local PV surplus in battery;
+        # 2) when importing from grid, allow discharge when price indicates it is unfavorable.
+        if local_net_without_battery_kw < -1e-6:
+            solar_first_dispatch_kw = min(charge_limit_kw, -local_net_without_battery_kw)
+        elif local_net_without_battery_kw > 1e-6 and price_dispatch_kw < -1e-6:
+            solar_first_dispatch_kw = -min(discharge_limit_kw, local_net_without_battery_kw)
+        else:
+            solar_first_dispatch_kw = 0.0
+
         dispatch_kw = (
             setpoint_dispatch_kw
             if setpoint_dispatch_kw is not None
-            else (target_dispatch_kw if target_dispatch_kw is not None else price_dispatch_kw)
+            else (target_dispatch_kw if target_dispatch_kw is not None else solar_first_dispatch_kw)
         )
         if target_dispatch_kw is not None and abs(dispatch_kw) < 0.5:
-            dispatch_kw = price_dispatch_kw
+            dispatch_kw = solar_first_dispatch_kw
 
         if dispatch_kw > 0.0:
             dispatch_kw = min(dispatch_kw, charge_limit_kw)

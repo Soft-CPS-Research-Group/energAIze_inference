@@ -6,10 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.models.requests import InferenceRequest
 from app.models.responses import InferenceResponse
 from app.logging import get_logger
+from app.services.rbc.community_optimizer import CommunityOptimizerRuntime
 from app.state import store
 from app.utils.flatten import flatten_payload
 
 router = APIRouter(prefix="/inference", tags=["inference"])
+community_optimizer = CommunityOptimizerRuntime()
 
 
 def _ensure_configured():
@@ -73,6 +75,62 @@ def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[
     return normalized
 
 
+def _is_community_mode(features: Dict[str, Any], record) -> bool:
+    if record is None or len(record.loaded_agent_indices) <= 1:
+        return False
+    sites = features.get("sites")
+    if not isinstance(sites, dict):
+        return False
+
+    manifest = record.pipelines[record.loaded_agent_indices[0]].manifest
+    has_site_mapping = True
+    optimization_enabled = False
+    for agent_index in record.loaded_agent_indices:
+        cfg = manifest.get_artifact(agent_index).config or {}
+        site_key = str(cfg.get("input_site_key") or "").strip()
+        if not site_key:
+            has_site_mapping = False
+            break
+        if bool(cfg.get("community_optimization_enabled", False)):
+            optimization_enabled = True
+
+    return has_site_mapping and optimization_enabled
+
+
+def _log_single_agent_actions(pipeline, flattened: Dict[str, Any], actions: Dict[str, Dict[str, float]]) -> None:
+    manifest = pipeline.manifest
+    agent_cfg = manifest.get_artifact(pipeline.agent_index).config or {}
+    chargers_cfg = agent_cfg.get("chargers", {})
+    actions_for_agent = actions.get(str(pipeline.agent_index), actions.get(pipeline.agent_index, {}))
+    connected = {
+        cid: bool(str(flattened.get(f"charging_sessions.{cid}.electric_vehicle", "")).strip())
+        for cid in chargers_cfg
+        if not str(cid).startswith("b_")
+    }
+    line_totals: dict[str, float] = {}
+    for cid, value in actions_for_agent.items():
+        if str(cid).startswith("b_") or cid not in chargers_cfg:
+            continue
+        if not connected.get(cid):
+            continue
+        meta = chargers_cfg.get(cid, {})
+        phases = meta.get("phases") or ([meta.get("line")] if meta.get("line") else [])
+        phases = [p for p in phases if p]
+        n_phases = max(len(phases), 1)
+        per_phase = value / n_phases
+        for phase in phases or ["unknown"]:
+            line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
+    board_total = sum(v for k, v in actions_for_agent.items() if connected.get(k))
+    line_totals = dict(sorted(line_totals.items()))
+    get_logger().debug(
+        "inference.actions",
+        actions=actions_for_agent,
+        connected=connected,
+        phase_totals=line_totals,
+        board_total=board_total,
+    )
+
+
 @router.post("", response_model=InferenceResponse)
 async def run_inference(payload: InferenceRequest, request: Request, _ = Depends(_ensure_configured)):
     """Run inference for the configured agent using the supplied feature dict."""
@@ -81,11 +139,19 @@ async def run_inference(payload: InferenceRequest, request: Request, _ = Depends
     if request is not None:
         request_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
     try:
-        pipeline = store.get_pipeline(payload.agent_index)
-        selected_features = _select_agent_features(payload.features, pipeline)
-        runtime_features = _normalize_agent_input(selected_features, pipeline)
-        flattened = flatten_payload(runtime_features)
-        actions = pipeline.inference(flattened)
+        record = store.get_record()
+        if _is_community_mode(payload.features, record):
+            actions = community_optimizer.allocate(payload.features, record)
+        else:
+            pipeline = store.get_pipeline(payload.agent_index)
+            selected_features = _select_agent_features(payload.features, pipeline)
+            runtime_features = _normalize_agent_input(selected_features, pipeline)
+            flattened = flatten_payload(runtime_features)
+            actions = pipeline.inference(flattened)
+            try:
+                _log_single_agent_actions(pipeline, flattened, actions)
+            except Exception:
+                log.exception("inference.action_logging_failed")
     except KeyError as exc:
         log.warning("Inference payload missing data", missing=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -96,41 +162,5 @@ async def run_inference(payload: InferenceRequest, request: Request, _ = Depends
     except Exception as exc:  # noqa: BLE001
         log.exception("Inference failed")
         raise HTTPException(status_code=500, detail="Inference execution failed") from exc
-
-    # Emit per-request action summary with phase/board totals for debugging.
-    try:
-        manifest = pipeline.manifest
-        agent_cfg = manifest.get_artifact(pipeline.agent_index).config or {}
-        chargers_cfg = agent_cfg.get("chargers", {})
-        actions_for_agent = actions.get(str(pipeline.agent_index), actions.get(pipeline.agent_index, {}))
-        connected = {
-            cid: bool(str(flattened.get(f"charging_sessions.{cid}.electric_vehicle", "")).strip())
-            for cid in chargers_cfg
-            if not str(cid).startswith("b_")
-        }
-        line_totals: dict[str, float] = {}
-        for cid, value in actions_for_agent.items():
-            if str(cid).startswith("b_") or cid not in chargers_cfg:
-                continue
-            if not connected.get(cid):
-                continue
-            meta = chargers_cfg.get(cid, {})
-            phases = meta.get("phases") or ([meta.get("line")] if meta.get("line") else [])
-            phases = [p for p in phases if p]
-            n_phases = max(len(phases), 1)
-            per_phase = value / n_phases
-            for phase in phases or ["unknown"]:
-                line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
-        board_total = sum(v for k, v in actions_for_agent.items() if connected.get(k))
-        line_totals = dict(sorted(line_totals.items()))
-        log.debug(
-            "inference.actions",
-            actions=actions_for_agent,
-            connected=connected,
-            phase_totals=line_totals,
-            board_total=board_total,
-        )
-    except Exception:
-        log.exception("inference.action_logging_failed")
 
     return InferenceResponse(actions=actions, request_id=request_id)

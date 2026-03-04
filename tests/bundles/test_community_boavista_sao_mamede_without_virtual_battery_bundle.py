@@ -36,8 +36,9 @@ def test_bundle_loads_and_actions_contract_without_virtual_battery():
         message = _load_message()
         resp = _inference(client, 1, message["features"])
         assert resp.status_code == 200
-        actions = resp.json()["actions"]["1"]
-        assert set(actions.keys()) == {"BB000SMI_1", "BB000SMI_2"}
+        actions = resp.json()["actions"]
+        assert set(actions.keys()) == {"0", "1"}
+        assert set(actions["1"].keys()) == {"BB000SMI_1", "BB000SMI_2"}
     finally:
         if store.is_configured():
             store.unload()
@@ -51,11 +52,23 @@ def test_sequence_smoke_replay_without_virtual_battery():
     try:
         sequence = _load_sequence()
         assert sequence
+        base_features = _load_message()["features"]
         for step in sequence:
-            response = _inference(client, step["agent_index"], step["features"])
+            features = json.loads(json.dumps(base_features))
+            step_features = step.get("features", {})
+            step_sites = step_features.get("sites", {})
+            if isinstance(step_sites, dict):
+                for site_key, site_payload in step_sites.items():
+                    if isinstance(site_payload, dict):
+                        features.setdefault("sites", {})[site_key] = site_payload
+            if isinstance(step_features.get("community"), dict):
+                features["community"] = step_features["community"]
+            if step_features.get("timestamp") is not None:
+                features["timestamp"] = step_features["timestamp"]
+            response = _inference(client, step["agent_index"], features)
             assert response.status_code == 200
-            if step["agent_index"] == 1:
-                assert "virtual_battery_kw" not in response.json()["actions"]["1"]
+            assert set(response.json()["actions"].keys()) == {"0", "1"}
+            assert "virtual_battery_kw" not in response.json()["actions"]["1"]
     finally:
         if store.is_configured():
             store.unload()
