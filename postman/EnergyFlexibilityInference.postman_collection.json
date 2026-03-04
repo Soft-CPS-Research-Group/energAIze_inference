@@ -294,7 +294,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:36:14Z\",\n    \"non_shiftable_load\": 12,\n    \"energy_price\": 0,\n    \"solar_generation\": 2.8,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 4.078, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 4.274, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.724, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.807, \"electric_vehicle\": 11825},\n      \"AC000008_1\": {\"power\": 2.819, \"electric_vehicle\": 11822},\n      \"AC000009_1\": {\"power\": 2.788, \"electric_vehicle\": 11832},\n      \"AC000014_1\": {\"power\": 3.035, \"electric_vehicle\": 11838},\n      \"ACEXT004_1\": {\"power\": 2.979, \"electric_vehicle\": 11821}\n    },\n    \"electric_vehicles\": {\n      \"11824\": {\n        \"SoC\": 0.5,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.95,\n          \"estimated_time_at_departure\": \"2025-11-04T10:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T11:30:00Z\",\n          \"capacity_kwh\": 75\n        }\n      },\n      \"11833\": {\n        \"SoC\": 0.55,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.7,\n          \"estimated_time_at_departure\": \"2025-11-04T13:00:00Z\"\n        }\n      },\n      \"11825\": {\n        \"SoC\": 0.7,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.85,\n          \"estimated_time_at_departure\": \"2025-11-04T12:30:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 2.8}\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 6.5,\n      \"solar_generation\": 1.8,\n      \"energy_price\": {\n        \"values\": [\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"AC000004_1\": {\n          \"power\": 2.0,\n          \"electric_vehicle\": \"11824\"\n        },\n        \"AC000007_1\": {\n          \"power\": 1.8,\n          \"electric_vehicle\": \"11823\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"11824\": {\n          \"SoC\": 0.3,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n          }\n        },\n        \"11823\": {\n          \"SoC\": 0.55,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": -1,\n            \"estimated_time_at_departure\": \"\"\n          }\n        }\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -337,7 +337,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-04T09:00:00Z\",\n    \"non_shiftable_load\": 5,\n    \"energy_price\": 0,\n    \"solar_generation\": 1.5,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 2\n      },\n      \"AC000007_1\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": 11823\n      }\n    },\n    \"electric_vehicles\": {\n      \"2\": {\n        \"SoC\": 0.2,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.9,\n          \"estimated_time_at_departure\": \"2025-11-04T09:15:00Z\"\n        }\n      },\n      \"11823\": {\n        \"SoC\": 0.6,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2025-11-04T11:00:00Z\"\n        }\n      }\n    },\n    \"pv_panels\": {\n      \"PV01\": {\n        \"energy\": 2.0\n      }\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 6.5,\n      \"solar_generation\": 1.8,\n      \"energy_price\": {\n        \"values\": [\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"AC000004_1\": {\n          \"power\": 2.0,\n          \"electric_vehicle\": \"11824\"\n        },\n        \"AC000007_1\": {\n          \"power\": 1.8,\n          \"electric_vehicle\": \"11823\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"11824\": {\n          \"SoC\": 0.3,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T12:45:00Z\"\n          }\n        },\n        \"11823\": {\n          \"SoC\": 0.55,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": -1,\n            \"estimated_time_at_departure\": \"\"\n          }\n        }\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -457,7 +457,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2025-11-07T08:00:00Z\",\n    \"non_shiftable_load\": 0,\n    \"solar_generation\": 0,\n    \"energy_price\": 0,\n    \"charging_sessions\": {\n      \"AC000004_1\": {\"power\": 2.4, \"electric_vehicle\": 11824},\n      \"AC000007_1\": {\"power\": 2.6, \"electric_vehicle\": 11823},\n      \"AC000005_1\": {\"power\": 2.8, \"electric_vehicle\": 11833},\n      \"AC000006_1\": {\"power\": 2.1, \"electric_vehicle\": 11825}\n    },\n    \"pv_panels\": {\n      \"PV01\": {\"energy\": 0}\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 6.5,\n      \"solar_generation\": 1.8,\n      \"energy_price\": {\n        \"values\": [\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11,\n          0.11\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"AC000004_1\": {\n          \"power\": 2.0,\n          \"electric_vehicle\": \"11824\"\n        },\n        \"AC000007_1\": {\n          \"power\": 1.8,\n          \"electric_vehicle\": \"11823\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"11824\": {\n          \"SoC\": 0.3,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n          }\n        },\n        \"11823\": {\n          \"SoC\": 0.55,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": -1,\n            \"estimated_time_at_departure\": \"\"\n          }\n        }\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -526,7 +526,7 @@
       ]
     },
     {
-      "name": "22 - iCharging Sao Mamede",
+      "name": "22 - iCharging Sao Mamede (without virtual battery)",
       "item": [
         {
           "name": "Admin Load",
@@ -550,7 +550,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"manifest_path\": \"{{ichargingSaoMamedeManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingSaoMamedeAliasPath}}\"\n}"
+              "raw": "{\n  \"manifest_path\": \"{{ichargingSaoMamedeWithoutVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingSaoMamedeWithoutVirtualBatteryAliasPath}}\"\n}"
             }
           },
           "event": [
@@ -571,7 +571,7 @@
           ]
         },
         {
-          "name": "Inference: EV + PT headroom",
+          "name": "Inference: EV envelope",
           "request": {
             "method": "POST",
             "header": [
@@ -591,7 +591,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"site\": {\n      \"pt_available_kw\": 47.5\n    },\n    \"solar_generation\": 17.1,\n    \"charging_sessions\": {\n      \"BB000SMI\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"SM_EV_01\"\n      },\n      \"M1123089-5\": {\n        \"power\": 6.2,\n        \"electric_vehicle\": \"\"\n      },\n      \"M1123089-6\": {\n        \"power\": 3.4,\n        \"electric_vehicle\": \"\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"SM_EV_01\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T13:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 18.0,\n      \"energy_price\": {\n        \"values\": [\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\n          \"power\": 20.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"BB000SMI_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"SM_EV_01\"\n        },\n        \"M1123089-5_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-5_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"SM_EV_01\": {\n          \"SoC\": 0.35,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n          }\n        }\n      },\n      \"electrical_storage\": {\n        \"soc\": 0.5\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             }
           },
           "event": [
@@ -603,11 +603,13 @@
                   "pm.test('Sao Mamede inference responds', function () {",
                   "  pm.response.to.have.status(200);",
                   "});",
-                  "pm.test('Sao Mamede response includes BB000SMI action', function () {",
+                  "pm.test('Sao Mamede response includes BB plug actions', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.actions).to.have.property('0');",
-                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI');",
-                  "  pm.expect(body.actions['0'].BB000SMI).to.be.within(0, 50);",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_2');",
+                  "  pm.expect(body.actions['0'].BB000SMI_1).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].BB000SMI_2).to.be.within(8, 50);",
                   "});"
                 ]
               }
@@ -615,7 +617,7 @@
           ]
         },
         {
-          "name": "Inference: missing PT headroom fail-safe",
+          "name": "Inference: envelope (BB plug output)",
           "request": {
             "method": "POST",
             "header": [
@@ -635,7 +637,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"solar_generation\": 17.1,\n    \"charging_sessions\": {\n      \"BB000SMI\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"SM_EV_02\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"SM_EV_02\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T13:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:15:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 18.0,\n      \"energy_price\": {\n        \"values\": [\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"BB000SMI_2\": {\n          \"power\": 24.0,\n          \"electric_vehicle\": \"SM_EV_01\"\n        },\n        \"M1123089-5_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-5_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"SM_EV_01\": {\n          \"SoC\": 0.35,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n          }\n        }\n      },\n      \"electrical_storage\": {\n        \"soc\": 0.5\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             }
           },
           "event": [
@@ -644,10 +646,191 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Sao Mamede fail-safe with missing PT headroom returns 0 kW', function () {",
+                  "pm.test('Sao Mamede returns plug-level outputs with technical minimum', function () {",
                   "  pm.response.to.have.status(200);",
                   "  const body = pm.response.json();",
-                  "  pm.expect(body.actions['0'].BB000SMI).to.eql(0);",
+                  "  pm.expect(body.actions['0'].BB000SMI_1).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].BB000SMI_2).to.be.within(8, 50);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede pipeline unloaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('unloaded');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "23 - iCharging Sao Mamede (with virtual battery)",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{ichargingSaoMamedeWithVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{agentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": \"{{ichargingSaoMamedeWithVirtualBatteryAliasPath}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: EV envelope",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 18.0,\n      \"energy_price\": {\n        \"values\": [\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\n          \"power\": 20.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"BB000SMI_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"SM_EV_01\"\n        },\n        \"M1123089-5_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-5_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"SM_EV_01\": {\n          \"SoC\": 0.35,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n          }\n        }\n      },\n      \"electrical_storage\": {\n        \"soc\": 0.5\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Sao Mamede response includes BB + virtual battery actions', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_2');",
+                  "  pm.expect(body.actions['0']).to.have.property('virtual_battery_kw');",
+                  "  pm.expect(body.actions['0'].BB000SMI_1).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].BB000SMI_2).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].virtual_battery_kw).to.be.within(-15, 15);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: envelope (BB plug output)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:15:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 18.0,\n      \"energy_price\": {\n        \"values\": [\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09,\n          0.09\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"BB000SMI_2\": {\n          \"power\": 24.0,\n          \"electric_vehicle\": \"SM_EV_01\"\n        },\n        \"M1123089-5_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-5_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_1\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        },\n        \"M1123089-6_2\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"SM_EV_01\": {\n          \"SoC\": 0.35,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n          }\n        }\n      },\n      \"electrical_storage\": {\n        \"soc\": 0.5\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Sao Mamede response includes BB + virtual battery actions', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000SMI_2');",
+                  "  pm.expect(body.actions['0']).to.have.property('virtual_battery_kw');",
+                  "  pm.expect(body.actions['0'].BB000SMI_1).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].BB000SMI_2).to.be.within(8, 50);",
+                  "  pm.expect(body.actions['0'].virtual_battery_kw).to.be.within(-15, 15);",
                   "});"
                 ]
               }
@@ -759,7 +942,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T10:00:00Z\",\n    \"non_shiftable_load\": 2.2,\n    \"solar_generation\": 1.8,\n    \"electricity_pricing\": {\n      \"current\": 0.14,\n      \"h1\": 0.17,\n      \"h2\": 0.22,\n      \"h6\": 0.26,\n      \"h12\": 0.23,\n      \"h24\": 0.18\n    },\n    \"grid\": {\n      \"import_limit_kw\": 8.0,\n      \"export_limit_kw\": 5.0\n    },\n    \"electrical_storage\": {\n      \"soc\": 0.45\n    },\n    \"cooling\": {\n      \"temperature\": {\n        \"current_c\": 24.5,\n        \"min_c\": 21.0,\n        \"max_c\": 25.0\n      }\n    },\n    \"dhw\": {\n      \"temperature\": {\n        \"current_c\": 49.0,\n        \"min_c\": 47.0,\n        \"max_c\": 56.0\n      }\n    },\n    \"charging_sessions\": {\n      \"EVC01\": {\n        \"power\": 0.0,\n        \"electric_vehicle\": \"EV1\"\n      }\n    },\n    \"electric_vehicles\": {\n      \"EV1\": {\n        \"SoC\": 0.35,\n        \"flexibility\": {\n          \"estimated_soc_at_departure\": 0.8,\n          \"estimated_time_at_departure\": \"2026-02-22T14:00:00Z\"\n        }\n      }\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 1.7,\n      \"solar_generation\": 0.9,\n      \"energy_price\": {\n        \"values\": [\n          0.08,\n          0.08,\n          0.08,\n          0.08,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18,\n          0.18\n        ],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 86400\n      },\n      \"batteries\": {\n        \"B01\": {\n          \"SoC\": 89.0\n        }\n      },\n      \"charging_sessions\": {\n        \"EVC01\": {\n          \"power\": 0.0,\n          \"electric_vehicle\": \"EV01\"\n        }\n      },\n      \"electric_vehicles\": {\n        \"EV01\": {\n          \"SoC\": 0.33,\n          \"flexibility\": {\n            \"estimated_soc_at_departure\": 0.8,\n            \"estimated_time_at_departure\": \"2026-03-01T18:00:00Z\"\n          }\n        }\n      },\n      \"pv_panels\": {\n        \"PV01\": {\n          \"energy\": 0.9\n        }\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             }
           },
           "event": [
@@ -947,7 +1130,7 @@
       ]
     },
     {
-      "name": "50 - Community Boavista + Sao Mamede",
+      "name": "50 - Community Boavista + Sao Mamede (with virtual battery)",
       "item": [
         {
           "name": "Admin Load",
@@ -961,7 +1144,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeWithVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/admin/load",
@@ -1004,7 +1187,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agent_index\": {{communityAgentBoavista}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"agent_index\": 0,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1045,7 +1228,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agent_index\": {{communityAgentSaoMamede}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"agent_index\": 1,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"sao_mamede\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 0.0,\n          \"solar_generation\": 18.0,\n          \"energy_price\": {\n            \"values\": [\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"BB000SMI_1\": {\n              \"power\": 20.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"BB000SMI_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"SM_EV_01\"\n            },\n            \"M1123089-5_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-5_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"SM_EV_01\": {\n              \"SoC\": 0.35,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n              }\n            }\n          },\n          \"electrical_storage\": {\n            \"soc\": 0.5\n          },\n          \"virtual_battery\": {\n            \"setpoint_kw\": 20.0\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1067,7 +1250,8 @@
                   "  pm.response.to.have.status(200);",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.actions).to.have.property('1');",
-                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_2');",
                   "  pm.expect(body.actions['1']).to.have.property('virtual_battery_kw');",
                   "});"
                 ]
@@ -1087,7 +1271,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1200,7 +1384,7 @@
       ]
     },
     {
-      "name": "51 - Community Boavista + Sao Mamede + RH1",
+      "name": "52 - Community Boavista + Sao Mamede (without virtual battery)",
       "item": [
         {
           "name": "Admin Load",
@@ -1214,7 +1398,261 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeRh1ManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeWithoutVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community 2-site pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(1);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 0 (Boavista)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": 0,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community agent 0 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 1 (Sao Mamede + virtual battery)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": 1,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"sao_mamede\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 0.0,\n          \"solar_generation\": 18.0,\n          \"energy_price\": {\n            \"values\": [\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"BB000SMI_1\": {\n              \"power\": 20.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"BB000SMI_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"SM_EV_01\"\n            },\n            \"M1123089-5_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-5_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"SM_EV_01\": {\n              \"SoC\": 0.35,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n              }\n            }\n          },\n          \"electrical_storage\": {\n            \"soc\": 0.5\n          },\n          \"virtual_battery\": {\n            \"setpoint_kw\": 20.0\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community agent 1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_2');",
+                  "  pm.expect(body.actions['1']).to.not.have.property('virtual_battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: default agent (without agent_index)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community default agent inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  const idx = String(pm.variables.get('communityDefaultAgentIndex'));",
+                  "  pm.expect(body.actions).to.have.property(idx);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "info"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community info exposes multi-agent metadata', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('default_agent_index');",
+                  "  pm.expect(body).to.have.property('loaded_agent_indices');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community health exposes multi-agent metadata', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body).to.have.property('default_agent_index');",
+                  "  pm.expect(body).to.have.property('loaded_agent_indices');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "51 - Community Boavista + Sao Mamede + RH1 (with virtual battery)",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeRh1WithVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/admin/load",
@@ -1258,7 +1696,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agent_index\": {{communityAgentRh1}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"agent_index\": 2,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"rh1\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 1.7,\n          \"solar_generation\": 0.9,\n          \"energy_price\": {\n            \"values\": [\n              0.08,\n              0.08,\n              0.08,\n              0.08,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"batteries\": {\n            \"B01\": {\n              \"SoC\": 89.0\n            }\n          },\n          \"charging_sessions\": {\n            \"EVC01\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"EV01\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"EV01\": {\n              \"SoC\": 0.33,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T18:00:00Z\"\n              }\n            }\n          },\n          \"pv_panels\": {\n            \"PV01\": {\n              \"energy\": 0.9\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1300,7 +1738,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agent_index\": {{communityAgentSaoMamede}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"agent_index\": 1,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"sao_mamede\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 0.0,\n          \"solar_generation\": 18.0,\n          \"energy_price\": {\n            \"values\": [\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"BB000SMI_1\": {\n              \"power\": 20.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"BB000SMI_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"SM_EV_01\"\n            },\n            \"M1123089-5_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-5_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"SM_EV_01\": {\n              \"SoC\": 0.35,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n              }\n            }\n          },\n          \"electrical_storage\": {\n            \"soc\": 0.5\n          },\n          \"virtual_battery\": {\n            \"setpoint_kw\": 10.0\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1341,7 +1779,199 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"agent_index\": {{communityAgentBoavista}},\n  \"features\": {\n    \"timestamp\": \"2026-02-22T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"non_shiftable_load\": 7.0,\n        \"solar_generation\": 2.0,\n        \"energy_price\": 0.11,\n        \"charging_sessions\": {\n          \"AC000004_1\": {\"power\": 2.0, \"electric_vehicle\": \"11824\"},\n          \"AC000007_1\": {\"power\": 2.0, \"electric_vehicle\": \"11823\"}\n        },\n        \"electric_vehicles\": {\n          \"11824\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T15:00:00Z\"\n            }\n          },\n          \"11823\": {\n            \"SoC\": 0.6,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": -1,\n              \"estimated_time_at_departure\": \"\"\n            }\n          }\n        }\n      },\n      \"sao_mamede\": {\n        \"site\": {\"pt_available_kw\": 80.0},\n        \"solar_generation\": 12.0,\n        \"charging_sessions\": {\n          \"BB000SMI\": {\"power\": 0.0, \"electric_vehicle\": \"SM_EV_01\"}\n        },\n        \"electric_vehicles\": {\n          \"SM_EV_01\": {\n            \"SoC\": 0.35,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T16:00:00Z\"\n            }\n          }\n        },\n        \"electrical_storage\": {\"soc\": 0.5},\n        \"virtual_battery\": {\"setpoint_kw\": 18.0}\n      },\n      \"rh1\": {\n        \"non_shiftable_load\": 2.0,\n        \"solar_generation\": 1.0,\n        \"electricity_pricing\": {\n          \"current\": 0.19,\n          \"h1\": 0.18,\n          \"h2\": 0.20,\n          \"h6\": 0.22,\n          \"h12\": 0.24,\n          \"h24\": 0.21\n        },\n        \"grid\": {\"import_limit_kw\": 8.0, \"export_limit_kw\": 8.0},\n        \"electrical_storage\": {\"soc\": 0.45},\n        \"cooling\": {\"temperature\": {\"current_c\": 25.0, \"min_c\": 22.0, \"max_c\": 26.0}},\n        \"dhw\": {\"temperature\": {\"current_c\": 44.0, \"min_c\": 42.0, \"max_c\": 52.0}},\n        \"charging_sessions\": {\n          \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"EV1\"}\n        },\n        \"electric_vehicles\": {\n          \"EV1\": {\n            \"SoC\": 0.3,\n            \"flexibility\": {\n              \"estimated_soc_at_departure\": 0.8,\n              \"estimated_time_at_departure\": \"2026-02-22T18:00:00Z\"\n            }\n          }\n        }\n      }\n    },\n    \"community\": {\"note\": \"postman community payload\"}\n  }\n}"
+              "raw": "{\n  \"agent_index\": 0,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community Boavista inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000004_1');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Unload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/unload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "unload"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "53 - Community Boavista + Sao Mamede + RH1 (without virtual battery)",
+      "item": [
+        {
+          "name": "Admin Load",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"manifest_path\": \"{{communityBoavistaSaoMamedeRh1WithoutVirtualBatteryManifestPath}}\",\n  \"agent_index\": {{communityDefaultAgentIndex}},\n  \"artifacts_dir\": null,\n  \"alias_mapping_path\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/load",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "load"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community 3-site pipeline loaded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.status).to.eql('loaded');",
+                  "  pm.expect(body.loaded_agent_indices).to.include(0);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(1);",
+                  "  pm.expect(body.loaded_agent_indices).to.include(2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 2 (RH1)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": 2,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"rh1\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 1.7,\n          \"solar_generation\": 0.9,\n          \"energy_price\": {\n            \"values\": [\n              0.08,\n              0.08,\n              0.08,\n              0.08,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18,\n              0.18\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"batteries\": {\n            \"B01\": {\n              \"SoC\": 89.0\n            }\n          },\n          \"charging_sessions\": {\n            \"EVC01\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"EV01\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"EV01\": {\n              \"SoC\": 0.33,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T18:00:00Z\"\n              }\n            }\n          },\n          \"pv_panels\": {\n            \"PV01\": {\n              \"energy\": 0.9\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community RH1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('2');",
+                  "  pm.expect(body.actions['2']).to.have.property('ev_charge_kw');",
+                  "  pm.expect(body.actions['2']).to.have.property('battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 1 (Sao Mamede + virtual battery)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": 1,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"sao_mamede\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 0.0,\n          \"solar_generation\": 18.0,\n          \"energy_price\": {\n            \"values\": [\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09,\n              0.09\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"BB000SMI_1\": {\n              \"power\": 20.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"BB000SMI_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"SM_EV_01\"\n            },\n            \"M1123089-5_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-5_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_1\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            },\n            \"M1123089-6_2\": {\n              \"power\": 0.0,\n              \"electric_vehicle\": \"\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"SM_EV_01\": {\n              \"SoC\": 0.35,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T15:30:00Z\"\n              }\n            }\n          },\n          \"electrical_storage\": {\n            \"soc\": 0.5\n          },\n          \"virtual_battery\": {\n            \"setpoint_kw\": 10.0\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Community agent 1 inference responds', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions).to.have.property('1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_1');",
+                  "  pm.expect(body.actions['1']).to.have.property('BB000SMI_2');",
+                  "  pm.expect(body.actions['1']).to.not.have.property('virtual_battery_kw');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: agent 0 (Boavista)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agent_index\": 0,\n  \"features\": {\n    \"timestamp\": \"2026-03-01T12:00:00Z\",\n    \"sites\": {\n      \"boavista\": {\n        \"timestamp\": \"2026-03-01T12:00:00Z\",\n        \"observations\": {\n          \"non_shiftable_load\": 6.5,\n          \"solar_generation\": 1.8,\n          \"energy_price\": {\n            \"values\": [\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11,\n              0.11\n            ],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 86400\n          },\n          \"charging_sessions\": {\n            \"AC000004_1\": {\n              \"power\": 2.0,\n              \"electric_vehicle\": \"11824\"\n            },\n            \"AC000007_1\": {\n              \"power\": 1.8,\n              \"electric_vehicle\": \"11823\"\n            }\n          },\n          \"electric_vehicles\": {\n            \"11824\": {\n              \"SoC\": 0.3,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": 0.8,\n                \"estimated_time_at_departure\": \"2026-03-01T16:00:00Z\"\n              }\n            },\n            \"11823\": {\n              \"SoC\": 0.55,\n              \"flexibility\": {\n                \"estimated_soc_at_departure\": -1,\n                \"estimated_time_at_departure\": \"\"\n              }\n            }\n          }\n        },\n        \"forecasts\": {}\n      }\n    }\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1486,6 +2116,38 @@
     {
       "key": "breakerOnlyAliasPath",
       "value": "/data/icharging_boavista_without_flex/aliases.json"
+    },
+    {
+      "key": "ichargingSaoMamedeWithoutVirtualBatteryManifestPath",
+      "value": "/data/icharging_sao_mamede_without_virtual_battery/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingSaoMamedeWithoutVirtualBatteryAliasPath",
+      "value": "/data/icharging_sao_mamede_without_virtual_battery/aliases.json"
+    },
+    {
+      "key": "ichargingSaoMamedeWithVirtualBatteryManifestPath",
+      "value": "/data/icharging_sao_mamede_with_virtual_battery/artifact_manifest.json"
+    },
+    {
+      "key": "ichargingSaoMamedeWithVirtualBatteryAliasPath",
+      "value": "/data/icharging_sao_mamede_with_virtual_battery/aliases.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeWithVirtualBatteryManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery/artifact_manifest.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeWithoutVirtualBatteryManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede_without_virtual_battery/artifact_manifest.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeRh1WithVirtualBatteryManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede_rh1_with_virtual_battery/artifact_manifest.json"
+    },
+    {
+      "key": "communityBoavistaSaoMamedeRh1WithoutVirtualBatteryManifestPath",
+      "value": "/data/icharging_community_boavista_sao_mamede_rh1_without_virtual_battery/artifact_manifest.json"
     }
   ]
 }
