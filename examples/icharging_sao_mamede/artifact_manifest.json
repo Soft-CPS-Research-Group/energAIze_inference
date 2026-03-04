@@ -4,7 +4,8 @@
     "experiment_name": "icharging_sao_mamede",
     "run_name": "icharging_sao_mamede_v1",
     "alias_mapping_path": "aliases.json",
-    "bundle_version": "2026-02-22-v1"
+    "bundle_version": "2026-02-22-v1",
+    "description": "icharging_sao_mamede bundle"
   },
   "simulator": {},
   "training": {},
@@ -19,32 +20,69 @@
     "observation_names": [
       [
         "timestamp",
-        "site.pt_available_kw",
         "solar_generation",
-        "charging_sessions.BB000SMI.power",
-        "charging_sessions.M1123089-5.power",
-        "charging_sessions.M1123089-6.power"
+        "charging_sessions.BB000SMI_1.power",
+        "charging_sessions.BB000SMI_2.power",
+        "charging_sessions.M1123089-5_1.power",
+        "charging_sessions.M1123089-5_2.power",
+        "charging_sessions.M1123089-6_1.power",
+        "charging_sessions.M1123089-6_2.power"
       ]
     ],
     "encoders": [
       [
-        {"type": "NoNormalization", "params": {}},
-        {"type": "NoNormalization", "params": {}},
-        {"type": "NoNormalization", "params": {}},
-        {"type": "NoNormalization", "params": {}},
-        {"type": "NoNormalization", "params": {}},
-        {"type": "NoNormalization", "params": {}}
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
       ]
     ],
     "action_bounds": [
       [
         {
-          "low": [0.0],
-          "high": [50.0]
+          "low": [
+            8.0,
+            8.0
+          ],
+          "high": [
+            50.0,
+            50.0
+          ]
         }
       ]
     ],
-    "action_names": ["BB000SMI"],
+    "action_names": [
+      "BB000SMI_1",
+      "BB000SMI_2"
+    ],
     "reward_function": {
       "name": "RewardFunction",
       "params": {}
@@ -68,29 +106,46 @@
           "min_connected_kw": 0.0,
           "per_phase_headroom_kw": 0.0,
           "solar_generation_key": "solar_generation",
-          "site_available_headroom_key": "site.pt_available_kw",
-          "site_available_headroom_fallback_kw": 0.0,
-          "site_available_headroom_includes_pv": true,
           "chargers": {
-            "BB000SMI": {
+            "BB000SMI_1": {
               "line": "L1",
-              "min_kw": 0.0,
+              "min_kw": 8.0,
+              "max_kw": 50.0,
+              "allow_flex_when_ev": true
+            },
+            "BB000SMI_2": {
+              "line": "L1",
+              "min_kw": 8.0,
               "max_kw": 50.0,
               "allow_flex_when_ev": true
             }
           },
           "line_limits": {
             "L1": {
-              "limit_kw": 400.0,
-              "chargers": ["BB000SMI"]
+              "limit_kw": 50.0,
+              "chargers": [
+                "BB000SMI_1",
+                "BB000SMI_2"
+              ]
             }
           },
-          "action_order": ["BB000SMI"],
+          "action_order": [
+            "BB000SMI_1",
+            "BB000SMI_2"
+          ],
           "flexibility_fields": {
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
-          }
+          },
+          "require_observations_envelope": true,
+          "exclusive_charger_groups": [
+            [
+              "BB000SMI_1",
+              "BB000SMI_2"
+            ]
+          ],
+          "exclusive_group_strategy": "highest_power"
         }
       }
     ]

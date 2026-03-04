@@ -363,7 +363,8 @@
             "BB000018_1",
             "b_1",
             "b_2"
-          ]
+          ],
+          "require_observations_envelope": true
         }
       }
     ]

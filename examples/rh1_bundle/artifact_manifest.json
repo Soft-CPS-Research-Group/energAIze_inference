@@ -94,7 +94,8 @@
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
-          }
+          },
+          "require_observations_envelope": true
         }
       }
     ]

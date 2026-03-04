@@ -350,7 +350,11 @@
               "allow_flex_when_ev": true
             },
             "BB000018_1": {
-              "phases": ["L1", "L2", "L3"],
+              "phases": [
+                "L1",
+                "L2",
+                "L3"
+              ],
               "min_kw": 8.0,
               "max_kw": 10.0,
               "allow_flex_when_ev": true
@@ -396,7 +400,8 @@
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
           },
           "non_flex_active_power_kw": 0.05,
-          "drop_inactive_non_flex": true
+          "drop_inactive_non_flex": true,
+          "require_observations_envelope": true
         }
       }
     ]
