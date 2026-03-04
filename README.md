@@ -136,13 +136,31 @@ uvicorn app.main:app --reload
 ```
 
 ## Docker
+Simple local run (CPU, no NVIDIA runtime required):
 ```bash
-export BUNDLE_PATH="$PWD/examples"
-export MODEL_MANIFEST_PATH="/data/your_bundle/artifact_manifest.json"
-export MODEL_AGENT_INDEX=0  # optional default agent
-export FEATURE_ALIAS_PATH="/data/your_bundle/aliases.json"  # optional
-
 docker compose up --build
+```
+
+If your Docker daemon has NVIDIA as default runtime, force CPU runtime:
+```bash
+DOCKER_RUNTIME=runc docker compose up --build
+```
+
+Default startup bundle in `docker-compose.yml`:
+- `MODEL_MANIFEST_PATH=/data/icharging_boavista_with_flex/artifact_manifest.json`
+- `FEATURE_ALIAS_PATH=/data/icharging_boavista_with_flex/aliases.json`
+
+Override for another bundle:
+```bash
+export MODEL_MANIFEST_PATH="/data/your_bundle/artifact_manifest.json"
+export FEATURE_ALIAS_PATH="/data/your_bundle/aliases.json"  # optional
+export MODEL_AGENT_INDEX=0
+docker compose up --build
+```
+
+Optional GPU run (if NVIDIA runtime/driver is available):
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
 ## Environment Variables

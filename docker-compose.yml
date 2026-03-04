@@ -9,16 +9,10 @@ services:
       - "${HOST_PORT:-8000}:8000"
     environment:
       LOG_JSON: "${LOG_JSON:-false}"
-      MODEL_MANIFEST_PATH: "${MODEL_MANIFEST_PATH:-/data/rule_based/artifact_manifest.json}"
+      MODEL_MANIFEST_PATH: "${MODEL_MANIFEST_PATH:-/data/icharging_boavista_with_flex/artifact_manifest.json}"
       MODEL_AGENT_INDEX: "${MODEL_AGENT_INDEX:-0}"
-      ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CUDAExecutionProvider,CPUExecutionProvider}"
+      FEATURE_ALIAS_PATH: "${FEATURE_ALIAS_PATH:-/data/icharging_boavista_with_flex/aliases.json}"
+      ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CPUExecutionProvider}"
     volumes:
       - "${BUNDLE_PATH:-./examples}:/data:ro"
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+    runtime: "${DOCKER_RUNTIME:-runc}"

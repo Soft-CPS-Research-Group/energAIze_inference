@@ -1,0 +1,12 @@
+services:
+  inference:
+    environment:
+      ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CUDAExecutionProvider,CPUExecutionProvider}"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    runtime: nvidia
