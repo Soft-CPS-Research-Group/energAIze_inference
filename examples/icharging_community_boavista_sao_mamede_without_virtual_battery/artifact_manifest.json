@@ -1,15 +1,15 @@
 {
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "icharging_community_boavista_sao_mamede_rh1",
-    "run_name": "icharging_community_boavista_sao_mamede_rh1_v1",
+    "experiment_name": "icharging_community_boavista_sao_mamede_without_virtual_battery",
+    "run_name": "icharging_community_boavista_sao_mamede_without_virtual_battery_v1",
     "bundle_version": "2026-02-22-v1",
-    "description": "icharging_community_boavista_sao_mamede_rh1 bundle"
+    "description": "icharging_community_boavista_sao_mamede_without_virtual_battery bundle"
   },
   "simulator": {},
   "training": {},
   "topology": {
-    "num_agents": 3
+    "num_agents": 2
   },
   "algorithm": {
     "name": "RuleBasedCommunity",
@@ -22,18 +22,9 @@
       ],
       [
         "timestamp"
-      ],
-      [
-        "timestamp"
       ]
     ],
     "encoders": [
-      [
-        {
-          "type": "NoNormalization",
-          "params": {}
-        }
-      ],
       [
         {
           "type": "NoNormalization",
@@ -98,25 +89,11 @@
         {
           "low": [
             8.0,
-            8.0,
-            -15.0
+            8.0
           ],
           "high": [
             50.0,
-            50.0,
-            15.0
-          ]
-        }
-      ],
-      [
-        {
-          "low": [
-            0.0,
-            -4.8
-          ],
-          "high": [
-            4.6,
-            4.8
+            50.0
           ]
         }
       ]
@@ -166,12 +143,7 @@
       ],
       "1": [
         "BB000SMI_1",
-        "BB000SMI_2",
-        "virtual_battery_kw"
-      ],
-      "2": [
-        "ev_charge_kw",
-        "battery_kw"
+        "BB000SMI_2"
       ]
     },
     "reward_function": {
@@ -383,12 +355,6 @@
           "min_connected_kw": 0.0,
           "per_phase_headroom_kw": 0.0,
           "solar_generation_key": "solar_generation",
-          "virtual_battery_action_name": "virtual_battery_kw",
-          "virtual_battery_nominal_power_kw": 15.0,
-          "virtual_battery_capacity_kwh": 20.0,
-          "virtual_battery_soc_key": "virtual_battery.soc",
-          "virtual_battery_soc_min": 0.1,
-          "virtual_battery_soc_max": 1.0,
           "chargers": {
             "BB000SMI_1": {
               "line": "L1",
@@ -428,61 +394,7 @@
               "BB000SMI_2"
             ]
           ],
-          "exclusive_group_strategy": "highest_power",
-          "virtual_battery_capacity_min_kwh": 20.0,
-          "virtual_battery_capacity_max_kwh": 20.0,
-          "virtual_battery_charge_power_max_kw": 15.0,
-          "virtual_battery_discharge_power_max_kw": 15.0,
-          "virtual_battery_soc_fallback_key": "electrical_storage.soc",
-          "virtual_battery_use_setpoint": false,
-          "virtual_battery_use_community_signals": true,
-          "virtual_battery_community_target_import_key": "community.target_net_import_kw",
-          "virtual_battery_community_current_import_key": "community.current_net_import_kw",
-          "virtual_battery_community_price_prefix": "community.price_signal",
-          "virtual_battery_local_price_prefix": "energy_price"
-        }
-      },
-      {
-        "agent_index": 2,
-        "path": "policy_agent_2.json",
-        "format": "rule_based",
-        "config": {
-          "use_preprocessor": false,
-          "strategy": "rh1_house_rbc_v1",
-          "input_site_key": "rh1",
-          "grid_import_limit_kw": 8.0,
-          "control_interval_minutes": 1.0,
-          "export_price_factor": 0.8,
-          "ev_min_connected_kw": 1.6,
-          "baseline_price_threshold_eur_kwh": 0.2,
-          "battery_capacity_kwh": 4.0,
-          "battery_nominal_power_kw": 4.8,
-          "battery_efficiency": 0.95,
-          "battery_soc_min": 0.2,
-          "battery_soc_max": 0.9,
-          "battery_degradation_penalty_eur_per_kwh": 0.01,
-          "ev_default_capacity_kwh": 60.0,
-          "chargers": {
-            "EVC01": {
-              "min_kw": 1.6,
-              "max_kw": 4.6
-            }
-          },
-          "vehicle_capacities": {
-            "EV01": 60.0
-          },
-          "ev_flexibility_fields": {
-            "soc": "electric_vehicles.{ev_id}.SoC",
-            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
-            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
-          },
-          "price_unit_mode": "auto",
-          "price_auto_mwh_threshold": 3.0,
-          "soc_unit_mode": "auto",
-          "battery_soc_keys": [
-            "electrical_storage.soc"
-          ],
-          "require_observations_envelope": true
+          "exclusive_group_strategy": "highest_power"
         }
       }
     ]

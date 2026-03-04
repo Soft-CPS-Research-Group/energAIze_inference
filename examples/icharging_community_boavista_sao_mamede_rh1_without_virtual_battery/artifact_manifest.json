@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "icharging_community_boavista_sao_mamede_rh1",
-    "run_name": "icharging_community_boavista_sao_mamede_rh1_v1",
+    "experiment_name": "icharging_community_boavista_sao_mamede_rh1_without_virtual_battery",
+    "run_name": "icharging_community_boavista_sao_mamede_rh1_without_virtual_battery_v1",
     "bundle_version": "2026-02-22-v1",
-    "description": "icharging_community_boavista_sao_mamede_rh1 bundle"
+    "description": "icharging_community_boavista_sao_mamede_rh1_without_virtual_battery bundle"
   },
   "simulator": {},
   "training": {},
@@ -98,13 +98,11 @@
         {
           "low": [
             8.0,
-            8.0,
-            -15.0
+            8.0
           ],
           "high": [
             50.0,
-            50.0,
-            15.0
+            50.0
           ]
         }
       ],
@@ -166,8 +164,7 @@
       ],
       "1": [
         "BB000SMI_1",
-        "BB000SMI_2",
-        "virtual_battery_kw"
+        "BB000SMI_2"
       ],
       "2": [
         "ev_charge_kw",
@@ -383,12 +380,6 @@
           "min_connected_kw": 0.0,
           "per_phase_headroom_kw": 0.0,
           "solar_generation_key": "solar_generation",
-          "virtual_battery_action_name": "virtual_battery_kw",
-          "virtual_battery_nominal_power_kw": 15.0,
-          "virtual_battery_capacity_kwh": 20.0,
-          "virtual_battery_soc_key": "virtual_battery.soc",
-          "virtual_battery_soc_min": 0.1,
-          "virtual_battery_soc_max": 1.0,
           "chargers": {
             "BB000SMI_1": {
               "line": "L1",
@@ -428,18 +419,7 @@
               "BB000SMI_2"
             ]
           ],
-          "exclusive_group_strategy": "highest_power",
-          "virtual_battery_capacity_min_kwh": 20.0,
-          "virtual_battery_capacity_max_kwh": 20.0,
-          "virtual_battery_charge_power_max_kw": 15.0,
-          "virtual_battery_discharge_power_max_kw": 15.0,
-          "virtual_battery_soc_fallback_key": "electrical_storage.soc",
-          "virtual_battery_use_setpoint": false,
-          "virtual_battery_use_community_signals": true,
-          "virtual_battery_community_target_import_key": "community.target_net_import_kw",
-          "virtual_battery_community_current_import_key": "community.current_net_import_kw",
-          "virtual_battery_community_price_prefix": "community.price_signal",
-          "virtual_battery_local_price_prefix": "energy_price"
+          "exclusive_group_strategy": "highest_power"
         }
       },
       {

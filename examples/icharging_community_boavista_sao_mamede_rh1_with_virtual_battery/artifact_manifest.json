@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "icharging_community_boavista_sao_mamede_rh1",
-    "run_name": "icharging_community_boavista_sao_mamede_rh1_v1",
+    "experiment_name": "icharging_community_boavista_sao_mamede_rh1_with_virtual_battery",
+    "run_name": "icharging_community_boavista_sao_mamede_rh1_with_virtual_battery_v1",
     "bundle_version": "2026-02-22-v1",
-    "description": "icharging_community_boavista_sao_mamede_rh1 bundle"
+    "description": "icharging_community_boavista_sao_mamede_rh1_with_virtual_battery bundle"
   },
   "simulator": {},
   "training": {},
