@@ -458,7 +458,13 @@ def test_onnx_icharging_sample_bundle():
     charging_sessions["AC000002_1"]["electric_vehicle"] = 2
     charging_sessions["AC000003_1"]["power"] = 3.0
     charging_sessions["AC000003_1"]["electric_vehicle"] = 3
-    payload = {"charging_sessions": charging_sessions}
+    payload = {
+        "timestamp": "2026-03-04T12:00:00Z",
+        "observations": {
+            "charging_sessions": charging_sessions,
+        },
+        "forecasts": {},
+    }
     try:
         response = _post_payload(client, payload)
         assert response.status_code == 200

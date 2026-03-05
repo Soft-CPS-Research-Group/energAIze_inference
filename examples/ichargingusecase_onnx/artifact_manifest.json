@@ -206,7 +206,9 @@
         "path": "onnx_models/agent_0.onnx",
         "observation_dimension": 19,
         "action_dimension": 21,
-        "config": {}
+        "config": {
+          "require_observations_envelope": true
+        }
       }
     ]
   }

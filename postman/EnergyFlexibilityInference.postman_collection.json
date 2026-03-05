@@ -1065,7 +1065,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"features\": {\n    \"charging_sessions\": {\n      \"AC000001_1\": {\"power\": 1.0, \"electric_vehicle\": 1},\n      \"AC000002_1\": {\"power\": 2.0, \"electric_vehicle\": 2},\n      \"AC000003_1\": {\"power\": 3.0, \"electric_vehicle\": 3},\n      \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000005_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000006_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000007_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000008_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000009_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000010_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000011_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000012_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000013_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"AC000014_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT001_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT002_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT003_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"ACEXT004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n      \"BB000018_1\": {\"power\": 0, \"electric_vehicle\": \"\"}\n    }\n  }\n}"
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-03-04T12:00:00Z\",\n    \"observations\": {\n      \"charging_sessions\": {\n        \"AC000001_1\": {\"power\": 1.0, \"electric_vehicle\": 1},\n        \"AC000002_1\": {\"power\": 2.0, \"electric_vehicle\": 2},\n        \"AC000003_1\": {\"power\": 3.0, \"electric_vehicle\": 3},\n        \"AC000004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000005_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000006_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000007_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000008_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000009_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000010_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000011_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000012_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000013_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"AC000014_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"ACEXT001_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"ACEXT002_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"ACEXT003_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"ACEXT004_1\": {\"power\": 0, \"electric_vehicle\": \"\"},\n        \"BB000018_1\": {\"power\": 0, \"electric_vehicle\": \"\"}\n      }\n    },\n    \"forecasts\": {}\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/inference",
@@ -1089,6 +1089,8 @@
                   "pm.test('ONNX inference returns actions for agent 0', function () {",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.actions).to.have.property('0');",
+                  "  pm.expect(body.actions['0']).to.have.property('AC000001_1');",
+                  "  pm.expect(body.actions['0']).to.have.property('BB000018_1');",
                   "});"
                 ]
               }

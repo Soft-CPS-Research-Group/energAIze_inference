@@ -204,6 +204,7 @@ Bundle and multi-agent suite example:
 Collection: `postman/EnergyFlexibilityInference.postman_collection.json`.
 - Includes sample requests for loading bundles and running inference.
 - Supports `x-request-id` for tracing.
+- ONNX sample requests use the envelope contract: `features.timestamp + features.observations` (with optional `features.forecasts`).
 
 ## Observability
 - Console logs by default (optionally JSON).
