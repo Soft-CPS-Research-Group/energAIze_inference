@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from app.services.pipeline import InferencePipeline
 from app.utils.manifest import load_manifest
@@ -63,6 +63,11 @@ class PipelineStore:
         manifest_path = manifest_path.expanduser().resolve()
         root = artifacts_dir.expanduser().resolve() if artifacts_dir else manifest_path.parent
         manifest = load_manifest(manifest_path)
+        effective_alias_mapping_path = _resolve_alias_mapping_path(
+            alias_mapping_path=alias_mapping_path,
+            manifest_metadata=manifest.metadata,
+            artifacts_root=root,
+        )
 
         loaded_agent_indices = sorted({int(artifact.agent_index) for artifact in manifest.agent.artifacts})
         if not loaded_agent_indices:
@@ -85,14 +90,14 @@ class PipelineStore:
             loaded_agent_indices=loaded_agent_indices,
         )
 
+        alias_overrides = _load_alias_overrides(effective_alias_mapping_path, default_agent_index)
         pipelines: Dict[int, InferencePipeline] = {}
         for current_agent_index in loaded_agent_indices:
-            alias_overrides = _load_alias_overrides(alias_mapping_path, current_agent_index)
             pipelines[current_agent_index] = InferencePipeline(
                 manifest=manifest,
                 artifacts_root=root,
                 agent_index=current_agent_index,
-                alias_overrides=alias_overrides,
+                alias_overrides=dict(alias_overrides),
             )
 
         self._record = PipelineRecord(
@@ -101,7 +106,7 @@ class PipelineStore:
             artifacts_dir=root,
             agent_index=default_agent_index,
             loaded_agent_indices=loaded_agent_indices,
-            alias_mapping_path=alias_mapping_path,
+            alias_mapping_path=effective_alias_mapping_path,
         )
         return self._record
 
@@ -120,6 +125,26 @@ class PipelineStore:
 
 
 store = PipelineStore()
+
+
+def _resolve_alias_mapping_path(
+    alias_mapping_path: Optional[Path],
+    manifest_metadata: Dict[str, Any],
+    artifacts_root: Path,
+) -> Path | None:
+    if alias_mapping_path is not None:
+        return alias_mapping_path.expanduser().resolve()
+
+    metadata_alias_path = manifest_metadata.get("alias_mapping_path")
+    if metadata_alias_path in (None, ""):
+        return None
+    if not isinstance(metadata_alias_path, str):
+        raise ValueError("metadata.alias_mapping_path must be a string when provided")
+
+    candidate = Path(metadata_alias_path).expanduser()
+    if candidate.is_absolute():
+        return candidate.resolve()
+    return (artifacts_root / candidate).resolve()
 
 
 def _load_alias_overrides(path: Optional[Path], agent_index: int) -> Dict[str, str]:

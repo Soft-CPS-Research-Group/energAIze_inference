@@ -99,7 +99,12 @@ def _build_rule_based_bundle(tmp_path: Path) -> Path:
     return manifest_path
 
 
-def _build_rule_based_alias_bundle(tmp_path: Path) -> tuple[Path, Path]:
+def _build_rule_based_alias_bundle(
+    tmp_path: Path,
+    *,
+    include_manifest_alias_path: bool = False,
+    alias_mapping_path: str = "aliases.json",
+) -> tuple[Path, Path]:
     bundle_dir = tmp_path / "alias_bundle"
     bundle_dir.mkdir()
 
@@ -112,9 +117,13 @@ def _build_rule_based_alias_bundle(tmp_path: Path) -> tuple[Path, Path]:
     policy_path = bundle_dir / "policy_agent_0.json"
     policy_path.write_text(json.dumps(policy), encoding="utf-8")
 
+    metadata: dict[str, str] = {}
+    if include_manifest_alias_path:
+        metadata["alias_mapping_path"] = alias_mapping_path
+
     manifest = {
         "manifest_version": 1,
-        "metadata": {},
+        "metadata": metadata,
         "simulator": {},
         "training": {},
         "topology": {"num_agents": 1},
@@ -410,6 +419,26 @@ def test_alias_mapping_applies_to_rule_based(tmp_path):
     if store.is_configured():
         store.unload()
     store.load(manifest_path, None, 0, alias_path)
+
+    client = TestClient(app)
+    try:
+        response = client.post("/inference", json={"features": {"energy_price": 5}})
+        assert response.status_code == 200
+        body = response.json()
+        assert body["actions"]["0"]["hvac"] == pytest.approx(0.9, rel=1e-6)
+    finally:
+        store.unload()
+
+
+def test_alias_mapping_applies_from_manifest_metadata(tmp_path):
+    manifest_path, _ = _build_rule_based_alias_bundle(
+        tmp_path,
+        include_manifest_alias_path=True,
+        alias_mapping_path="aliases.json",
+    )
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
 
     client = TestClient(app)
     try:

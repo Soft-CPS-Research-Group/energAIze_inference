@@ -6,7 +6,7 @@ import pytest
 from app.state import store
 
 
-def build_manifest(tmp_path: Path) -> Path:
+def build_manifest(tmp_path: Path, metadata_alias_path: str | None = None) -> Path:
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
 
@@ -34,6 +34,8 @@ def build_manifest(tmp_path: Path) -> Path:
             ],
         },
     }
+    if metadata_alias_path is not None:
+        manifest["metadata"]["alias_mapping_path"] = metadata_alias_path
 
     import onnx
     from onnx import helper, TensorProto
@@ -69,3 +71,26 @@ def test_store_load_unload(tmp_path):
     assert not store.is_configured()
     with pytest.raises(RuntimeError):
         store.get_pipeline()
+
+
+def test_store_load_uses_manifest_alias_mapping_path_fallback(tmp_path):
+    if store.is_configured():
+        store.unload()
+    manifest_path = build_manifest(tmp_path, metadata_alias_path="aliases.json")
+    alias_file = manifest_path.parent / "aliases.json"
+    alias_file.write_text('{"alias_feat": "feat"}', encoding="utf-8")
+
+    record = store.load(manifest_path, manifest_path.parent, 0)
+    assert record.alias_mapping_path == alias_file.resolve()
+    assert store.get_pipeline(0).agent.feature_aliases["alias_feat"] == "feat"
+
+    store.unload()
+
+
+def test_store_load_raises_when_manifest_alias_mapping_missing(tmp_path):
+    if store.is_configured():
+        store.unload()
+    manifest_path = build_manifest(tmp_path, metadata_alias_path="missing_aliases.json")
+
+    with pytest.raises(FileNotFoundError, match="Alias mapping file not found"):
+        store.load(manifest_path, manifest_path.parent, 0)

@@ -41,6 +41,8 @@ bundle/
 - `topology`: number of agents.
 - `environment`: observation names, encoders, action names, and action bounds.
 - `agent`: list of artifacts with `path`, `format`, and optional `config`.
+  - In community mode, set `agent.artifacts[*].config.input_site_key` per agent.
+  - `config.require_observations_envelope` controls whether input is read from `features.observations`.
 
 Supported artifact formats:
 - `onnx`: load ONNX Runtime session.
@@ -91,6 +93,9 @@ Full request/response contracts and error semantics:
 - Nested objects are flattened using dot notation: `a.b.c`.
 - Arrays use indices: `list[0]`, `list[1]`.
 - Aliases can map external field names to internal ones.
+- Alias precedence at load time:
+  - explicit `/admin/load.alias_mapping_path` (or `FEATURE_ALIAS_PATH`) takes priority.
+  - fallback to `metadata.alias_mapping_path` in `artifact_manifest.json`.
 - Two request modes are supported:
   - Single-agent mode: `features` contains direct feature fields.
   - Community mode: `features.sites.<input_site_key>` is selected for the target agent.
