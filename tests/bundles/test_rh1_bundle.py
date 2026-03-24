@@ -16,7 +16,7 @@ from app.utils.flatten import flatten_payload
 BUNDLE_DIR = Path("examples/rh1_bundle")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_R-H-01.json"
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_R-H-01_2303.json"
 
 
 def _safe_float(value, default: float = 0.0) -> float:  # noqa: ANN001

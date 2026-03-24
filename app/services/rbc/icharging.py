@@ -540,7 +540,9 @@ class IchargingBreakerRuntime:
                     flexible_whitelist,
                 ):
                     actions[charger_id] = state.required_kw
-                    min_levels[charger_id] = state.required_kw
+                    # `required_kw` is a soft target. Keep the technical minimum as hard floor so
+                    # line/board enforcement can still reduce infeasible flex plans.
+                    min_levels[charger_id] = state.min_kw
                     charger_priority[charger_id] = state.priority
                     flexible_chargers.append(charger_id)
                     continue
@@ -573,6 +575,20 @@ class IchargingBreakerRuntime:
             _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
             self._enforce_line_limits(
                 cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
+            )
+
+        flex_shortfalls = {
+            cid: state.required_kw - actions.get(cid, 0.0)
+            for cid in flexible_chargers
+            if (state := states.get(cid)) is not None
+            and state.required_kw - actions.get(cid, 0.0) > 1e-6
+        }
+        if flex_shortfalls:
+            get_logger().warning(
+                "rbc.flex_requirement_shortfall",
+                strategy="icharging_breaker",
+                affected=len(flex_shortfalls),
+                max_shortfall_kw=round(max(flex_shortfalls.values()), 3),
             )
 
         quantized: Dict[str, float] = {}

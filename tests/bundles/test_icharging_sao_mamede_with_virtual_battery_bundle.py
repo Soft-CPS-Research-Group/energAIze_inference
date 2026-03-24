@@ -14,7 +14,7 @@ from app.state import store
 BUNDLE_DIR = Path("examples/icharging_sao_mamede_with_virtual_battery")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede.json"
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def test_virtual_battery_solar_first_charge(sao_mamede_with_battery_client):
     payload = _base_payload()
     payload["observations"]["solar_generation"] = 20.0
     payload["observations"]["non_shiftable_load"] = 0.0
-    payload["observations"]["energy_price"]["values"] = [0.20] + [0.10] * 95
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.20] + [0.10] * 95
     actions = _run(sao_mamede_with_battery_client, payload)
     assert 0.0 <= actions["virtual_battery_kw"] <= 15.0
 
@@ -85,7 +85,7 @@ def test_virtual_battery_can_discharge_when_no_solar_and_price_unfavorable(
             "estimated_time_at_departure": "2026-03-01T12:00:00Z",
         },
     }
-    payload["observations"]["energy_price"]["values"] = [0.25] + [0.08] * 95
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.25] + [0.08] * 95
     actions = _run(sao_mamede_with_battery_client, payload)
     assert -15.0 <= actions["virtual_battery_kw"] <= 0.0
 
@@ -93,7 +93,7 @@ def test_virtual_battery_can_discharge_when_no_solar_and_price_unfavorable(
 def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):
     high_soc = _base_payload()
     high_soc["observations"]["virtual_battery"]["soc"] = 1.0
-    high_soc["observations"]["energy_price"]["values"] = [0.08] + [0.22] * 95
+    high_soc["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.08] + [0.22] * 95
     high_actions = _run(sao_mamede_with_battery_client, high_soc)
     assert high_actions["virtual_battery_kw"] == pytest.approx(0.0, rel=1e-6)
 
@@ -101,6 +101,6 @@ def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):
     low_soc["observations"]["virtual_battery"]["soc"] = 0.05
     low_soc["observations"]["solar_generation"] = 0.0
     low_soc["observations"]["non_shiftable_load"] = 0.0
-    low_soc["observations"]["energy_price"]["values"] = [0.25] + [0.08] * 95
+    low_soc["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.25] + [0.08] * 95
     low_actions = _run(sao_mamede_with_battery_client, low_soc)
     assert low_actions["virtual_battery_kw"] >= 0.0

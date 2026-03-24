@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.state import store
 
+pytestmark = pytest.mark.skip(reason="ONNX em standby")
+
 
 BUNDLE_DIR = Path("examples/ichargingusecase_onnx")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"

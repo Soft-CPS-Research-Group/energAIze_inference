@@ -21,7 +21,7 @@ from tests.bundles._icharging_shared import (
 BUNDLE_DIR = Path("examples/icharging_boavista_without_flex")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_i-charging_headquarters.json"
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_i-charging_headquarters_2303.json"
 
 
 @pytest.fixture
@@ -61,8 +61,8 @@ def test_price_vector_does_not_change_dispatch_without_flex(boavista_without_fle
     record = load_json(MESSAGE_PATH)[0]
     payload_a = normalize_record(record)
     payload_b = json.loads(json.dumps(payload_a))
-    payload_b["observations"]["energy_price"]["values"] = [8.88] * 96
-    payload_b["observations"]["energy_price"]["measurement_unit"] = "€/kWh"
+    payload_b["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [8.88] * 96
+    payload_b["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["measurement_unit"] = "€/kWh"
 
     actions_a = post_inference(boavista_without_flex_client, payload_a)
     actions_b = post_inference(boavista_without_flex_client, payload_b)

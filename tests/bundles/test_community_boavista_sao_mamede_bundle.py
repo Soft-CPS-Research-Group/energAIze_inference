@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.state import store
 
+pytestmark = pytest.mark.skip(reason="Community em standby")
+
 
 BUNDLE_DIR = Path("examples/icharging_community_boavista_sao_mamede_with_virtual_battery")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"

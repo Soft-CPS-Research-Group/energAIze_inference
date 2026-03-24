@@ -14,7 +14,7 @@ from app.state import store
 BUNDLE_DIR = Path("examples/icharging_sao_mamede_without_virtual_battery")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
-MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede.json"
+MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
 
 MIN_TECHNICAL_KW = 8.0
@@ -187,7 +187,7 @@ def test_price_forecast_do_not_change_dispatch(sao_mamede_client):
     }
 
     payload_b = copy.deepcopy(payload_a)
-    payload_b["observations"]["energy_price"]["values"] = [9.0] * 96
+    payload_b["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [9.0] * 96
     payload_b["forecasts"] = {"dummy": {"values": [123.0, 456.0]}}
 
     actions_a = _run(sao_mamede_client, payload_a)

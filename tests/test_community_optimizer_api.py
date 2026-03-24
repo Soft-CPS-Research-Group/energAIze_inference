@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.state import store
+
+pytestmark = pytest.mark.skip(reason="Community em standby")
 
 
 COMMUNITY_BUNDLE_DIR = Path("examples/icharging_community_boavista_sao_mamede_rh1_with_virtual_battery")

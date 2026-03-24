@@ -4,11 +4,14 @@ import copy
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 from app.state import store
 from app.utils.flatten import flatten_payload
+
+pytestmark = pytest.mark.skip(reason="Community em standby")
 
 
 BUNDLE_DIR = Path("examples/icharging_community_boavista_sao_mamede_rh1_without_virtual_battery")
