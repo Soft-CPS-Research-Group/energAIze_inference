@@ -242,7 +242,45 @@ def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):
         "observations": {
             "non_shiftable_load": 0.0,
             "solar_generation": 6.0,
-            "grid_meters": {"GR01": {"energy_in": 3.0, "energy_out": 0.0}},
+            "grid_meters": {
+                "GR01": {
+                    "energy_in_total": 3.0,
+                    "energy_in_l1": 1.0,
+                    "energy_in_l2": 1.0,
+                    "energy_in_l3": 1.0,
+                    "energy_out_total": 0.0,
+                    "energy_out_l1": 0.0,
+                    "energy_out_l2": 0.0,
+                    "energy_out_l3": 0.0,
+                }
+            },
+            "batteries": {"B01": {"SoC": 80.0}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        "forecasts": {},
+    }
+    _set_tariff_curve(payload["observations"], 0.30, 0.10, 0.09, 0.08, 0.07, 0.06)
+    actions = _run(rh1_client, payload)
+    assert actions["battery_kw"] < 0.0
+
+
+def test_rh1_grid_meter_phase_sum_fallback_works_without_totals(rh1_client):
+    payload = {
+        "timestamp": "2026-03-01T10:00:00Z",
+        "observations": {
+            "non_shiftable_load": 0.0,
+            "solar_generation": 6.0,
+            "grid_meters": {
+                "GR01": {
+                    "energy_in_l1": 1.0,
+                    "energy_in_l2": 1.0,
+                    "energy_in_l3": 1.0,
+                    "energy_out_l1": 0.0,
+                    "energy_out_l2": 0.0,
+                    "energy_out_l3": 0.0,
+                }
+            },
             "batteries": {"B01": {"SoC": 80.0}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
             "electric_vehicles": {},

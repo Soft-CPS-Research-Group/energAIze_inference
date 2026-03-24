@@ -444,6 +444,74 @@ class IchargingBreakerRuntime:
     def __init__(self, config: IchargingRuntimeConfig):
         self.config = config
 
+    def _site_meter_component_kw(
+        self,
+        payload: Dict[str, Any],
+        meter_key: Optional[str],
+        component: str,
+    ) -> Optional[float]:
+        """Read site meter import/export with support for legacy and per-phase schemas."""
+        if not meter_key:
+            return None
+
+        key = str(meter_key).strip()
+        if not key:
+            return None
+
+        candidates: List[str] = [key]
+        if component == "energy_in":
+            if key.endswith(".energy_in_total"):
+                candidates.append(f"{key[:-len('energy_in_total')]}energy_in")
+            elif key.endswith(".energy_in"):
+                candidates.append(f"{key[:-len('energy_in')]}energy_in_total")
+        elif component == "energy_out":
+            if key.endswith(".energy_out_total"):
+                candidates.append(f"{key[:-len('energy_out_total')]}energy_out")
+            elif key.endswith(".energy_out"):
+                candidates.append(f"{key[:-len('energy_out')]}energy_out_total")
+
+        seen: Set[str] = set()
+        ordered_candidates: List[str] = []
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            ordered_candidates.append(candidate)
+
+        for candidate in ordered_candidates:
+            value = _maybe_float(payload.get(candidate))
+            if value is not None:
+                return max(value, 0.0)
+
+        prefix = key
+        for suffix in (
+            ".energy_in_total",
+            ".energy_in",
+            ".energy_out_total",
+            ".energy_out",
+        ):
+            if key.endswith(suffix):
+                prefix = key[: -len(suffix)]
+                break
+        if prefix == key:
+            prefix = key.rsplit(".", 1)[0] if "." in key else key
+
+        phase_suffixes = (
+            ("energy_in_l1", "energy_in_l2", "energy_in_l3")
+            if component == "energy_in"
+            else ("energy_out_l1", "energy_out_l2", "energy_out_l3")
+        )
+        phase_values: List[float] = []
+        for suffix in phase_suffixes:
+            value = _maybe_float(payload.get(f"{prefix}.{suffix}"))
+            if value is None:
+                continue
+            phase_values.append(max(value, 0.0))
+        if phase_values:
+            return sum(phase_values)
+
+        return 0.0
+
     def _effective_session_state(self, payload: Dict[str, Any], charger_id: str) -> tuple[str, float]:
         cfg = self.config
         sources = cfg.session_merge_map.get(charger_id) or [charger_id]
@@ -548,16 +616,14 @@ class IchargingBreakerRuntime:
                 effective_board_limit += solar_kw
         else:
             effective_board_limit = cfg.max_board_kw + solar_kw
-            site_import = (
-                max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
-                if cfg.site_meter_import_key
-                else None
+            site_import = self._site_meter_component_kw(
+                payload, cfg.site_meter_import_key, "energy_in"
             )
-            site_export = (
-                max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
-                if cfg.site_meter_export_key
-                else 0.0
+            site_export = self._site_meter_component_kw(
+                payload, cfg.site_meter_export_key, "energy_out"
             )
+            if site_export is None:
+                site_export = 0.0
             if site_import is not None:
                 net_import = max(site_import - site_export, 0.0)
                 effective_board_limit -= net_import
@@ -742,15 +808,11 @@ class IchargingBreakerRuntime:
                 }
                 for cid in flexible_chargers
             }
-            site_import_kw = (
-                max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
-                if cfg.site_meter_import_key
-                else None
+            site_import_kw = self._site_meter_component_kw(
+                payload, cfg.site_meter_import_key, "energy_in"
             )
-            site_export_kw = (
-                max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
-                if cfg.site_meter_export_key
-                else None
+            site_export_kw = self._site_meter_component_kw(
+                payload, cfg.site_meter_export_key, "energy_out"
             )
             site_net_kw = (
                 max(site_import_kw - (site_export_kw or 0.0), 0.0)
@@ -1006,16 +1068,14 @@ class IchargingBreakerRuntime:
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
         modeled_local_net_kw = non_shiftable_load_kw + board_total_kw - solar_kw
 
-        site_import = (
-            max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
-            if cfg.site_meter_import_key
-            else None
+        site_import = self._site_meter_component_kw(
+            payload, cfg.site_meter_import_key, "energy_in"
         )
-        site_export = (
-            max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
-            if cfg.site_meter_export_key
-            else 0.0
+        site_export = self._site_meter_component_kw(
+            payload, cfg.site_meter_export_key, "energy_out"
         )
+        if site_export is None:
+            site_export = 0.0
         candidate_nets_kw = [modeled_local_net_kw]
         if site_import is not None:
             # Project PCC meter net import to post-control setpoints so unmanaged loads

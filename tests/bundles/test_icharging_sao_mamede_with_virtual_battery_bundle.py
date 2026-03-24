@@ -173,13 +173,13 @@ def test_grid_meter_headroom_constrains_bb_dispatch(sao_mamede_with_battery_clie
         target_soc=0.90,
         departure_minutes_from_now=30,
     )
-    low_meter["observations"]["grid_meters"]["GR01"]["energy_in"] = 0.0
-    low_meter["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+    low_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 0.0
+    low_meter["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
     low_meter["observations"]["solar_generation"] = 0.0
 
     high_meter = copy.deepcopy(low_meter)
-    high_meter["observations"]["grid_meters"]["GR01"]["energy_in"] = 390.0
-    high_meter["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+    high_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 390.0
+    high_meter["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
 
     actions_low = _run(sao_mamede_with_battery_client, low_meter)
     actions_high = _run(sao_mamede_with_battery_client, high_meter)
@@ -193,8 +193,8 @@ def test_virtual_battery_uses_pt_meter_net_import_for_local_dispatch(
     payload["observations"]["virtual_battery"]["soc"] = 0.7
     payload["observations"]["solar_generation"] = 0.0
     payload["observations"]["non_shiftable_load"] = 0.0
-    payload["observations"]["grid_meters"]["GR01"]["energy_in"] = 120.0
-    payload["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 120.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
     payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
 
     actions = _run(sao_mamede_with_battery_client, payload)

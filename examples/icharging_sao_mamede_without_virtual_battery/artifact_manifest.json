@@ -103,8 +103,8 @@
           "min_connected_kw": 0.0,
           "per_phase_headroom_kw": 0.0,
           "solar_generation_key": "solar_generation",
-          "site_meter_import_key": "grid_meters.GR01.energy_in",
-          "site_meter_export_key": "grid_meters.GR01.energy_out",
+          "site_meter_import_key": "grid_meters.GR01.energy_in_total",
+          "site_meter_export_key": "grid_meters.GR01.energy_out_total",
           "chargers": {
             "BB000SMI": {
               "line": "PT",

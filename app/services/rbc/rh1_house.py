@@ -208,6 +208,46 @@ class Rh1HouseRuntime:
     def __init__(self, config: Rh1HouseConfig):
         self.config = config
 
+    def _meter_component_kw(self, payload: Dict[str, Any], component: str) -> float | None:
+        """Read RH01 grid meter import/export with support for total, legacy and phase schemas."""
+        base = "grid_meters.GR01"
+        if component == "energy_in":
+            keys = [
+                f"{base}.energy_in_total",
+                f"{base}.energy_in",
+            ]
+            phase_keys = (
+                f"{base}.energy_in_l1",
+                f"{base}.energy_in_l2",
+                f"{base}.energy_in_l3",
+            )
+        else:
+            keys = [
+                f"{base}.energy_out_total",
+                f"{base}.energy_out",
+            ]
+            phase_keys = (
+                f"{base}.energy_out_l1",
+                f"{base}.energy_out_l2",
+                f"{base}.energy_out_l3",
+            )
+
+        for key in keys:
+            value = _maybe_float(payload.get(key))
+            if value is not None:
+                return max(value, 0.0)
+
+        phase_values: List[float] = []
+        for key in phase_keys:
+            value = _maybe_float(payload.get(key))
+            if value is None:
+                continue
+            phase_values.append(max(value, 0.0))
+        if phase_values:
+            return sum(phase_values)
+
+        return None
+
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
         log = get_logger()
@@ -354,8 +394,8 @@ class Rh1HouseRuntime:
         if net_grid_kw < -grid_export_limit_kw - 1e-6:
             local_constraint_flags["grid_export_limit_unmet"] = True
 
-        meter_import_kw = _maybe_float(payload.get("grid_meters.GR01.energy_in"))
-        meter_export_kw = _maybe_float(payload.get("grid_meters.GR01.energy_out"))
+        meter_import_kw = self._meter_component_kw(payload, "energy_in")
+        meter_export_kw = self._meter_component_kw(payload, "energy_out")
         meter_net_kw = None
         if meter_import_kw is not None or meter_export_kw is not None:
             meter_net_kw = max(meter_import_kw or 0.0, 0.0) - max(meter_export_kw or 0.0, 0.0)
@@ -632,8 +672,8 @@ class Rh1HouseRuntime:
         return non_shiftable_load + ev_kw - solar_generation
 
     def _project_meter_net_without_battery(self, payload: Dict[str, Any], ev_kw: float) -> float | None:
-        meter_import = _maybe_float(payload.get("grid_meters.GR01.energy_in"))
-        meter_export = _maybe_float(payload.get("grid_meters.GR01.energy_out"))
+        meter_import = self._meter_component_kw(payload, "energy_in")
+        meter_export = self._meter_component_kw(payload, "energy_out")
         if meter_import is None and meter_export is None:
             return None
 
