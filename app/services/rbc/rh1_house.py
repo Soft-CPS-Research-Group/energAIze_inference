@@ -354,6 +354,12 @@ class Rh1HouseRuntime:
         if net_grid_kw < -grid_export_limit_kw - 1e-6:
             local_constraint_flags["grid_export_limit_unmet"] = True
 
+        meter_import_kw = _maybe_float(payload.get("grid_meters.GR01.energy_in"))
+        meter_export_kw = _maybe_float(payload.get("grid_meters.GR01.energy_out"))
+        meter_net_kw = None
+        if meter_import_kw is not None or meter_export_kw is not None:
+            meter_net_kw = max(meter_import_kw or 0.0, 0.0) - max(meter_export_kw or 0.0, 0.0)
+
         log.info(
             "rbc.actions",
             strategy="rh1_house_rbc_v1",
@@ -361,7 +367,69 @@ class Rh1HouseRuntime:
             connected={"ev": ev.connected},
             phase_totals={"grid": net_grid_kw},
             board_total=max(net_grid_kw, 0.0),
+            grid_import_limit_kw=grid_import_limit_kw,
+            grid_export_limit_kw=grid_export_limit_kw,
+            price_now_eur_kwh=price_now,
+            avg_future_price_eur_kwh=future_avg_price,
+            meter_net_kw=meter_net_kw,
         )
+
+        def fmt_kw(value: float) -> str:
+            return f"{_round_one_decimal_towards_zero(value):.1f}"
+
+        def fmt_optional_kw(value: float | None) -> str:
+            if value is None:
+                return "-"
+            return fmt_kw(value)
+
+        def fmt_price(value: float) -> str:
+            return f"{value:.4f}"
+
+        summary_lines = [
+            "Strategy: rh1_house_rbc_v1",
+            (
+                f"Inputs: non_shiftable={fmt_kw(non_shiftable_load)} kW"
+                f" solar={fmt_kw(solar_generation)} kW"
+                f" meter_in={fmt_optional_kw(meter_import_kw)} kW"
+                f" meter_out={fmt_optional_kw(meter_export_kw)} kW"
+                f" meter_net={fmt_optional_kw(meter_net_kw)} kW"
+            ),
+            (
+                f"Prices (EUR/kWh): now={fmt_price(price_now)}"
+                f" h1={fmt_price(prices.get(1.0, price_now))}"
+                f" h2={fmt_price(prices.get(2.0, price_now))}"
+                f" h6={fmt_price(prices.get(6.0, price_now))}"
+                f" h12={fmt_price(prices.get(12.0, price_now))}"
+                f" h24={fmt_price(prices.get(24.0, price_now))}"
+                f" avg_24h={fmt_price(future_avg_price)}"
+            ),
+            (
+                f"EV: connected={'yes' if ev.connected else 'no'}"
+                f" hard_min={fmt_kw(ev.hard_min_kw)} kW"
+                f" max={fmt_kw(ev.max_kw)} kW"
+                f" dispatch={fmt_kw(quantized['ev_charge_kw'])} kW"
+            ),
+            (
+                f"Battery: soc={battery_soc * 100.0:.1f}%"
+                f" bounds=[{fmt_kw(battery_bounds.min_kw)}, {fmt_kw(battery_bounds.max_kw)}] kW"
+                f" dispatch={fmt_kw(quantized['battery_kw'])} kW"
+            ),
+            (
+                f"Grid: base_wo_battery={fmt_kw(base_without_battery)} kW"
+                f" import_limit={fmt_kw(grid_import_limit_kw)} kW"
+                f" export_limit={fmt_kw(grid_export_limit_kw)} kW"
+                f" net={fmt_kw(net_grid_kw)} kW"
+            ),
+            "Objective: minimize_import_cost_with_free_local_pv_self_consumption",
+        ]
+        if warnings:
+            summary_lines.append(f"Fallbacks: {', '.join(warnings)}")
+        if local_constraint_flags:
+            summary_lines.append(
+                "Constraint flags: " + ", ".join(sorted(local_constraint_flags.keys()))
+            )
+        log.info("rbc.summary\n{}\n", "\n".join(summary_lines))
+
         if warnings:
             log.warning("rh1.payload_fallbacks", issues=warnings)
         if local_constraint_flags:

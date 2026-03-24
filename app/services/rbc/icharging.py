@@ -732,7 +732,8 @@ class IchargingBreakerRuntime:
                 for phase in phases or ["unknown"]:
                     line_totals[phase] = line_totals.get(phase, 0.0) + per_phase
             line_totals = dict(sorted(line_totals.items()))
-            board_total = sum(log_actions.get(cid, 0.0) for cid in connected)
+            connected_board_total = sum(log_actions.get(cid, 0.0) for cid in connected)
+            commanded_board_total = sum(log_actions.get(cid, 0.0) for cid in cfg.chargers)
             flex_summary = {
                 cid: {
                     "ev": states[cid].ev_id,
@@ -741,6 +742,35 @@ class IchargingBreakerRuntime:
                 }
                 for cid in flexible_chargers
             }
+            site_import_kw = (
+                max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
+                if cfg.site_meter_import_key
+                else None
+            )
+            site_export_kw = (
+                max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
+                if cfg.site_meter_export_key
+                else None
+            )
+            site_net_kw = (
+                max(site_import_kw - (site_export_kw or 0.0), 0.0)
+                if site_import_kw is not None
+                else None
+            )
+            virtual_battery_kw = (
+                log_actions.get(cfg.virtual_battery_action_name, 0.0)
+                if cfg.virtual_battery_action_name
+                else None
+            )
+            virtual_battery_soc: Optional[float] = None
+            if cfg.virtual_battery_action_name:
+                virtual_battery_soc = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
+                if virtual_battery_soc is None:
+                    virtual_battery_soc = _maybe_float(payload.get(cfg.virtual_battery_soc_fallback_key))
+                if virtual_battery_soc is not None and 1.0 < virtual_battery_soc <= 100.0:
+                    virtual_battery_soc = virtual_battery_soc / 100.0
+                if virtual_battery_soc is not None:
+                    virtual_battery_soc = _clamp(virtual_battery_soc, 0.0, 1.0)
             log.debug(
                 "rbc.actions",
                 strategy="icharging_breaker",
@@ -748,11 +778,26 @@ class IchargingBreakerRuntime:
                 connected=connected,
                 flex=flex_summary,
                 phase_totals=line_totals,
-                board_total=board_total,
+                board_total=connected_board_total,
+                command_total=commanded_board_total,
+                effective_board_limit_kw=effective_board_limit,
+                per_phase_limit_kw=per_phase_limit,
+                solar_kw=solar_kw,
+                unmanaged_load_kw=unmanaged_load_kw,
+                site_meter_net_kw=site_net_kw,
+                virtual_battery_kw=virtual_battery_kw,
             )
 
             def fmt_kw(value: float) -> str:
                 return f"{_round_down_one_decimal(value):.1f}"
+
+            def fmt_optional_kw(value: Optional[float]) -> str:
+                return "-" if value is None else fmt_kw(value)
+
+            def fmt_optional_pct(value: Optional[float]) -> str:
+                if value is None:
+                    return "-"
+                return f"{value * 100.0:.1f}%"
 
             line_chargers: Dict[str, List[str]] = {}
             for cid in cfg.chargers:
@@ -771,12 +816,45 @@ class IchargingBreakerRuntime:
                 if phase not in ordered_lines:
                     ordered_lines.append(phase)
 
-            summary_lines = [f"Board total: {fmt_kw(board_total)} kW"]
+            input_line = (
+                f"Inputs: solar={fmt_kw(solar_kw)} kW unmanaged={fmt_kw(unmanaged_load_kw)} kW"
+            )
+            if site_import_kw is not None:
+                input_line += (
+                    f" meter_in={fmt_kw(site_import_kw)} kW"
+                    f" meter_out={fmt_optional_kw(site_export_kw)} kW"
+                    f" meter_net={fmt_optional_kw(site_net_kw)} kW"
+                )
+
+            summary_lines = [
+                "Strategy: icharging_breaker",
+                input_line,
+                (
+                    f"Limits: board_effective={fmt_kw(effective_board_limit)} kW"
+                    f" per_line_effective={fmt_kw(per_phase_limit)} kW"
+                ),
+                (
+                    f"Dispatch: connected_total={fmt_kw(connected_board_total)} kW"
+                    f" commanded_total={fmt_kw(commanded_board_total)} kW"
+                ),
+            ]
+            if cfg.unmanaged_session_groups:
+                summary_lines.append(
+                    f"Unmanaged groups: count={len(cfg.unmanaged_session_groups)} measured_peak_sum={fmt_kw(unmanaged_load_kw)} kW"
+                )
+
             for phase in ordered_lines:
                 if phase not in line_chargers:
                     continue
                 phase_total = line_totals.get(phase, 0.0)
-                summary_lines.append(f"{phase} - Phase total: {fmt_kw(phase_total)} kW")
+                manifest_limit = _maybe_float((cfg.line_limits.get(phase) or {}).get("limit_kw"))
+                phase_line = (
+                    f"{phase} - total={fmt_kw(phase_total)} kW"
+                    f" runtime_limit={fmt_kw(per_phase_limit)} kW"
+                )
+                if manifest_limit is not None:
+                    phase_line += f" manifest_limit={fmt_kw(manifest_limit)} kW"
+                summary_lines.append(phase_line)
                 for cid in line_chargers[phase]:
                     state = states[cid]
                     ev = state.ev_id or "-"
@@ -794,8 +872,22 @@ class IchargingBreakerRuntime:
                     else:
                         flex_text = "flex=no"
                     summary_lines.append(
-                        f"  {cid} - ev={ev} connected={connected_flag} action={action_text} {flex_text}"
+                        (
+                            f"  {cid} - ev={ev} connected={connected_flag}"
+                            f" action={action_text} min={fmt_kw(state.min_kw)} max={fmt_kw(state.max_kw)} {flex_text}"
+                        )
                     )
+
+            if cfg.virtual_battery_action_name:
+                summary_lines.append(
+                    (
+                        f"Virtual battery ({cfg.virtual_battery_action_name}):"
+                        f" action={fmt_optional_kw(virtual_battery_kw)} kW"
+                        f" soc={fmt_optional_pct(virtual_battery_soc)}"
+                        f" charge_cap={fmt_kw(cfg.virtual_battery_charge_power_max_kw)} kW"
+                        f" discharge_cap={fmt_kw(cfg.virtual_battery_discharge_power_max_kw)} kW"
+                    )
+                )
 
             log.info("rbc.summary\n{}\n", "\n".join(summary_lines))
         except Exception:
