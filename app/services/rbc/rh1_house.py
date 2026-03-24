@@ -347,6 +347,8 @@ class Rh1HouseRuntime:
             payload.get("electricity_pricing.current"),
             payload.get("electricity_pricing"),
             payload.get("energy_price"),
+            payload.get("energy_tariffs.OMIE.energy_price.current"),
+            payload.get("energy_tariffs.OMIE.energy_price"),
         ]
         for candidate in current_candidates:
             numeric = _maybe_float(candidate)
@@ -380,29 +382,38 @@ class Rh1HouseRuntime:
     def _extract_price_points_from_vector(
         self, payload: Dict[str, Any], warnings: List[str]
     ) -> Dict[float, float] | None:
+        prefixes = ("energy_tariffs.OMIE.energy_price", "energy_price")
         indexed_values: Dict[int, float] = {}
-        for key, raw in payload.items():
-            if not isinstance(key, str):
-                continue
-            if not key.startswith("energy_price.values[") or not key.endswith("]"):
-                continue
-            idx_raw = key[len("energy_price.values[") : -1]
-            if not idx_raw.isdigit():
-                continue
-            numeric = _maybe_float(raw)
-            if numeric is None:
-                continue
-            indexed_values[int(idx_raw)] = numeric
+        selected_prefix: str | None = None
+        for prefix in prefixes:
+            candidate_values: Dict[int, float] = {}
+            value_prefix = f"{prefix}.values["
+            for key, raw in payload.items():
+                if not isinstance(key, str):
+                    continue
+                if not key.startswith(value_prefix) or not key.endswith("]"):
+                    continue
+                idx_raw = key[len(value_prefix) : -1]
+                if not idx_raw.isdigit():
+                    continue
+                numeric = _maybe_float(raw)
+                if numeric is None:
+                    continue
+                candidate_values[int(idx_raw)] = numeric
+            if candidate_values:
+                indexed_values = candidate_values
+                selected_prefix = prefix
+                break
 
-        if not indexed_values:
+        if not indexed_values or selected_prefix is None:
             return None
 
-        freq_seconds = _maybe_float(payload.get("energy_price.frequency_seconds"))
+        freq_seconds = _maybe_float(payload.get(f"{selected_prefix}.frequency_seconds"))
         if freq_seconds is None or freq_seconds <= 0.0:
             warnings.append("missing_energy_price_frequency_defaulted")
             freq_seconds = 900.0
 
-        unit_hint = payload.get("energy_price.measurement_unit")
+        unit_hint = payload.get(f"{selected_prefix}.measurement_unit")
         current_value = indexed_values.get(0)
         if current_value is None:
             first_idx = min(indexed_values)

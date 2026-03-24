@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -16,9 +17,17 @@ MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
-
+ACTION_CHARGER = "BB000SMI"
 MIN_TECHNICAL_KW = 8.0
 MAX_BB_KW = 50.0
+PHYSICAL_PLUGS = {
+    "BB000SMI_1",
+    "BB000SMI_2",
+    "M1123089-5_1",
+    "M1123089-5_2",
+    "M1123089-6_1",
+    "M1123089-6_2",
+}
 
 
 def _run(client: TestClient, payload: dict) -> dict[str, float]:
@@ -57,134 +66,147 @@ def _base_payload() -> dict:
     return payload
 
 
+def _set_flex(
+    payload: dict,
+    *,
+    ev_id: str,
+    soc: float,
+    target_soc: float,
+    departure_minutes_from_now: int,
+) -> None:
+    now = datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00")).astimezone(
+        timezone.utc
+    )
+    departure = now + timedelta(minutes=departure_minutes_from_now)
+    payload["observations"]["electric_vehicles"][ev_id] = {
+        "SoC": soc,
+        "flexibility": {
+            "estimated_soc_at_arrival": None,
+            "estimated_soc_at_departure": target_soc,
+            "estimated_time_at_arrival": "",
+            "estimated_time_at_departure": departure.isoformat().replace("+00:00", "Z"),
+            "charger": "",
+            "mode": "",
+        },
+    }
+
+
 def test_bundle_loads_sao_mamede(sao_mamede_client):
     pipeline = store.get_pipeline()
     assert pipeline.agent.strategy == "icharging_breaker"
     assert pipeline.agent._icharging_runtime is not None  # noqa: SLF001
 
 
-def test_actions_contract_per_real_plug(sao_mamede_client):
+def test_payload_assets_reflect_three_physical_chargers(sao_mamede_client):
+    payload = _base_payload()
+    sessions = set(payload["observations"]["charging_sessions"].keys())
+    assert sessions == PHYSICAL_PLUGS
+
+
+def test_actions_contract_has_single_controllable_charger(sao_mamede_client):
     payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert set(actions.keys()) == {"BB000SMI_1", "BB000SMI_2"}
+    assert set(actions.keys()) == {ACTION_CHARGER}
 
 
-def test_idle_plug_outputs_min_technical_kw(sao_mamede_client):
-    payload = _base_payload()
-    payload["observations"]["charging_sessions"]["BB000SMI_1"] = {
-        "power": 20.0,
-        "electric_vehicle": "SM_EV_01",
-    }
-    payload["observations"]["electric_vehicles"] = {
-        "SM_EV_01": {
-            "SoC": 0.40,
-            "flexibility": {
-                "estimated_soc_at_departure": 0.80,
-                "estimated_time_at_departure": "2026-03-01T14:00:00Z",
-            },
-        }
-    }
-
-    actions = _run(sao_mamede_client, payload)
-    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
-
-
-def test_both_idle_output_minimum(sao_mamede_client):
+def test_idle_outputs_minimum_even_without_ev(sao_mamede_client):
     payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert actions["BB000SMI_1"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
-    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    assert actions[ACTION_CHARGER] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
 
 
-def test_active_plug_is_optimized(sao_mamede_client):
+def test_connected_ev_on_second_plug_is_controlled(sao_mamede_client):
     payload = _base_payload()
     payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
-        "power": 18.0,
+        "power": 0.0,
         "electric_vehicle": "SM_EV_02",
     }
-    payload["observations"]["electric_vehicles"] = {
-        "SM_EV_02": {
-            "SoC": 0.30,
-            "flexibility": {
-                "estimated_soc_at_departure": 0.90,
-                "estimated_time_at_departure": "2026-03-01T13:00:00Z",
-            },
-        }
-    }
+    _set_flex(
+        payload,
+        ev_id="SM_EV_02",
+        soc=0.20,
+        target_soc=0.90,
+        departure_minutes_from_now=60,
+    )
 
     actions = _run(sao_mamede_client, payload)
-    assert MIN_TECHNICAL_KW <= actions["BB000SMI_2"] <= MAX_BB_KW
-    assert actions["BB000SMI_1"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    assert MIN_TECHNICAL_KW <= actions[ACTION_CHARGER] <= MAX_BB_KW
+    assert actions[ACTION_CHARGER] > MIN_TECHNICAL_KW
 
 
-def test_ambiguous_dual_ev_prioritizes_highest_power_with_warning(
-    sao_mamede_client,
-    monkeypatch,
-):
-    warnings: list[tuple[str, dict]] = []
-
-    class _DummyLogger:
-        def warning(self, message, *args, **kwargs):  # noqa: ANN001
-            warnings.append((str(message), dict(kwargs)))
-
-        def debug(self, *args, **kwargs):  # noqa: ANN001
-            return None
-
-        def info(self, *args, **kwargs):  # noqa: ANN001
-            return None
-
-        def exception(self, *args, **kwargs):  # noqa: ANN001
-            return None
-
-    monkeypatch.setattr("app.services.rbc.icharging.get_logger", lambda: _DummyLogger())
-
+def test_stale_power_on_other_bb_plug_does_not_mask_connected_ev(sao_mamede_client):
     payload = _base_payload()
     payload["observations"]["charging_sessions"]["BB000SMI_1"] = {
-        "power": 35.0,
-        "electric_vehicle": "SM_EV_11",
+        "power": 38.0,
+        "electric_vehicle": "0",
     }
     payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
-        "power": 10.0,
-        "electric_vehicle": "SM_EV_22",
-    }
-    payload["observations"]["electric_vehicles"] = {
-        "SM_EV_11": {
-            "SoC": 0.20,
-            "flexibility": {
-                "estimated_soc_at_departure": 0.90,
-                "estimated_time_at_departure": "2026-03-01T12:00:00Z",
-            },
-        },
-        "SM_EV_22": {
-            "SoC": 0.55,
-            "flexibility": {
-                "estimated_soc_at_departure": 0.70,
-                "estimated_time_at_departure": "2026-03-01T16:00:00Z",
-            },
-        },
-    }
-
-    actions = _run(sao_mamede_client, payload)
-    assert MIN_TECHNICAL_KW <= actions["BB000SMI_1"] <= MAX_BB_KW
-    assert actions["BB000SMI_2"] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
-    assert any(msg == "rbc.exclusive_group_conflict" for msg, _ in warnings)
-
-
-def test_price_forecast_do_not_change_dispatch(sao_mamede_client):
-    payload_a = _base_payload()
-    payload_a["observations"]["charging_sessions"]["BB000SMI_1"] = {
-        "power": 25.0,
+        "power": 0.0,
         "electric_vehicle": "SM_EV_03",
     }
-    payload_a["observations"]["electric_vehicles"] = {
-        "SM_EV_03": {
-            "SoC": 0.35,
-            "flexibility": {
-                "estimated_soc_at_departure": 0.85,
-                "estimated_time_at_departure": "2026-03-01T15:00:00Z",
-            },
-        }
+    _set_flex(
+        payload,
+        ev_id="SM_EV_03",
+        soc=0.10,
+        target_soc=0.90,
+        departure_minutes_from_now=30,
+    )
+
+    actions = _run(sao_mamede_client, payload)
+    assert actions[ACTION_CHARGER] > MIN_TECHNICAL_KW
+
+
+def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmanaged(
+    sao_mamede_client,
+):
+    low_meter = _base_payload()
+    low_meter["observations"]["charging_sessions"]["BB000SMI_2"] = {
+        "power": 0.0,
+        "electric_vehicle": "SM_EV_04",
     }
+    _set_flex(
+        low_meter,
+        ev_id="SM_EV_04",
+        soc=0.10,
+        target_soc=0.90,
+        departure_minutes_from_now=30,
+    )
+    low_meter["observations"]["grid_meters"]["GR01"]["energy_in"] = 0.0
+    low_meter["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+    low_meter["observations"]["solar_generation"] = 0.0
+    low_meter["observations"]["charging_sessions"]["M1123089-5_1"] = {
+        "power": 22.0,
+        "electric_vehicle": "0",
+    }
+    low_meter["observations"]["charging_sessions"]["M1123089-6_2"] = {
+        "power": 22.0,
+        "electric_vehicle": "0",
+    }
+
+    high_meter = copy.deepcopy(low_meter)
+    high_meter["observations"]["grid_meters"]["GR01"]["energy_in"] = 390.0
+    high_meter["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+
+    actions_low = _run(sao_mamede_client, low_meter)
+    actions_high = _run(sao_mamede_client, high_meter)
+    assert set(actions_low.keys()) == {ACTION_CHARGER}
+    assert set(actions_high.keys()) == {ACTION_CHARGER}
+    assert actions_high[ACTION_CHARGER] < actions_low[ACTION_CHARGER]
+
+
+def test_price_forecast_do_not_change_dispatch_without_virtual_battery(sao_mamede_client):
+    payload_a = _base_payload()
+    payload_a["observations"]["charging_sessions"]["BB000SMI_2"] = {
+        "power": 0.0,
+        "electric_vehicle": "SM_EV_05",
+    }
+    _set_flex(
+        payload_a,
+        ev_id="SM_EV_05",
+        soc=0.35,
+        target_soc=0.85,
+        departure_minutes_from_now=180,
+    )
 
     payload_b = copy.deepcopy(payload_a)
     payload_b["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [9.0] * 96

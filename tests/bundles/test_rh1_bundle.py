@@ -41,6 +41,20 @@ def _price_curve(now: float, h1: float, h2: float, h6: float, h12: float, h24: f
     }
 
 
+def _set_tariff_curve(
+    observations: dict,
+    now: float,
+    h1: float,
+    h2: float,
+    h6: float,
+    h12: float,
+    h24: float,
+) -> None:
+    observations.setdefault("energy_tariffs", {}).setdefault("OMIE", {})["energy_price"] = _price_curve(
+        now, h1, h2, h6, h12, h24
+    )
+
+
 def _run(client: TestClient, payload: dict) -> dict[str, float]:
     response = client.post("/inference", json={"features": payload})
     assert response.status_code == 200
@@ -68,7 +82,13 @@ def _step_cost_baseline_no_export(net_grid_kw: float, price: float, dt_hours: fl
 def _baseline_actions(record: dict, cfg) -> dict[str, float]:  # noqa: ANN001
     obs = record.get("observations", {})
     threshold = float(cfg.baseline_price_threshold_eur_kwh)
-    values = obs.get("energy_price", {}).get("values", [])
+    tariff_values = (
+        obs.get("energy_tariffs", {})
+        .get("OMIE", {})
+        .get("energy_price", {})
+        .get("values", [])
+    )
+    values = tariff_values or obs.get("energy_price", {}).get("values", [])
     price = _safe_float(values[0] if values else 0.0, 0.0)
 
     ev_id = str(obs.get("charging_sessions", {}).get("EVC01", {}).get("electric_vehicle") or "").strip()
@@ -179,6 +199,84 @@ def test_rh1_price_vector_normalization_affects_dispatch(rh1_client):
 
     assert cheap_actions["battery_kw"] > 0.0
     assert expensive_actions["battery_kw"] < 0.0
+
+
+def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
+    common_obs = {
+        "non_shiftable_load": 1.0,
+        "solar_generation": 0.0,
+        "batteries": {"B01": {"SoC": 55.0}},
+        "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+        "electric_vehicles": {},
+    }
+
+    cheap = {
+        "timestamp": "2026-03-01T12:00:00Z",
+        "observations": dict(common_obs),
+        "forecasts": {},
+    }
+    _set_tariff_curve(cheap["observations"], 0.05, 0.25, 0.24, 0.23, 0.22, 0.21)
+
+    expensive = {
+        "timestamp": "2026-03-01T13:00:00Z",
+        "observations": dict(common_obs),
+        "forecasts": {},
+    }
+    _set_tariff_curve(expensive["observations"], 0.30, 0.10, 0.09, 0.08, 0.07, 0.06)
+
+    cheap_actions = _run(rh1_client, cheap)
+    expensive_actions = _run(rh1_client, expensive)
+
+    assert cheap_actions["battery_kw"] > 0.0
+    assert expensive_actions["battery_kw"] < 0.0
+
+
+def test_rh1_real_payload_tariffs_drive_decisions(rh1_client):
+    message = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))[0]
+    payload = copy.deepcopy(message)
+    payload["timestamp"] = "2026-03-01T10:00:00Z"
+    payload["observations"]["charging_sessions"] = {
+        "EVC01": {"power": 0.0, "electric_vehicle": "EV01"}
+    }
+    payload["observations"]["electric_vehicles"] = {
+        "EV01": {
+            "SoC": 0.5,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.8,
+                "estimated_time_at_departure": "2026-03-01T18:00:00Z",
+            },
+        }
+    }
+    payload["observations"]["batteries"] = {"B01": {"SoC": 55.0}}
+    payload["observations"]["non_shiftable_load"] = 0.5
+    payload["observations"]["solar_generation"] = 0.0
+
+    expensive_now = copy.deepcopy(payload)
+    _set_tariff_curve(
+        expensive_now["observations"],
+        now=0.30,
+        h1=0.10,
+        h2=0.09,
+        h6=0.08,
+        h12=0.07,
+        h24=0.06,
+    )
+    expensive_actions = _run(rh1_client, expensive_now)
+
+    cheap_now = copy.deepcopy(payload)
+    _set_tariff_curve(
+        cheap_now["observations"],
+        now=0.05,
+        h1=0.20,
+        h2=0.22,
+        h6=0.24,
+        h12=0.23,
+        h24=0.21,
+    )
+    cheap_actions = _run(rh1_client, cheap_now)
+
+    assert expensive_actions["battery_kw"] < 0.0
+    assert cheap_actions["battery_kw"] > 0.0
 
 
 def test_rh1_ev_hard_deadline_behavior(rh1_client):

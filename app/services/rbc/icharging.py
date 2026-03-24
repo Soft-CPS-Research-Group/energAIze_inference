@@ -166,6 +166,8 @@ class IchargingRuntimeConfig:
     site_available_headroom_key: Optional[str] = None
     site_available_headroom_fallback_kw: float = 0.0
     site_available_headroom_includes_pv: bool = True
+    site_meter_import_key: Optional[str] = None
+    site_meter_export_key: Optional[str] = None
     virtual_battery_action_name: Optional[str] = None
     virtual_battery_nominal_power_kw: float = 15.0
     virtual_battery_capacity_kwh: float = 20.0
@@ -187,6 +189,8 @@ class IchargingRuntimeConfig:
     session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
     session_merge_power_key: str = "power"
     session_merge_ev_key: str = "electric_vehicle"
+    unmanaged_session_groups: Dict[str, List[str]] = field(default_factory=dict)
+    unmanaged_session_power_key: str = "power"
     exclusive_charger_groups: List[List[str]] = field(default_factory=list)
     exclusive_group_strategy: str = "highest_power"
 
@@ -205,6 +209,8 @@ class IchargingRuntimeConfig:
         flexibility_fields = data.pop("flexibility_fields", None)
         inactive_value = data.pop("inactive_power_threshold_kw", None)
         site_available_headroom_key = data.pop("site_available_headroom_key", None)
+        site_meter_import_key = data.pop("site_meter_import_key", None)
+        site_meter_export_key = data.pop("site_meter_export_key", None)
         virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
         session_merge_map_raw = data.pop("session_merge_map", {}) or {}
         session_merge_map: Dict[str, List[str]] = {}
@@ -220,6 +226,20 @@ class IchargingRuntimeConfig:
                     sources = [source] if source else []
                 if sources:
                     session_merge_map[target] = sources
+        unmanaged_session_groups_raw = data.pop("unmanaged_session_groups", {}) or {}
+        unmanaged_session_groups: Dict[str, List[str]] = {}
+        if isinstance(unmanaged_session_groups_raw, dict):
+            for key, value in unmanaged_session_groups_raw.items():
+                target = str(key).strip()
+                if not target:
+                    continue
+                if isinstance(value, list):
+                    sources = [str(item).strip() for item in value if str(item).strip()]
+                else:
+                    source = str(value).strip()
+                    sources = [source] if source else []
+                if sources:
+                    unmanaged_session_groups[target] = sources
         exclusive_groups_raw = data.pop("exclusive_charger_groups", []) or []
         exclusive_charger_groups: List[List[str]] = []
         if isinstance(exclusive_groups_raw, list):
@@ -266,6 +286,12 @@ class IchargingRuntimeConfig:
             site_available_headroom_includes_pv=bool(
                 data.pop("site_available_headroom_includes_pv", True)
             ),
+            site_meter_import_key=str(site_meter_import_key).strip()
+            if site_meter_import_key is not None and str(site_meter_import_key).strip()
+            else None,
+            site_meter_export_key=str(site_meter_export_key).strip()
+            if site_meter_export_key is not None and str(site_meter_export_key).strip()
+            else None,
             virtual_battery_action_name=str(virtual_battery_action_name).strip()
             if virtual_battery_action_name is not None and str(virtual_battery_action_name).strip()
             else None,
@@ -333,6 +359,10 @@ class IchargingRuntimeConfig:
             session_merge_map=session_merge_map,
             session_merge_power_key=str(data.pop("session_merge_power_key", "power") or "power"),
             session_merge_ev_key=str(data.pop("session_merge_ev_key", "electric_vehicle") or "electric_vehicle"),
+            unmanaged_session_groups=unmanaged_session_groups,
+            unmanaged_session_power_key=str(
+                data.pop("unmanaged_session_power_key", "power") or "power"
+            ),
             exclusive_charger_groups=exclusive_charger_groups,
             exclusive_group_strategy=exclusive_group_strategy,
         )
@@ -389,11 +419,27 @@ class IchargingBreakerRuntime:
         if not session_rows:
             return "", 0.0
 
-        max_power = max(row[2] for row in session_rows)
-        candidates = [row for row in session_rows if abs(row[2] - max_power) <= 1e-9]
-        with_ev = [row for row in candidates if row[1]]
-        chosen = with_ev[0] if with_ev else candidates[0]
+        with_ev = [row for row in session_rows if row[1]]
+        if with_ev:
+            chosen = max(with_ev, key=lambda row: row[2])
+        else:
+            chosen = max(session_rows, key=lambda row: row[2])
         return chosen[1], chosen[2]
+
+    def _unmanaged_session_load_kw(self, payload: Dict[str, Any]) -> float:
+        cfg = self.config
+        if not cfg.unmanaged_session_groups:
+            return 0.0
+
+        total_kw = 0.0
+        for source_ids in cfg.unmanaged_session_groups.values():
+            group_peak = 0.0
+            for source_id in source_ids:
+                power_key = f"charging_sessions.{source_id}.{cfg.unmanaged_session_power_key}"
+                power_kw = max(_safe_float(payload.get(power_key), 0.0), 0.0)
+                group_peak = max(group_peak, power_kw)
+            total_kw += group_peak
+        return total_kw
 
     def _apply_exclusive_groups(self, states: Dict[str, ChargerState]) -> None:
         cfg = self.config
@@ -446,6 +492,7 @@ class IchargingBreakerRuntime:
         control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         min_minutes = control_minutes
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
+        unmanaged_load_kw = self._unmanaged_session_load_kw(payload)
         if cfg.site_available_headroom_key:
             headroom_raw = _maybe_float(payload.get(cfg.site_available_headroom_key))
             if headroom_raw is None or headroom_raw < 0.0:
@@ -462,6 +509,21 @@ class IchargingBreakerRuntime:
                 effective_board_limit += solar_kw
         else:
             effective_board_limit = cfg.max_board_kw + solar_kw
+            site_import = (
+                max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
+                if cfg.site_meter_import_key
+                else None
+            )
+            site_export = (
+                max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
+                if cfg.site_meter_export_key
+                else 0.0
+            )
+            if site_import is not None:
+                net_import = max(site_import - site_export, 0.0)
+                effective_board_limit -= net_import
+            elif unmanaged_load_kw > 1e-6:
+                effective_board_limit -= unmanaged_load_kw
         effective_board_limit = max(effective_board_limit, 0.0)
         per_phase_limit = (
             effective_board_limit / max(len(cfg.line_limits), 1)
@@ -698,28 +760,34 @@ class IchargingBreakerRuntime:
         return quantized
 
     def _extract_price_series(self, payload: Dict[str, Any], prefix: str) -> List[float]:
-        values: List[tuple[int, float]] = []
-        values_prefix = f"{prefix}.values["
-        for key, raw in payload.items():
-            if not key.startswith(values_prefix):
-                continue
-            idx_text = key[len(values_prefix) : -1] if key.endswith("]") else ""
-            if not idx_text.isdigit():
-                continue
-            value = _maybe_float(raw)
-            if value is None:
-                continue
-            values.append((int(idx_text), value))
-        if values:
-            return [value for _, value in sorted(values, key=lambda pair: pair[0])]
+        prefixes = [prefix]
+        nested_prefix = f"energy_tariffs.OMIE.{prefix}"
+        if prefix and not prefix.startswith("energy_tariffs.") and nested_prefix not in prefixes:
+            prefixes.append(nested_prefix)
 
-        scalar = _maybe_float(payload.get(prefix))
-        if scalar is not None:
-            return [scalar]
+        for candidate in prefixes:
+            values: List[tuple[int, float]] = []
+            values_prefix = f"{candidate}.values["
+            for key, raw in payload.items():
+                if not key.startswith(values_prefix):
+                    continue
+                idx_text = key[len(values_prefix) : -1] if key.endswith("]") else ""
+                if not idx_text.isdigit():
+                    continue
+                value = _maybe_float(raw)
+                if value is None:
+                    continue
+                values.append((int(idx_text), value))
+            if values:
+                return [value for _, value in sorted(values, key=lambda pair: pair[0])]
 
-        current = _maybe_float(payload.get(f"{prefix}.current"))
-        if current is not None:
-            return [current]
+            scalar = _maybe_float(payload.get(candidate))
+            if scalar is not None:
+                return [scalar]
+
+            current = _maybe_float(payload.get(f"{candidate}.current"))
+            if current is not None:
+                return [current]
         return []
 
     def _price_based_virtual_battery_dispatch(

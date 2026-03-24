@@ -70,11 +70,9 @@
         {
           "low": [
             8.0,
-            8.0,
             -15.0
           ],
           "high": [
-            50.0,
             50.0,
             15.0
           ]
@@ -82,8 +80,7 @@
       ]
     ],
     "action_names": [
-      "BB000SMI_1",
-      "BB000SMI_2",
+      "BB000SMI",
       "virtual_battery_kw"
     ],
     "reward_function": {
@@ -109,14 +106,10 @@
           "min_connected_kw": 0.0,
           "per_phase_headroom_kw": 0.0,
           "solar_generation_key": "solar_generation",
+          "site_meter_import_key": "grid_meters.GR01.energy_in",
+          "site_meter_export_key": "grid_meters.GR01.energy_out",
           "chargers": {
-            "BB000SMI_1": {
-              "line": "L1",
-              "min_kw": 8.0,
-              "max_kw": 50.0,
-              "allow_flex_when_ev": true
-            },
-            "BB000SMI_2": {
+            "BB000SMI": {
               "line": "L1",
               "min_kw": 8.0,
               "max_kw": 50.0,
@@ -127,28 +120,35 @@
             "L1": {
               "limit_kw": 50.0,
               "chargers": [
-                "BB000SMI_1",
-                "BB000SMI_2"
+                "BB000SMI"
               ]
             }
           },
           "action_order": [
-            "BB000SMI_1",
-            "BB000SMI_2"
+            "BB000SMI"
           ],
+          "session_merge_map": {
+            "BB000SMI": [
+              "BB000SMI_1",
+              "BB000SMI_2"
+            ]
+          },
+          "unmanaged_session_groups": {
+            "M1123089-5": [
+              "M1123089-5_1",
+              "M1123089-5_2"
+            ],
+            "M1123089-6": [
+              "M1123089-6_1",
+              "M1123089-6_2"
+            ]
+          },
           "flexibility_fields": {
             "soc": "electric_vehicles.{ev_id}.SoC",
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
           },
           "require_observations_envelope": true,
-          "exclusive_charger_groups": [
-            [
-              "BB000SMI_1",
-              "BB000SMI_2"
-            ]
-          ],
-          "exclusive_group_strategy": "highest_power",
           "virtual_battery_action_name": "virtual_battery_kw",
           "virtual_battery_nominal_power_kw": 15.0,
           "virtual_battery_capacity_kwh": 20.0,
@@ -163,7 +163,7 @@
           "virtual_battery_community_target_import_key": "community.target_net_import_kw",
           "virtual_battery_community_current_import_key": "community.current_net_import_kw",
           "virtual_battery_community_price_prefix": "community.price_signal",
-          "virtual_battery_local_price_prefix": "energy_price",
+          "virtual_battery_local_price_prefix": "energy_tariffs.OMIE.energy_price",
           "virtual_battery_soc_min": 0.1,
           "virtual_battery_soc_max": 1.0
         }
