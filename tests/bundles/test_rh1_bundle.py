@@ -138,6 +138,11 @@ def test_rh1_bundle_loads_and_strategy_selected(rh1_client):
     assert pipeline.agent.strategy == "rh1_house_rbc_v1"
 
 
+def test_rh1_manifest_soc_key_matches_real_payload_schema(rh1_client):
+    cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
+    assert cfg.battery_soc_keys[0] == "batteries.B01.SoC"
+
+
 def test_rh1_actions_contract_ev_battery_only(rh1_client):
     message = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))[0]
     actions = _run(rh1_client, message)
@@ -229,6 +234,48 @@ def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
 
     assert cheap_actions["battery_kw"] > 0.0
     assert expensive_actions["battery_kw"] < 0.0
+
+
+def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):
+    payload = {
+        "timestamp": "2026-03-01T10:00:00Z",
+        "observations": {
+            "non_shiftable_load": 0.0,
+            "solar_generation": 6.0,
+            "grid_meters": {"GR01": {"energy_in": 3.0, "energy_out": 0.0}},
+            "batteries": {"B01": {"SoC": 80.0}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        "forecasts": {},
+    }
+    _set_tariff_curve(payload["observations"], 0.30, 0.10, 0.09, 0.08, 0.07, 0.06)
+    actions = _run(rh1_client, payload)
+    assert actions["battery_kw"] < 0.0
+
+
+def test_rh1_quantization_keeps_grid_import_within_limit(rh1_client):
+    payload = {
+        "timestamp": "2026-03-01T10:00:00Z",
+        "observations": {
+            "non_shiftable_load": 8.970622904531151,
+            "solar_generation": 0.14326037443006923,
+            "batteries": {"B01": {"SoC": 20.3850795696542}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        "forecasts": {},
+    }
+    _set_tariff_curve(payload["observations"], 0.30, 0.10, 0.10, 0.10, 0.10, 0.10)
+
+    actions = _run(rh1_client, payload)
+    net_grid_kw = (
+        payload["observations"]["non_shiftable_load"]
+        + actions["ev_charge_kw"]
+        + actions["battery_kw"]
+        - payload["observations"]["solar_generation"]
+    )
+    assert net_grid_kw <= 8.0 + 1e-6
 
 
 def test_rh1_real_payload_tariffs_drive_decisions(rh1_client):

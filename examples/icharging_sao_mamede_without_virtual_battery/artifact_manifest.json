@@ -107,15 +107,15 @@
           "site_meter_export_key": "grid_meters.GR01.energy_out",
           "chargers": {
             "BB000SMI": {
-              "line": "L1",
+              "line": "PT",
               "min_kw": 8.0,
               "max_kw": 50.0,
               "allow_flex_when_ev": true
             }
           },
           "line_limits": {
-            "L1": {
-              "limit_kw": 50.0,
+            "PT": {
+              "limit_kw": 400.0,
               "chargers": [
                 "BB000SMI"
               ]

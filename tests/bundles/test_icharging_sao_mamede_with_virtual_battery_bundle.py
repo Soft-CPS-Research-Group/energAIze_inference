@@ -87,6 +87,15 @@ def test_actions_contract_includes_virtual_battery(sao_mamede_with_battery_clien
     assert set(actions.keys()) == {ACTION_CHARGER, "virtual_battery_kw"}
 
 
+def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
+    runtime = store.get_pipeline().agent._icharging_runtime  # noqa: SLF001
+    assert runtime is not None
+    cfg = runtime.config
+    assert cfg.max_board_kw == pytest.approx(400.0, rel=1e-6)
+    assert set(cfg.line_limits.keys()) == {"PT"}
+    assert cfg.chargers["BB000SMI"]["line"] == "PT"
+
+
 def test_single_controllable_bb_charger_uses_merged_plugs(sao_mamede_with_battery_client):
     payload = _base_payload()
     payload["observations"]["charging_sessions"]["BB000SMI_2"] = {
@@ -175,3 +184,18 @@ def test_grid_meter_headroom_constrains_bb_dispatch(sao_mamede_with_battery_clie
     actions_low = _run(sao_mamede_with_battery_client, low_meter)
     actions_high = _run(sao_mamede_with_battery_client, high_meter)
     assert actions_high[ACTION_CHARGER] < actions_low[ACTION_CHARGER]
+
+
+def test_virtual_battery_uses_pt_meter_net_import_for_local_dispatch(
+    sao_mamede_with_battery_client,
+):
+    payload = _base_payload()
+    payload["observations"]["virtual_battery"]["soc"] = 0.7
+    payload["observations"]["solar_generation"] = 0.0
+    payload["observations"]["non_shiftable_load"] = 0.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_in"] = 120.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_out"] = 0.0
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
+
+    actions = _run(sao_mamede_with_battery_client, payload)
+    assert actions["virtual_battery_kw"] < -1e-6

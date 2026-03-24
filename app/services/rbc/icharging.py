@@ -145,6 +145,45 @@ def _reduce_actions(
                 break
 
 
+def _reduce_actions_for_line(
+    order: List[str],
+    line_name: str,
+    amount: float,
+    actions: Dict[str, float],
+    min_levels: Dict[str, float],
+    states: Dict[str, "ChargerState"],
+) -> None:
+    """Reduce actions to remove per-line overflow, accounting for multi-phase chargers."""
+    remaining = amount
+    while remaining > 1e-6:
+        adjustable: List[tuple[str, int, float]] = []
+        for cid in order:
+            state = states.get(cid)
+            if state is None or not state.connected:
+                continue
+            phases = state.phases or ([state.line] if state.line else [])
+            if line_name not in phases:
+                continue
+            phase_count = max(state.n_phases, 1)
+            reducible_action = max(actions.get(cid, 0.0) - min_levels.get(cid, 0.0), 0.0)
+            reducible_line = reducible_action / phase_count
+            if reducible_line > 1e-6:
+                adjustable.append((cid, phase_count, reducible_line))
+
+        if not adjustable:
+            break
+
+        share = remaining / len(adjustable)
+        for cid, phase_count, reducible_line in adjustable:
+            reduction_line = min(reducible_line, share, remaining)
+            if reduction_line <= 0.0:
+                continue
+            actions[cid] = actions.get(cid, 0.0) - (reduction_line * phase_count)
+            remaining -= reduction_line
+            if remaining <= 1e-6:
+                break
+
+
 @dataclass
 class IchargingRuntimeConfig:
     max_board_kw: float
@@ -628,6 +667,11 @@ class IchargingBreakerRuntime:
             per_phase_limit,
             effective_board_limit,
         )
+        # Top-up can increase allocations after an earlier phase-limit pass.
+        # Re-enforce line limits unconditionally to keep hard phase constraints.
+        self._enforce_line_limits(
+            cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
+        )
 
         board_total = sum(
             value for cid, value in actions.items() if states.get(cid) and states[cid].connected
@@ -868,7 +912,30 @@ class IchargingBreakerRuntime:
 
         non_shiftable_load_kw = _safe_float(payload.get("non_shiftable_load"), 0.0)
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
-        local_net_without_battery_kw = non_shiftable_load_kw + board_total_kw - solar_kw
+        modeled_local_net_kw = non_shiftable_load_kw + board_total_kw - solar_kw
+
+        site_import = (
+            max(_safe_float(payload.get(cfg.site_meter_import_key), 0.0), 0.0)
+            if cfg.site_meter_import_key
+            else None
+        )
+        site_export = (
+            max(_safe_float(payload.get(cfg.site_meter_export_key), 0.0), 0.0)
+            if cfg.site_meter_export_key
+            else 0.0
+        )
+        candidate_nets_kw = [modeled_local_net_kw]
+        if site_import is not None:
+            # Project PCC meter net import to post-control setpoints so unmanaged loads
+            # at the site are reflected in local battery policy.
+            meter_net_import_kw = site_import - site_export
+            controlled_now_kw = sum(
+                state.session_power
+                for state in states.values()
+                if state.connected
+            )
+            meter_projected_net_kw = meter_net_import_kw + (board_total_kw - controlled_now_kw)
+            candidate_nets_kw.append(meter_projected_net_kw)
 
         target_dispatch_kw: Optional[float] = None
         if cfg.virtual_battery_use_community_signals:
@@ -893,10 +960,12 @@ class IchargingBreakerRuntime:
         # Solar-first local policy:
         # 1) absorb local PV surplus in battery;
         # 2) when importing from grid, allow discharge when price indicates it is unfavorable.
-        if local_net_without_battery_kw < -1e-6:
-            solar_first_dispatch_kw = min(charge_limit_kw, -local_net_without_battery_kw)
-        elif local_net_without_battery_kw > 1e-6 and price_dispatch_kw < -1e-6:
-            solar_first_dispatch_kw = -min(discharge_limit_kw, local_net_without_battery_kw)
+        surplus_kw = max((-net for net in candidate_nets_kw if net < -1e-6), default=0.0)
+        import_kw = max((net for net in candidate_nets_kw if net > 1e-6), default=0.0)
+        if surplus_kw > 1e-6:
+            solar_first_dispatch_kw = min(charge_limit_kw, surplus_kw)
+        elif import_kw > 1e-6 and price_dispatch_kw < -1e-6:
+            solar_first_dispatch_kw = -min(discharge_limit_kw, import_kw)
         else:
             solar_first_dispatch_kw = 0.0
 
@@ -1129,7 +1198,14 @@ class IchargingBreakerRuntime:
                     [cid for cid in flexible_chargers if states[cid].phases and line_name in states[cid].phases],
                     extra=[cid for cid in chargers if cid in states and not states[cid].flexible],
                 )
-                _reduce_actions(order, overflow, actions, min_levels)
+                _reduce_actions_for_line(
+                    order=order,
+                    line_name=line_name,
+                    amount=overflow,
+                    actions=actions,
+                    min_levels=min_levels,
+                    states=states,
+                )
 
     def _ordered_chargers(
         self,
@@ -1346,7 +1422,14 @@ class BreakerOnlyRuntime:
                 order = [cid for cid in chargers if cid in states and states[cid].connected]
                 if not order:
                     continue
-                _reduce_actions(order, overflow, actions, min_levels)
+                _reduce_actions_for_line(
+                    order=order,
+                    line_name=line_name,
+                    amount=overflow,
+                    actions=actions,
+                    min_levels=min_levels,
+                    states=states,
+                )
 
     def _current_timestamp(self, payload: Dict[str, Any]) -> datetime:
         return _current_timestamp(payload)

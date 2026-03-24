@@ -221,7 +221,7 @@ class Rh1HouseRuntime:
         price_now = prices[0.0]
         future_avg_price = self._average_interpolated_price(prices)
 
-        non_shiftable_load = max(0.0, _safe_float(payload.get("non_shiftable_load"), 0.0))
+        non_shiftable_load = _safe_float(payload.get("non_shiftable_load"), 0.0)
         solar_generation = self._extract_solar_generation(payload, warnings)
 
         grid_import_limit_kw = _safe_float(
@@ -246,7 +246,12 @@ class Rh1HouseRuntime:
             ev_kw = ev.max_kw
         ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
 
-        base_without_battery = non_shiftable_load + ev_kw - solar_generation
+        base_without_battery = self._estimate_base_without_battery(
+            payload=payload,
+            ev_kw=ev_kw,
+            non_shiftable_load=non_shiftable_load,
+            solar_generation=solar_generation,
+        )
 
         battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
         battery_kw = self._battery_dispatch(
@@ -275,7 +280,12 @@ class Rh1HouseRuntime:
             if ev_kw + 1e-6 < ev.hard_min_kw:
                 local_constraint_flags["ev_hard_min_unmet"] = True
 
-            base_without_battery = non_shiftable_load + ev_kw - solar_generation
+            base_without_battery = self._estimate_base_without_battery(
+                payload=payload,
+                ev_kw=ev_kw,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+            )
             battery_kw = self._fit_battery_to_grid(
                 base_without_battery,
                 battery_kw,
@@ -294,7 +304,12 @@ class Rh1HouseRuntime:
             increased = min(excess_export, ev_room)
             ev_kw += increased
 
-            base_without_battery = non_shiftable_load + ev_kw - solar_generation
+            base_without_battery = self._estimate_base_without_battery(
+                payload=payload,
+                ev_kw=ev_kw,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+            )
             battery_kw = self._fit_battery_to_grid(
                 base_without_battery,
                 battery_kw,
@@ -320,7 +335,24 @@ class Rh1HouseRuntime:
             _clamp(quantized["battery_kw"], battery_bounds.min_kw, battery_bounds.max_kw)
         )
 
-        net_grid_kw = non_shiftable_load + quantized["ev_charge_kw"] + quantized["battery_kw"] - solar_generation
+        base_without_battery = self._estimate_base_without_battery(
+            payload=payload,
+            ev_kw=quantized["ev_charge_kw"],
+            non_shiftable_load=non_shiftable_load,
+            solar_generation=solar_generation,
+        )
+        quantized["battery_kw"] = self._fit_quantized_battery_to_grid(
+            base_without_battery,
+            quantized["battery_kw"],
+            battery_bounds,
+            grid_import_limit_kw,
+            grid_export_limit_kw,
+        )
+        net_grid_kw = base_without_battery + quantized["battery_kw"]
+        if net_grid_kw > grid_import_limit_kw + 1e-6:
+            local_constraint_flags["grid_import_limit_unmet"] = True
+        if net_grid_kw < -grid_export_limit_kw - 1e-6:
+            local_constraint_flags["grid_export_limit_unmet"] = True
 
         log.info(
             "rbc.actions",
@@ -518,6 +550,38 @@ class Rh1HouseRuntime:
         warnings.append("missing_battery_soc_defaulted")
         return 0.5
 
+    def _estimate_base_without_battery(
+        self,
+        payload: Dict[str, Any],
+        ev_kw: float,
+        non_shiftable_load: float,
+        solar_generation: float,
+    ) -> float:
+        projected_meter_base = self._project_meter_net_without_battery(payload, ev_kw)
+        if projected_meter_base is not None:
+            return projected_meter_base
+        # Local production is modeled as free self-consumption by subtracting PV.
+        return non_shiftable_load + ev_kw - solar_generation
+
+    def _project_meter_net_without_battery(self, payload: Dict[str, Any], ev_kw: float) -> float | None:
+        meter_import = _maybe_float(payload.get("grid_meters.GR01.energy_in"))
+        meter_export = _maybe_float(payload.get("grid_meters.GR01.energy_out"))
+        if meter_import is None and meter_export is None:
+            return None
+
+        measured_net_kw = max(meter_import or 0.0, 0.0) - max(meter_export or 0.0, 0.0)
+        measured_ev_kw = 0.0
+        for charger_id in self.config.chargers:
+            ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
+            ev_id = str(ev_raw).strip() if ev_raw is not None else ""
+            if not ev_id:
+                continue
+            measured_ev_kw += max(
+                _safe_float(payload.get(f"charging_sessions.{charger_id}.power"), 0.0),
+                0.0,
+            )
+        return measured_net_kw + (ev_kw - measured_ev_kw)
+
     def _find_battery_soc_fallback_key(self, payload: Dict[str, Any]) -> str | None:
         for key in sorted(payload.keys()):
             if not isinstance(key, str):
@@ -688,3 +752,45 @@ class Rh1HouseRuntime:
             adjusted = _clamp(adjusted, bounds.min_kw, bounds.max_kw)
 
         return adjusted
+
+    def _fit_quantized_battery_to_grid(
+        self,
+        base_without_battery: float,
+        battery_kw: float,
+        bounds: BatteryPowerBounds,
+        grid_import_limit_kw: float,
+        grid_export_limit_kw: float,
+    ) -> float:
+        """Grid-fit helper for already-quantized battery actions.
+
+        Uses 0.1 kW steps first, then falls back to an exact in-bounds correction when
+        step granularity alone cannot satisfy the grid limits.
+        """
+        adjusted = _clamp(_round_one_decimal_towards_zero(battery_kw), bounds.min_kw, bounds.max_kw)
+        net_grid = base_without_battery + adjusted
+        step_kw = 0.1
+
+        if net_grid > grid_import_limit_kw + 1e-9:
+            while net_grid > grid_import_limit_kw + 1e-9 and adjusted - step_kw >= bounds.min_kw - 1e-9:
+                adjusted = round(adjusted - step_kw, 10)
+                net_grid = base_without_battery + adjusted
+
+        if net_grid < -grid_export_limit_kw - 1e-9:
+            while net_grid < -grid_export_limit_kw - 1e-9 and adjusted + step_kw <= bounds.max_kw + 1e-9:
+                adjusted = round(adjusted + step_kw, 10)
+                net_grid = base_without_battery + adjusted
+
+        # If quantized stepping cannot satisfy limits but an exact in-bounds setpoint can,
+        # use that exact value to keep the returned action grid-feasible.
+        if net_grid > grid_import_limit_kw + 1e-9:
+            exact = _clamp(grid_import_limit_kw - base_without_battery, bounds.min_kw, bounds.max_kw)
+            if exact < adjusted - 1e-9:
+                adjusted = exact
+                net_grid = base_without_battery + adjusted
+
+        if net_grid < -grid_export_limit_kw - 1e-9:
+            exact = _clamp(-grid_export_limit_kw - base_without_battery, bounds.min_kw, bounds.max_kw)
+            if exact > adjusted + 1e-9:
+                adjusted = exact
+
+        return float(_clamp(adjusted, bounds.min_kw, bounds.max_kw))

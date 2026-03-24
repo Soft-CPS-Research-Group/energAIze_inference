@@ -79,6 +79,7 @@
           "price_auto_mwh_threshold": 3.0,
           "soc_unit_mode": "auto",
           "battery_soc_keys": [
+            "batteries.B01.SoC",
             "electrical_storage.soc"
           ],
           "chargers": {

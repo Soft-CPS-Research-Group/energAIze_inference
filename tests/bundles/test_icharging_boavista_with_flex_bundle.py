@@ -229,3 +229,22 @@ def test_infeasible_flex_is_curtailed_to_respect_phase_limit(boavista_with_flex_
     assert_board_and_phase_limits(actions, payload, board_limit_kw=55.0)
     assert_connected_charger_action_bounds(actions, payload)
     assert max(actions[cid] for cid in selected_l1) <= 4.0
+
+
+def test_triphase_plus_l1_flex_contention_still_respects_phase_limit(boavista_with_flex_client):
+    payload = _empty_hq_payload()
+    connected = list(L1_CHARGERS) + ["BB000018_1"]
+    ev_map = _connect_chargers(payload, connected)
+
+    for charger_id in connected:
+        _set_flex(
+            payload,
+            ev_id=ev_map[charger_id],
+            soc=0.10,
+            target_soc=0.95,
+            departure_minutes_from_now=30,
+        )
+
+    actions = post_inference(boavista_with_flex_client, payload)
+    assert_board_and_phase_limits(actions, payload, board_limit_kw=55.0)
+    assert_connected_charger_action_bounds(actions, payload)

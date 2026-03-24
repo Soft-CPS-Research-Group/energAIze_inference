@@ -97,6 +97,15 @@ def test_bundle_loads_sao_mamede(sao_mamede_client):
     assert pipeline.agent._icharging_runtime is not None  # noqa: SLF001
 
 
+def test_manifest_models_single_pt_limit(sao_mamede_client):
+    runtime = store.get_pipeline().agent._icharging_runtime  # noqa: SLF001
+    assert runtime is not None
+    cfg = runtime.config
+    assert cfg.max_board_kw == pytest.approx(400.0, rel=1e-6)
+    assert set(cfg.line_limits.keys()) == {"PT"}
+    assert cfg.chargers["BB000SMI"]["line"] == "PT"
+
+
 def test_payload_assets_reflect_three_physical_chargers(sao_mamede_client):
     payload = _base_payload()
     sessions = set(payload["observations"]["charging_sessions"].keys())
