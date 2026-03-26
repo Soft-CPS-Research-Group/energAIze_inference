@@ -42,9 +42,29 @@ def _bb_total_kw(actions: dict[str, float]) -> float:
     return float(actions.get(ACTION_PLUG_1, 0.0) + actions.get(ACTION_PLUG_2, 0.0))
 
 
-def _assert_single_active_bb_plug(actions: dict[str, float]) -> None:
-    active = [plug for plug in ACTION_PLUGS if actions.get(plug, 0.0) > 1e-6]
-    assert len(active) <= 1
+def _has_ev(raw: object) -> bool:
+    text = "" if raw is None else str(raw).strip()
+    if not text:
+        return False
+    return text.lower() not in {"0", "0.0", "none", "nan", "null"}
+
+
+def _bb_counted_total_kw(payload: dict, actions: dict[str, float]) -> float:
+    sessions = payload["observations"]["charging_sessions"]
+    total = 0.0
+    for plug in ACTION_PLUGS:
+        ev_raw = (sessions.get(plug) or {}).get("electric_vehicle")
+        if _has_ev(ev_raw):
+            total += float(actions.get(plug, 0.0))
+    return total
+
+
+def _assert_idle_floor_on_unplugged(payload: dict, actions: dict[str, float]) -> None:
+    sessions = payload["observations"]["charging_sessions"]
+    for plug in ACTION_PLUGS:
+        ev_raw = (sessions.get(plug) or {}).get("electric_vehicle")
+        if not _has_ev(ev_raw):
+            assert actions.get(plug, 0.0) == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
 
 
 @pytest.fixture
@@ -132,8 +152,9 @@ def test_actions_contract_has_single_controllable_charger(sao_mamede_client):
 def test_idle_outputs_minimum_even_without_ev(sao_mamede_client):
     payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert _bb_total_kw(actions) == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
-    _assert_single_active_bb_plug(actions)
+    assert _bb_total_kw(actions) == pytest.approx(2 * MIN_TECHNICAL_KW, rel=1e-6)
+    assert _bb_counted_total_kw(payload, actions) == pytest.approx(0.0, rel=1e-6)
+    _assert_idle_floor_on_unplugged(payload, actions)
 
 
 def test_connected_ev_on_second_plug_is_controlled(sao_mamede_client):
@@ -151,10 +172,11 @@ def test_connected_ev_on_second_plug_is_controlled(sao_mamede_client):
     )
 
     actions = _run(sao_mamede_client, payload)
-    assert MIN_TECHNICAL_KW <= _bb_total_kw(actions) <= MAX_BB_KW
+    counted_total = _bb_counted_total_kw(payload, actions)
+    assert MIN_TECHNICAL_KW <= counted_total <= MAX_BB_KW
     assert actions[ACTION_PLUG_2] > MIN_TECHNICAL_KW
-    assert actions[ACTION_PLUG_1] == pytest.approx(0.0, rel=1e-6)
-    _assert_single_active_bb_plug(actions)
+    assert actions[ACTION_PLUG_1] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    _assert_idle_floor_on_unplugged(payload, actions)
 
 
 def test_stale_power_on_other_bb_plug_does_not_mask_connected_ev(sao_mamede_client):
@@ -177,8 +199,8 @@ def test_stale_power_on_other_bb_plug_does_not_mask_connected_ev(sao_mamede_clie
 
     actions = _run(sao_mamede_client, payload)
     assert actions[ACTION_PLUG_2] > MIN_TECHNICAL_KW
-    assert actions[ACTION_PLUG_1] == pytest.approx(0.0, rel=1e-6)
-    _assert_single_active_bb_plug(actions)
+    assert actions[ACTION_PLUG_1] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    _assert_idle_floor_on_unplugged(payload, actions)
 
 
 def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmanaged(
@@ -216,9 +238,11 @@ def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmana
     actions_high = _run(sao_mamede_client, high_meter)
     assert set(actions_low.keys()) == ACTION_PLUGS
     assert set(actions_high.keys()) == ACTION_PLUGS
-    assert _bb_total_kw(actions_high) < _bb_total_kw(actions_low)
-    _assert_single_active_bb_plug(actions_low)
-    _assert_single_active_bb_plug(actions_high)
+    assert _bb_counted_total_kw(high_meter, actions_high) < _bb_counted_total_kw(
+        low_meter, actions_low
+    )
+    _assert_idle_floor_on_unplugged(low_meter, actions_low)
+    _assert_idle_floor_on_unplugged(high_meter, actions_high)
 
 
 def test_price_forecast_do_not_change_dispatch_without_virtual_battery(sao_mamede_client):

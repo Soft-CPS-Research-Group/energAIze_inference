@@ -8,6 +8,8 @@ from app.logging import get_logger
 from app.state import PipelineRecord
 from app.utils.flatten import flatten_payload
 
+VALID_SOC_UNIT_MODES = {"auto", "fraction", "percent"}
+
 
 def _maybe_float(value: Any) -> float | None:
     if value is None:
@@ -38,6 +40,16 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(value, high))
+
+
+def _normalize_soc(value: float, mode: str = "auto") -> float:
+    normalized = value
+    unit_mode = str(mode or "auto").strip().lower()
+    if unit_mode == "percent":
+        normalized = value / 100.0
+    elif unit_mode == "auto" and 1.0 < value <= 100.0:
+        normalized = value / 100.0
+    return _clamp(normalized, 0.0, 1.0)
 
 
 def _round_one_decimal_towards_zero(value: float) -> float:
@@ -351,9 +363,13 @@ class CommunityOptimizerRuntime:
             soc = _maybe_float(flat_payload.get(soc_fallback_key))
         if soc is None:
             soc = 0.5
-        if 1.0 < soc <= 100.0:
-            soc = soc / 100.0
-        soc = _clamp(soc, 0.0, 1.0)
+        soc_mode = (
+            str(artifact_cfg.get("virtual_battery_soc_unit_mode") or "auto").strip().lower()
+            or "auto"
+        )
+        if soc_mode not in VALID_SOC_UNIT_MODES:
+            soc_mode = "auto"
+        soc = _normalize_soc(soc, soc_mode)
 
         soc_min = _clamp(_safe_float(artifact_cfg.get("virtual_battery_soc_min"), 0.1), 0.0, 1.0)
         soc_max = _clamp(_safe_float(artifact_cfg.get("virtual_battery_soc_max"), 1.0), 0.0, 1.0)

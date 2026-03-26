@@ -413,6 +413,7 @@
           "virtual_battery_charge_power_max_kw": 15.0,
           "virtual_battery_discharge_power_max_kw": 15.0,
           "virtual_battery_soc_fallback_key": "electrical_storage.soc",
+          "virtual_battery_soc_unit_mode": "fraction",
           "virtual_battery_use_setpoint": false,
           "virtual_battery_use_community_signals": true,
           "virtual_battery_community_target_import_key": "community.target_net_import_kw",

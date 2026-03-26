@@ -6,7 +6,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -195,7 +195,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -384,7 +384,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -573,7 +573,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -762,7 +762,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -951,7 +951,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -1140,7 +1140,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -1329,7 +1329,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -1518,7 +1518,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {
@@ -1707,7 +1707,7 @@
         "B01": {
           "energy_in": 0.008,
           "energy_out": 0.0,
-          "SoC": 25.0
+          "SoC": 0.25
         }
       },
       "grid_meters": {

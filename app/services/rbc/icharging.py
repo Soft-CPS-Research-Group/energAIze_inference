@@ -14,6 +14,7 @@ DEFAULT_FLEX_FIELDS = {
     "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure",
 }
 MIN_CONTROL_INTERVAL_MINUTES = 1.0 / 60.0
+VALID_SOC_UNIT_MODES = {"auto", "fraction", "percent"}
 
 
 def _maybe_float(value: Any) -> Optional[float]:
@@ -67,6 +68,16 @@ def _normalize_ev_id(value: Any) -> str:
 
 def _clamp(value: float, lower: float, upper: float) -> float:
     return max(min(value, upper), lower)
+
+
+def _normalize_soc_value(value: float, mode: str = "auto") -> float:
+    normalized = value
+    unit_mode = str(mode or "auto").strip().lower()
+    if unit_mode == "percent":
+        normalized = value / 100.0
+    elif unit_mode == "auto" and 1.0 < value <= 100.0:
+        normalized = value / 100.0
+    return _clamp(normalized, 0.0, 1.0)
 
 
 def _parse_datetime(raw: Any) -> Optional[datetime]:
@@ -216,6 +227,7 @@ class IchargingRuntimeConfig:
     virtual_battery_discharge_power_max_kw: float = 15.0
     virtual_battery_soc_key: str = "virtual_battery.soc"
     virtual_battery_soc_fallback_key: str = "electrical_storage.soc"
+    virtual_battery_soc_unit_mode: str = "auto"
     virtual_battery_setpoint_key: str = "virtual_battery.setpoint_kw"
     virtual_battery_use_setpoint: bool = False
     virtual_battery_use_community_signals: bool = True
@@ -252,6 +264,11 @@ class IchargingRuntimeConfig:
         site_meter_import_key = data.pop("site_meter_import_key", None)
         site_meter_export_key = data.pop("site_meter_export_key", None)
         virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
+        virtual_battery_soc_unit_mode = (
+            str(data.pop("virtual_battery_soc_unit_mode", "auto")).strip().lower() or "auto"
+        )
+        if virtual_battery_soc_unit_mode not in VALID_SOC_UNIT_MODES:
+            virtual_battery_soc_unit_mode = "auto"
         session_merge_map_raw = data.pop("session_merge_map", {}) or {}
         session_merge_map: Dict[str, List[str]] = {}
         if isinstance(session_merge_map_raw, dict):
@@ -365,6 +382,7 @@ class IchargingRuntimeConfig:
             virtual_battery_soc_fallback_key=str(
                 data.pop("virtual_battery_soc_fallback_key", "electrical_storage.soc")
             ),
+            virtual_battery_soc_unit_mode=virtual_battery_soc_unit_mode,
             virtual_battery_setpoint_key=str(
                 data.pop("virtual_battery_setpoint_key", "virtual_battery.setpoint_kw")
             ),
@@ -540,6 +558,7 @@ class IchargingBreakerRuntime:
         self,
         actions: Dict[str, float],
         states: Dict[str, ChargerState],
+        payload: Dict[str, Any],
     ) -> Dict[str, float]:
         cfg = self.config
         projected = {key: float(value) for key, value in actions.items()}
@@ -554,8 +573,12 @@ class IchargingBreakerRuntime:
                 continue
 
             charger_kw = float(projected.pop(charger_id))
+            state = states.get(charger_id)
+            idle_floor_kw = max(state.min_kw if state else 0.0, 0.0)
             for source_id in source_ids:
-                projected[source_id] = 0.0
+                source_ev_key = f"charging_sessions.{source_id}.{cfg.session_merge_ev_key}"
+                source_has_ev = bool(_normalize_ev_id(payload.get(source_ev_key)))
+                projected[source_id] = 0.0 if source_has_ev else idle_floor_kw
 
             preferred_source = (states.get(charger_id).session_source_id if states.get(charger_id) else "") or ""
             target_source = preferred_source if preferred_source in source_ids else source_ids[0]
@@ -813,7 +836,7 @@ class IchargingBreakerRuntime:
             )
 
         # Runtime summary for debugging
-        external_actions = self._project_actions_to_session_sources(quantized, states)
+        external_actions = self._project_actions_to_session_sources(quantized, states, payload)
 
         try:
             log = get_logger()
@@ -857,15 +880,22 @@ class IchargingBreakerRuntime:
                 if cfg.virtual_battery_action_name
                 else None
             )
+            virtual_battery_soc_raw: Optional[float] = None
+            virtual_battery_soc_key_used: Optional[str] = None
             virtual_battery_soc: Optional[float] = None
             if cfg.virtual_battery_action_name:
-                virtual_battery_soc = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
-                if virtual_battery_soc is None:
-                    virtual_battery_soc = _maybe_float(payload.get(cfg.virtual_battery_soc_fallback_key))
-                if virtual_battery_soc is not None and 1.0 < virtual_battery_soc <= 100.0:
-                    virtual_battery_soc = virtual_battery_soc / 100.0
-                if virtual_battery_soc is not None:
-                    virtual_battery_soc = _clamp(virtual_battery_soc, 0.0, 1.0)
+                virtual_battery_soc_raw = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
+                if virtual_battery_soc_raw is not None:
+                    virtual_battery_soc_key_used = cfg.virtual_battery_soc_key
+                else:
+                    virtual_battery_soc_raw = _maybe_float(payload.get(cfg.virtual_battery_soc_fallback_key))
+                    if virtual_battery_soc_raw is not None:
+                        virtual_battery_soc_key_used = cfg.virtual_battery_soc_fallback_key
+                if virtual_battery_soc_raw is not None:
+                    virtual_battery_soc = _normalize_soc_value(
+                        virtual_battery_soc_raw,
+                        cfg.virtual_battery_soc_unit_mode,
+                    )
             log.debug(
                 "rbc.actions",
                 strategy="icharging_breaker",
@@ -882,6 +912,9 @@ class IchargingBreakerRuntime:
                 unmanaged_load_kw=unmanaged_load_kw,
                 site_meter_net_kw=site_net_kw,
                 virtual_battery_kw=virtual_battery_kw,
+                virtual_battery_soc_raw=virtual_battery_soc_raw,
+                virtual_battery_soc_norm=virtual_battery_soc,
+                virtual_battery_soc_key=virtual_battery_soc_key_used,
             )
 
             def fmt_kw(value: float) -> str:
@@ -894,6 +927,11 @@ class IchargingBreakerRuntime:
                 if value is None:
                     return "-"
                 return f"{value * 100.0:.1f}%"
+
+            def fmt_optional_num(value: Optional[float]) -> str:
+                if value is None:
+                    return "-"
+                return f"{value:.4f}"
 
             line_chargers: Dict[str, List[str]] = {}
             for cid in cfg.chargers:
@@ -979,11 +1017,41 @@ class IchargingBreakerRuntime:
                     (
                         f"Virtual battery ({cfg.virtual_battery_action_name}):"
                         f" action={fmt_optional_kw(virtual_battery_kw)} kW"
+                        f" soc_raw={fmt_optional_num(virtual_battery_soc_raw)}"
+                        f" soc_key={virtual_battery_soc_key_used or '-'}"
                         f" soc={fmt_optional_pct(virtual_battery_soc)}"
+                        f" soc_unit_mode={cfg.virtual_battery_soc_unit_mode}"
                         f" charge_cap={fmt_kw(cfg.virtual_battery_charge_power_max_kw)} kW"
                         f" discharge_cap={fmt_kw(cfg.virtual_battery_discharge_power_max_kw)} kW"
                     )
                 )
+
+            if cfg.emit_session_source_actions and cfg.session_merge_map:
+                summary_lines.append("Session source actions:")
+                for charger_id, source_ids in cfg.session_merge_map.items():
+                    ids = [sid for sid in source_ids if sid]
+                    if not ids:
+                        continue
+                    chosen_source = (
+                        (states.get(charger_id).session_source_id if states.get(charger_id) else "") or "-"
+                    )
+                    source_parts = []
+                    for sid in ids:
+                        source_ev_key = f"charging_sessions.{sid}.{cfg.session_merge_ev_key}"
+                        source_ev = _normalize_ev_id(payload.get(source_ev_key))
+                        source_action = fmt_kw(external_actions.get(sid, 0.0))
+                        if sid == chosen_source:
+                            role = "selected"
+                        elif source_ev:
+                            role = "not_selected"
+                        else:
+                            role = "idle_min_no_count"
+                        source_parts.append(
+                            f"{sid}={source_action} kW ev={source_ev or '-'} role={role}"
+                        )
+                    summary_lines.append(
+                        f"  {charger_id} (selected_source={chosen_source}) -> " + ", ".join(source_parts)
+                    )
 
             log.info("rbc.summary\n{}\n", "\n".join(summary_lines))
         except Exception:
@@ -1072,9 +1140,7 @@ class IchargingBreakerRuntime:
             soc = _maybe_float(payload.get(cfg.virtual_battery_soc_fallback_key))
         if soc is None:
             soc = 0.5
-        if soc > 1.0 and soc <= 100.0:
-            soc = soc / 100.0
-        soc = _clamp(soc, 0.0, 1.0)
+        soc = _normalize_soc_value(soc, cfg.virtual_battery_soc_unit_mode)
 
         capacity_kwh = _clamp(
             cfg.virtual_battery_capacity_kwh,
