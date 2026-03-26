@@ -316,26 +316,22 @@ class Rh1HouseRuntime:
         battery_soc = self._extract_battery_soc(payload, warnings)
 
         ev = self._ev_action_bounds(payload, now, dt_hours)
-        ev_kw = ev.hard_min_kw
-        if ev.connected and price_now <= min(cfg.baseline_price_threshold_eur_kwh, future_avg_price):
-            ev_kw = ev.max_kw
-        ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
-
-        base_without_battery = self._estimate_base_without_battery(
+        battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
+        ev_kw, battery_kw, base_without_battery = self._optimize_joint_dispatch(
             payload=payload,
-            ev_kw=ev_kw,
+            ev=ev,
+            battery_soc=battery_soc,
+            battery_bounds=battery_bounds,
             non_shiftable_load=non_shiftable_load,
             solar_generation=solar_generation,
-        )
-
-        battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
-        battery_kw = self._battery_dispatch(
-            base_without_battery=base_without_battery,
             price_now=price_now,
             future_avg_price=future_avg_price,
-            bounds=battery_bounds,
+            grid_import_limit_kw=grid_import_limit_kw,
+            grid_export_limit_kw=grid_export_limit_kw,
+            dt_hours=dt_hours,
         )
 
+        ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
         battery_kw = _clamp(battery_kw, battery_bounds.min_kw, battery_bounds.max_kw)
         battery_kw = self._fit_battery_to_grid(
             base_without_battery,
@@ -883,6 +879,161 @@ class Rh1HouseRuntime:
             return bounds.min_kw
 
         return 0.0
+
+    def _candidate_values(self, low: float, high: float, step: float = 0.1) -> List[float]:
+        low = float(low)
+        high = float(high)
+        if high < low:
+            high = low
+        if high - low <= 1e-9:
+            return [low]
+
+        values = [low, high]
+        start_idx = int(math.ceil((low - 1e-9) / step))
+        end_idx = int(math.floor((high + 1e-9) / step))
+        for idx in range(start_idx, end_idx + 1):
+            candidate = round(idx * step, 10)
+            if low - 1e-9 <= candidate <= high + 1e-9:
+                values.append(candidate)
+
+        unique_sorted = sorted({round(value, 10) for value in values})
+        return [float(v) for v in unique_sorted]
+
+    def _battery_energy_delta_kwh(self, battery_kw: float, dt_hours: float) -> float:
+        eff = _clamp(self.config.battery_efficiency, 1e-6, 1.0)
+        if battery_kw >= 0.0:
+            return battery_kw * dt_hours * eff
+        return battery_kw * dt_hours / eff
+
+    def _joint_dispatch_objective(
+        self,
+        ev_kw: float,
+        ev_hard_min_kw: float,
+        base_without_battery: float,
+        battery_kw: float,
+        price_now: float,
+        future_avg_price: float,
+        grid_import_limit_kw: float,
+        grid_export_limit_kw: float,
+        dt_hours: float,
+    ) -> float:
+        cfg = self.config
+        net_grid_kw = base_without_battery + battery_kw
+        imported_kw = max(net_grid_kw, 0.0)
+        exported_kw = max(-net_grid_kw, 0.0)
+
+        grid_cost = (
+            imported_kw * price_now * dt_hours
+            - exported_kw * price_now * cfg.export_price_factor * dt_hours
+        )
+
+        battery_delta_kwh = self._battery_energy_delta_kwh(battery_kw, dt_hours)
+        battery_wear_cost = abs(battery_delta_kwh) * cfg.battery_degradation_penalty_eur_per_kwh
+        battery_future_value = -battery_delta_kwh * future_avg_price
+
+        flex_ev_energy_kwh = max(ev_kw - ev_hard_min_kw, 0.0) * dt_hours
+        ev_shift_value = -flex_ev_energy_kwh * future_avg_price
+
+        exported_from_battery_penalty = 0.0
+        if battery_kw < -1e-9 and net_grid_kw < -1e-9:
+            exported_from_battery_penalty = abs(battery_kw) * dt_hours * max(price_now, 0.0)
+
+        import_violation = max(net_grid_kw - grid_import_limit_kw, 0.0)
+        export_violation = max(-grid_export_limit_kw - net_grid_kw, 0.0)
+        hard_violation_penalty = (import_violation + export_violation) * 1000.0 * dt_hours
+
+        return (
+            grid_cost
+            + battery_wear_cost
+            + battery_future_value
+            + ev_shift_value
+            + exported_from_battery_penalty
+            + hard_violation_penalty
+        )
+
+    def _optimize_joint_dispatch(
+        self,
+        payload: Dict[str, Any],
+        ev: EvAggregate,
+        battery_soc: float,
+        battery_bounds: BatteryPowerBounds,
+        non_shiftable_load: float,
+        solar_generation: float,
+        price_now: float,
+        future_avg_price: float,
+        grid_import_limit_kw: float,
+        grid_export_limit_kw: float,
+        dt_hours: float,
+    ) -> tuple[float, float, float]:
+        ev_min_kw = _clamp(ev.hard_min_kw, 0.0, ev.max_kw)
+        if not ev.connected:
+            ev_values = [0.0]
+        else:
+            ev_values = self._candidate_values(ev_min_kw, ev.max_kw)
+
+        battery_values = self._candidate_values(battery_bounds.min_kw, battery_bounds.max_kw)
+
+        best_choice: tuple[float, float, float, float, float] | None = None
+        # tuple layout:
+        # (objective, ev_kw, battery_kw, base_without_battery, net_grid_kw)
+
+        for ev_kw in ev_values:
+            base_without_battery = self._estimate_base_without_battery(
+                payload=payload,
+                ev_kw=ev_kw,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+            )
+            for battery_kw in battery_values:
+                objective = self._joint_dispatch_objective(
+                    ev_kw=ev_kw,
+                    ev_hard_min_kw=ev_min_kw,
+                    base_without_battery=base_without_battery,
+                    battery_kw=battery_kw,
+                    price_now=price_now,
+                    future_avg_price=future_avg_price,
+                    grid_import_limit_kw=grid_import_limit_kw,
+                    grid_export_limit_kw=grid_export_limit_kw,
+                    dt_hours=dt_hours,
+                )
+                net_grid_kw = base_without_battery + battery_kw
+                candidate = (objective, ev_kw, battery_kw, base_without_battery, net_grid_kw)
+                if best_choice is None:
+                    best_choice = candidate
+                    continue
+                if objective < best_choice[0] - 1e-9:
+                    best_choice = candidate
+                    continue
+                if abs(objective - best_choice[0]) <= 1e-9:
+                    # Tie-breakers: prefer lower export first, then lower import.
+                    exported = max(-net_grid_kw, 0.0)
+                    best_exported = max(-best_choice[4], 0.0)
+                    if exported < best_exported - 1e-9:
+                        best_choice = candidate
+                        continue
+                    if abs(exported - best_exported) <= 1e-9:
+                        imported = max(net_grid_kw, 0.0)
+                        best_imported = max(best_choice[4], 0.0)
+                        if imported < best_imported - 1e-9:
+                            best_choice = candidate
+
+        if best_choice is None:
+            fallback_ev_kw = ev_min_kw
+            fallback_base = self._estimate_base_without_battery(
+                payload=payload,
+                ev_kw=fallback_ev_kw,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+            )
+            fallback_battery_kw = self._battery_dispatch(
+                base_without_battery=fallback_base,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                bounds=battery_bounds,
+            )
+            return fallback_ev_kw, fallback_battery_kw, fallback_base
+
+        return best_choice[1], best_choice[2], best_choice[3]
 
     def _fit_battery_to_grid(
         self,
