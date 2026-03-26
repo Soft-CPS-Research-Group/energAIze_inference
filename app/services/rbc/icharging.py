@@ -580,9 +580,11 @@ class IchargingBreakerRuntime:
                 source_has_ev = bool(_normalize_ev_id(payload.get(source_ev_key)))
                 projected[source_id] = 0.0 if source_has_ev else idle_floor_kw
 
-            preferred_source = (states.get(charger_id).session_source_id if states.get(charger_id) else "") or ""
-            target_source = preferred_source if preferred_source in source_ids else source_ids[0]
-            projected[target_source] = charger_kw
+            # Only pick a selected source when there is at least one connected EV.
+            if state and state.connected:
+                preferred_source = state.session_source_id or ""
+                target_source = preferred_source if preferred_source in source_ids else source_ids[0]
+                projected[target_source] = charger_kw
 
         return projected
 
@@ -1032,15 +1034,14 @@ class IchargingBreakerRuntime:
                     ids = [sid for sid in source_ids if sid]
                     if not ids:
                         continue
-                    chosen_source = (
-                        (states.get(charger_id).session_source_id if states.get(charger_id) else "") or "-"
-                    )
+                    state = states.get(charger_id)
+                    chosen_source = (state.session_source_id if state and state.connected else "") or "-"
                     source_parts = []
                     for sid in ids:
                         source_ev_key = f"charging_sessions.{sid}.{cfg.session_merge_ev_key}"
                         source_ev = _normalize_ev_id(payload.get(source_ev_key))
                         source_action = fmt_kw(external_actions.get(sid, 0.0))
-                        if sid == chosen_source:
+                        if sid == chosen_source and chosen_source != "-":
                             role = "selected"
                         elif source_ev:
                             role = "not_selected"
