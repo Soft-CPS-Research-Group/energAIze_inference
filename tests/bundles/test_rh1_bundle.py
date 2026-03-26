@@ -17,6 +17,8 @@ BUNDLE_DIR = Path("examples/rh1_bundle")
 MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_R-H-01_2303.json"
+ACTION_EV = "EVC01"
+ACTION_BATTERY = "B01"
 
 
 def _safe_float(value, default: float = 0.0) -> float:  # noqa: ANN001
@@ -65,7 +67,7 @@ def _net_grid_kw(record: dict, actions: dict[str, float]) -> float:
     obs = record.get("observations", {})
     non_shiftable = max(0.0, _safe_float(obs.get("non_shiftable_load"), 0.0))
     solar = max(0.0, _safe_float(obs.get("solar_generation"), 0.0))
-    return non_shiftable + _safe_float(actions.get("ev_charge_kw"), 0.0) + _safe_float(actions.get("battery_kw"), 0.0) - solar
+    return non_shiftable + _safe_float(actions.get(ACTION_EV), 0.0) + _safe_float(actions.get(ACTION_BATTERY), 0.0) - solar
 
 
 def _step_cost_with_export(net_grid_kw: float, price: float, dt_hours: float, export_factor: float) -> float:
@@ -117,7 +119,7 @@ def _baseline_actions(record: dict, cfg) -> dict[str, float]:  # noqa: ANN001
     batt_min = -min(nominal, discharge_room * eff / max(dt_hours, 1e-6))
     battery_kw = batt_max if price <= threshold else batt_min
 
-    return {"ev_charge_kw": float(ev_kw), "battery_kw": float(battery_kw)}
+    return {ACTION_EV: float(ev_kw), ACTION_BATTERY: float(battery_kw)}
 
 
 @pytest.fixture
@@ -146,7 +148,7 @@ def test_rh1_manifest_soc_key_matches_real_payload_schema(rh1_client):
 def test_rh1_actions_contract_ev_battery_only(rh1_client):
     message = json.loads(MESSAGE_PATH.read_text(encoding="utf-8"))[0]
     actions = _run(rh1_client, message)
-    assert set(actions.keys()) == {"ev_charge_kw", "battery_kw"}
+    assert set(actions.keys()) == {ACTION_EV, ACTION_BATTERY}
 
 
 def test_rh1_replay_real_sequence_parses_and_runs(rh1_client):
@@ -155,8 +157,8 @@ def test_rh1_replay_real_sequence_parses_and_runs(rh1_client):
 
     for step in sequence:
         actions = _run(rh1_client, step)
-        assert 0.0 <= actions["ev_charge_kw"] <= 4.6 + 1e-6
-        assert -cfg.battery_nominal_power_kw - 1e-6 <= actions["battery_kw"] <= cfg.battery_nominal_power_kw + 1e-6
+        assert 0.0 <= actions[ACTION_EV] <= 4.6 + 1e-6
+        assert -cfg.battery_nominal_power_kw - 1e-6 <= actions[ACTION_BATTERY] <= cfg.battery_nominal_power_kw + 1e-6
 
 
 def test_rh1_soc_fraction_input_supported(rh1_client):
@@ -173,7 +175,7 @@ def test_rh1_soc_fraction_input_supported(rh1_client):
         "forecasts": {},
     }
     actions = _run(rh1_client, payload)
-    assert -4.8 <= actions["battery_kw"] <= 4.8
+    assert -4.8 <= actions[ACTION_BATTERY] <= 4.8
 
 
 def test_rh1_price_vector_normalization_affects_dispatch(rh1_client):
@@ -202,8 +204,8 @@ def test_rh1_price_vector_normalization_affects_dispatch(rh1_client):
     cheap_actions = _run(rh1_client, cheap)
     expensive_actions = _run(rh1_client, expensive)
 
-    assert cheap_actions["battery_kw"] > 0.0
-    assert expensive_actions["battery_kw"] < 0.0
+    assert cheap_actions[ACTION_BATTERY] > 0.0
+    assert expensive_actions[ACTION_BATTERY] < 0.0
 
 
 def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
@@ -232,8 +234,8 @@ def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
     cheap_actions = _run(rh1_client, cheap)
     expensive_actions = _run(rh1_client, expensive)
 
-    assert cheap_actions["battery_kw"] > 0.0
-    assert expensive_actions["battery_kw"] < 0.0
+    assert cheap_actions[ACTION_BATTERY] > 0.0
+    assert expensive_actions[ACTION_BATTERY] < 0.0
 
 
 def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):
@@ -262,7 +264,7 @@ def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):
     }
     _set_tariff_curve(payload["observations"], 0.30, 0.10, 0.09, 0.08, 0.07, 0.06)
     actions = _run(rh1_client, payload)
-    assert actions["battery_kw"] < 0.0
+    assert actions[ACTION_BATTERY] < 0.0
 
 
 def test_rh1_grid_meter_phase_sum_fallback_works_without_totals(rh1_client):
@@ -289,7 +291,7 @@ def test_rh1_grid_meter_phase_sum_fallback_works_without_totals(rh1_client):
     }
     _set_tariff_curve(payload["observations"], 0.30, 0.10, 0.09, 0.08, 0.07, 0.06)
     actions = _run(rh1_client, payload)
-    assert actions["battery_kw"] < 0.0
+    assert actions[ACTION_BATTERY] < 0.0
 
 
 def test_rh1_quantization_keeps_grid_import_within_limit(rh1_client):
@@ -309,8 +311,8 @@ def test_rh1_quantization_keeps_grid_import_within_limit(rh1_client):
     actions = _run(rh1_client, payload)
     net_grid_kw = (
         payload["observations"]["non_shiftable_load"]
-        + actions["ev_charge_kw"]
-        + actions["battery_kw"]
+        + actions[ACTION_EV]
+        + actions[ACTION_BATTERY]
         - payload["observations"]["solar_generation"]
     )
     assert net_grid_kw <= 8.0 + 1e-6
@@ -360,8 +362,8 @@ def test_rh1_real_payload_tariffs_drive_decisions(rh1_client):
     )
     cheap_actions = _run(rh1_client, cheap_now)
 
-    assert expensive_actions["battery_kw"] < 0.0
-    assert cheap_actions["battery_kw"] > 0.0
+    assert expensive_actions[ACTION_BATTERY] < 0.0
+    assert cheap_actions[ACTION_BATTERY] > 0.0
 
 
 def test_rh1_ev_hard_deadline_behavior(rh1_client):
@@ -396,7 +398,7 @@ def test_rh1_ev_hard_deadline_behavior(rh1_client):
     required_kw = gap_kwh / (minutes_remaining / 60.0)
     expected_floor = min(max(required_kw, 0.0), 4.6)
 
-    assert actions["ev_charge_kw"] + 0.11 >= expected_floor
+    assert actions[ACTION_EV] + 0.11 >= expected_floor
 
 
 def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
@@ -422,7 +424,7 @@ def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
     }
 
     actions = _run(rh1_client, payload)
-    assert actions["ev_charge_kw"] == pytest.approx(1.6, rel=1e-6)
+    assert actions[ACTION_EV] == pytest.approx(1.6, rel=1e-6)
 
 
 def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):

@@ -41,7 +41,7 @@ BOAVISTA_ACTIONS = {
     "BB000018_1",
 }
 SAO_MAMEDE_ACTIONS = {"BB000SMI_1", "BB000SMI_2", "virtual_battery_kw"}
-RH1_ACTIONS = {"ev_charge_kw", "battery_kw"}
+RH1_ACTIONS = {"EVC01", "B01"}
 
 
 
@@ -98,8 +98,8 @@ def _site_net(features: dict, actions: dict) -> float:
         non_shiftable = float(obs.get("non_shiftable_load", 0.0))
         solar = float(obs.get("solar_generation", 0.0))
         if site_key == "rh1":
-            ev_kw = float(actions["2"].get("ev_charge_kw", 0.0))
-            battery_kw = float(actions["2"].get("battery_kw", 0.0))
+            ev_kw = float(actions["2"].get("EVC01", 0.0))
+            battery_kw = float(actions["2"].get("B01", 0.0))
             total += non_shiftable + ev_kw + battery_kw - solar
             continue
 

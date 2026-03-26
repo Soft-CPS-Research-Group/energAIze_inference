@@ -45,8 +45,8 @@
       ]
     ],
     "action_names": [
-      "ev_charge_kw",
-      "battery_kw"
+      "EVC01",
+      "B01"
     ],
     "reward_function": {
       "name": "RewardFunction",
@@ -88,6 +88,8 @@
               "max_kw": 4.6
             }
           },
+          "ev_action_name": "EVC01",
+          "battery_action_name": "B01",
           "vehicle_capacities": {
             "EV01": 60.0
           },

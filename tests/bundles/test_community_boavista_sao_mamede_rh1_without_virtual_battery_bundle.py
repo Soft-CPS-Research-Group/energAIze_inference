@@ -20,7 +20,7 @@ MESSAGE_PATH = BUNDLE_DIR / "community_message_example.json"
 SEQUENCE_PATH = BUNDLE_DIR / "community_sequence.json"
 
 
-RH1_ACTIONS = {"ev_charge_kw", "battery_kw"}
+RH1_ACTIONS = {"EVC01", "B01"}
 
 
 def _inference(client: TestClient, agent_index: int, features: dict):
@@ -55,7 +55,7 @@ def _site_net(features: dict, actions: dict) -> float:
         non_shiftable = float(obs.get("non_shiftable_load", 0.0))
         solar = float(obs.get("solar_generation", 0.0))
         if site_key == "rh1":
-            total += non_shiftable + float(actions["2"]["ev_charge_kw"]) + float(actions["2"]["battery_kw"]) - solar
+            total += non_shiftable + float(actions["2"]["EVC01"]) + float(actions["2"]["B01"]) - solar
             continue
         site_actions = actions["0"] if site_key == "boavista" else actions["1"]
         connected_kw = 0.0

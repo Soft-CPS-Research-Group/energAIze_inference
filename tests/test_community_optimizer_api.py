@@ -145,7 +145,7 @@ def test_inference_community_returns_all_agents():
         assert set(actions.keys()) == {"0", "1", "2"}
         assert "AC000004_1" in actions["0"]
         assert "BB000SMI_1" in actions["1"]
-        assert "ev_charge_kw" in actions["2"]
+        assert "EVC01" in actions["2"]
     finally:
         if store.is_configured():
             store.unload()

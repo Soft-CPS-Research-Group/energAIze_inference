@@ -18,6 +18,16 @@ DEFAULT_EV_FLEX_FIELDS = {
 }
 
 
+def _extract_battery_id_from_soc_key(key: str) -> str | None:
+    parts = [segment for segment in key.split(".") if segment]
+    if len(parts) < 3:
+        return None
+    if parts[0].lower() != "batteries" or parts[-1].lower() != "soc":
+        return None
+    candidate = parts[1].strip()
+    return candidate or None
+
+
 def _maybe_float(value: Any) -> float | None:
     if value is None:
         return None
@@ -104,6 +114,8 @@ class Rh1HouseConfig:
     price_auto_mwh_threshold: float = 3.0
     soc_unit_mode: str = "auto"
     battery_soc_keys: List[str] = field(default_factory=lambda: ["electrical_storage.soc"])
+    ev_action_name: str = ""
+    battery_action_name: str = ""
 
     @classmethod
     def from_dict(cls, payload: Dict[str, Any]) -> "Rh1HouseConfig":
@@ -147,6 +159,9 @@ class Rh1HouseConfig:
         if not battery_soc_keys:
             battery_soc_keys = ["electrical_storage.soc"]
 
+        ev_action_name = str(data.pop("ev_action_name", "")).strip()
+        battery_action_name = str(data.pop("battery_action_name", "")).strip()
+
         return cls(
             grid_import_limit_kw=grid_import_limit_kw,
             control_interval_minutes=max(
@@ -182,6 +197,8 @@ class Rh1HouseConfig:
             ),
             soc_unit_mode=soc_unit_mode,
             battery_soc_keys=battery_soc_keys,
+            ev_action_name=ev_action_name,
+            battery_action_name=battery_action_name,
         )
 
     def resolve_ev_field(self, key: str, ev_id: str) -> str:
@@ -189,6 +206,24 @@ class Rh1HouseConfig:
         if not template:
             return ""
         return template.replace("{ev_id}", ev_id)
+
+    def resolve_ev_action_name(self) -> str:
+        if self.ev_action_name:
+            return self.ev_action_name
+        for charger_id in self.chargers:
+            candidate = str(charger_id).strip()
+            if candidate:
+                return candidate
+        return "ev_charge_kw"
+
+    def resolve_battery_action_name(self) -> str:
+        if self.battery_action_name:
+            return self.battery_action_name
+        for key in self.battery_soc_keys:
+            candidate = _extract_battery_id_from_soc_key(str(key))
+            if candidate:
+                return candidate
+        return "battery_kw"
 
 
 @dataclass
@@ -400,10 +435,22 @@ class Rh1HouseRuntime:
         if meter_import_kw is not None or meter_export_kw is not None:
             meter_net_kw = max(meter_import_kw or 0.0, 0.0) - max(meter_export_kw or 0.0, 0.0)
 
+        ev_action_name = cfg.resolve_ev_action_name()
+        battery_action_name = cfg.resolve_battery_action_name()
+        if ev_action_name == battery_action_name:
+            warnings.append("duplicate_action_names_fallback_to_defaults")
+            ev_action_name = "ev_charge_kw"
+            battery_action_name = "battery_kw"
+
+        output_actions = {
+            ev_action_name: quantized["ev_charge_kw"],
+            battery_action_name: quantized["battery_kw"],
+        }
+
         log.info(
             "rbc.actions",
             strategy="rh1_house_rbc_v1",
-            actions=quantized,
+            actions=output_actions,
             connected={"ev": ev.connected},
             phase_totals={"grid": net_grid_kw},
             board_total=max(net_grid_kw, 0.0),
@@ -475,7 +522,7 @@ class Rh1HouseRuntime:
         if local_constraint_flags:
             log.warning("rh1.constraint_flags", flags=local_constraint_flags)
 
-        return quantized
+        return output_actions
 
     def _extract_price_points(self, payload: Dict[str, Any], warnings: List[str]) -> Dict[float, float]:
         vector_points = self._extract_price_points_from_vector(payload, warnings)

@@ -301,7 +301,11 @@ class CommunityOptimizerRuntime:
                 actions=actions,
             )
         elif strategy == "rh1_house_rbc_v1":
-            connected_ev_kw = _safe_float(actions.get("ev_charge_kw"), 0.0)
+            ev_action_name = self._rh1_ev_action_name(artifact_cfg)
+            connected_ev_kw = _safe_float(
+                actions.get(ev_action_name, actions.get("ev_charge_kw", 0.0)),
+                0.0,
+            )
             net_without_battery = non_shiftable + connected_ev_kw - solar
             battery = self._build_rh1_battery_asset(
                 manifest=manifest,
@@ -432,9 +436,12 @@ class CommunityOptimizerRuntime:
         net_without_battery_kw: float,
         actions: Dict[str, float],
     ) -> BatteryAsset | None:
-        action_name = "battery_kw"
+        action_name = self._rh1_battery_action_name(artifact_cfg)
         if action_name not in actions:
-            return None
+            if "battery_kw" in actions:
+                action_name = "battery_kw"
+            else:
+                return None
 
         soc = None
         raw_soc_keys = artifact_cfg.get("battery_soc_keys", ["electrical_storage.soc"])
@@ -506,6 +513,46 @@ class CommunityOptimizerRuntime:
             low_kw=low_kw,
             high_kw=high_kw,
         )
+
+    def _rh1_ev_action_name(self, artifact_cfg: Dict[str, Any]) -> str:
+        explicit = str(artifact_cfg.get("ev_action_name") or "").strip()
+        if explicit:
+            return explicit
+
+        chargers_raw = artifact_cfg.get("chargers")
+        if isinstance(chargers_raw, dict):
+            for charger_id in chargers_raw:
+                candidate = str(charger_id).strip()
+                if candidate:
+                    return candidate
+
+        return "ev_charge_kw"
+
+    def _rh1_battery_action_name(self, artifact_cfg: Dict[str, Any]) -> str:
+        explicit = str(artifact_cfg.get("battery_action_name") or "").strip()
+        if explicit:
+            return explicit
+
+        raw_soc_keys = artifact_cfg.get("battery_soc_keys", [])
+        soc_keys: List[str] = []
+        if isinstance(raw_soc_keys, list):
+            soc_keys = [str(k) for k in raw_soc_keys if str(k)]
+        elif raw_soc_keys is not None:
+            key = str(raw_soc_keys).strip()
+            if key:
+                soc_keys = [key]
+
+        for key in soc_keys:
+            parts = [segment for segment in key.split(".") if segment]
+            if len(parts) < 3:
+                continue
+            if parts[0].lower() != "batteries" or parts[-1].lower() != "soc":
+                continue
+            candidate = parts[1].strip()
+            if candidate:
+                return candidate
+
+        return "battery_kw"
 
     def _action_bounds_for_name(self, manifest, agent_index: int, action_name: str) -> tuple[float | None, float | None]:
         action_names = manifest.get_action_names(agent_index)
