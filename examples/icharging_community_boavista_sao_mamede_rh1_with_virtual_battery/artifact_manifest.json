@@ -487,8 +487,9 @@
           },
           "price_unit_mode": "auto",
           "price_auto_mwh_threshold": 3.0,
-          "soc_unit_mode": "auto",
+          "soc_unit_mode": "fraction",
           "battery_soc_keys": [
+            "batteries.B01.SoC",
             "electrical_storage.soc"
           ],
           "require_observations_envelope": true,

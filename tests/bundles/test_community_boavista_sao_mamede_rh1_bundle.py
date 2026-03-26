@@ -222,7 +222,7 @@ def test_community_optimization_reduces_external_cost_vs_local_baseline(communit
     message = _load_message()
     features = copy.deepcopy(message["features"])
     features["sites"]["sao_mamede"]["observations"]["virtual_battery"] = {"soc": 0.9}
-    features["sites"]["rh1"]["observations"]["batteries"] = {"B01": {"SoC": 90}}
+    features["sites"]["rh1"]["observations"]["batteries"] = {"B01": {"SoC": 0.9}}
     features["sites"]["boavista"]["observations"]["solar_generation"] = 0.0
     features["sites"]["boavista"]["observations"]["non_shiftable_load"] = 15.0
     features["sites"]["sao_mamede"]["observations"]["solar_generation"] = 35.0

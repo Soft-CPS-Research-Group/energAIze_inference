@@ -159,14 +159,14 @@ def test_rh1_replay_real_sequence_parses_and_runs(rh1_client):
         assert -cfg.battery_nominal_power_kw - 1e-6 <= actions["battery_kw"] <= cfg.battery_nominal_power_kw + 1e-6
 
 
-def test_rh1_soc_auto_percent_normalization(rh1_client):
+def test_rh1_soc_fraction_input_supported(rh1_client):
     payload = {
         "timestamp": "2026-03-01T10:00:00Z",
         "observations": {
             "non_shiftable_load": 0.4,
             "solar_generation": 0.0,
             "energy_price": _price_curve(0.12, 0.22, 0.21, 0.20, 0.19, 0.18),
-            "batteries": {"B01": {"SoC": 89.0}},
+            "batteries": {"B01": {"SoC": 0.89}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
             "electric_vehicles": {},
         },
@@ -180,7 +180,7 @@ def test_rh1_price_vector_normalization_affects_dispatch(rh1_client):
     common_obs = {
         "non_shiftable_load": 1.0,
         "solar_generation": 0.0,
-        "batteries": {"B01": {"SoC": 55.0}},
+        "batteries": {"B01": {"SoC": 0.55}},
         "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
         "electric_vehicles": {},
     }
@@ -210,7 +210,7 @@ def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
     common_obs = {
         "non_shiftable_load": 1.0,
         "solar_generation": 0.0,
-        "batteries": {"B01": {"SoC": 55.0}},
+        "batteries": {"B01": {"SoC": 0.55}},
         "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
         "electric_vehicles": {},
     }
@@ -254,7 +254,7 @@ def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):
                     "energy_out_l3": 0.0,
                 }
             },
-            "batteries": {"B01": {"SoC": 80.0}},
+            "batteries": {"B01": {"SoC": 0.8}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
             "electric_vehicles": {},
         },
@@ -281,7 +281,7 @@ def test_rh1_grid_meter_phase_sum_fallback_works_without_totals(rh1_client):
                     "energy_out_l3": 0.0,
                 }
             },
-            "batteries": {"B01": {"SoC": 80.0}},
+            "batteries": {"B01": {"SoC": 0.8}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
             "electric_vehicles": {},
         },
@@ -298,7 +298,7 @@ def test_rh1_quantization_keeps_grid_import_within_limit(rh1_client):
         "observations": {
             "non_shiftable_load": 8.970622904531151,
             "solar_generation": 0.14326037443006923,
-            "batteries": {"B01": {"SoC": 20.3850795696542}},
+            "batteries": {"B01": {"SoC": 0.203850795696542}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
             "electric_vehicles": {},
         },
@@ -332,7 +332,7 @@ def test_rh1_real_payload_tariffs_drive_decisions(rh1_client):
             },
         }
     }
-    payload["observations"]["batteries"] = {"B01": {"SoC": 55.0}}
+    payload["observations"]["batteries"] = {"B01": {"SoC": 0.55}}
     payload["observations"]["non_shiftable_load"] = 0.5
     payload["observations"]["solar_generation"] = 0.0
 
@@ -371,7 +371,7 @@ def test_rh1_ev_hard_deadline_behavior(rh1_client):
             "non_shiftable_load": 0.5,
             "solar_generation": 0.0,
             "energy_price": _price_curve(0.25, 0.20, 0.18, 0.15, 0.14, 0.13),
-            "batteries": {"B01": {"SoC": 50.0}},
+            "batteries": {"B01": {"SoC": 0.5}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": "EV01"}},
             "electric_vehicles": {
                 "EV01": {
@@ -406,7 +406,7 @@ def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
             "non_shiftable_load": 1.0,
             "solar_generation": 0.0,
             "energy_price": _price_curve(0.35, 0.32, 0.30, 0.28, 0.26, 0.24),
-            "batteries": {"B01": {"SoC": 55.0}},
+            "batteries": {"B01": {"SoC": 0.55}},
             "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": "EV01"}},
             "electric_vehicles": {
                 "EV01": {
@@ -434,7 +434,7 @@ def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):
                 "non_shiftable_load": 2.8,
                 "solar_generation": 0.0,
                 "energy_price": _price_curve(0.06, 0.20, 0.22, 0.24, 0.23, 0.21),
-                "batteries": {"B01": {"SoC": 55.0}},
+                "batteries": {"B01": {"SoC": 0.55}},
                 "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
                 "electric_vehicles": {},
             },
@@ -446,7 +446,7 @@ def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):
                 "non_shiftable_load": 0.5,
                 "solar_generation": 2.5,
                 "energy_price": _price_curve(0.07, 0.18, 0.20, 0.22, 0.21, 0.19),
-                "batteries": {"B01": {"SoC": 65.0}},
+                "batteries": {"B01": {"SoC": 0.65}},
                 "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
                 "electric_vehicles": {},
             },
@@ -458,7 +458,7 @@ def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):
                 "non_shiftable_load": 3.0,
                 "solar_generation": 0.0,
                 "energy_price": _price_curve(0.30, 0.10, 0.09, 0.08, 0.08, 0.07),
-                "batteries": {"B01": {"SoC": 70.0}},
+                "batteries": {"B01": {"SoC": 0.7}},
                 "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
                 "electric_vehicles": {},
             },
@@ -470,7 +470,7 @@ def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):
                 "non_shiftable_load": 2.9,
                 "solar_generation": 0.0,
                 "energy_price": _price_curve(0.28, 0.12, 0.10, 0.09, 0.08, 0.07),
-                "batteries": {"B01": {"SoC": 60.0}},
+                "batteries": {"B01": {"SoC": 0.6}},
                 "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
                 "electric_vehicles": {},
             },

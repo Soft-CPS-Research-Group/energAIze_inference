@@ -154,7 +154,7 @@ def test_cost_reduction_vs_local_baseline_without_virtual_battery():
         features = copy.deepcopy(message["features"])
         features["sites"]["boavista"]["observations"]["solar_generation"] = 0.0
         features["sites"]["boavista"]["observations"]["non_shiftable_load"] = 14.0
-        features["sites"]["rh1"]["observations"]["batteries"] = {"B01": {"SoC": 90}}
+        features["sites"]["rh1"]["observations"]["batteries"] = {"B01": {"SoC": 0.9}}
         features["sites"]["rh1"]["observations"]["solar_generation"] = 0.0
         community = features.setdefault("community", {})
         community["price_signal"] = {

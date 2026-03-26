@@ -97,7 +97,7 @@ def _community_features() -> dict:
                             },
                         }
                     },
-                    "batteries": {"B01": {"SoC": 50}},
+                    "batteries": {"B01": {"SoC": 0.5}},
                 },
                 "forecasts": {},
             },
