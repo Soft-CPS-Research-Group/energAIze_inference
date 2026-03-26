@@ -226,6 +226,7 @@ class IchargingRuntimeConfig:
     virtual_battery_soc_min: float = 0.1
     virtual_battery_soc_max: float = 1.0
     session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
+    emit_session_source_actions: bool = False
     session_merge_power_key: str = "power"
     session_merge_ev_key: str = "electric_vehicle"
     unmanaged_session_groups: Dict[str, List[str]] = field(default_factory=dict)
@@ -396,6 +397,7 @@ class IchargingRuntimeConfig:
                 1.0,
             ),
             session_merge_map=session_merge_map,
+            emit_session_source_actions=bool(data.pop("emit_session_source_actions", False)),
             session_merge_power_key=str(data.pop("session_merge_power_key", "power") or "power"),
             session_merge_ev_key=str(data.pop("session_merge_ev_key", "electric_vehicle") or "electric_vehicle"),
             unmanaged_session_groups=unmanaged_session_groups,
@@ -434,6 +436,7 @@ class ChargerState:
     connected: bool = False
     allow_flex: bool = True
     session_power: float = 0.0
+    session_source_id: str = ""
     flexible: bool = False
     required_kw: float = 0.0
     priority: float = 0.0
@@ -512,7 +515,7 @@ class IchargingBreakerRuntime:
 
         return 0.0
 
-    def _effective_session_state(self, payload: Dict[str, Any], charger_id: str) -> tuple[str, float]:
+    def _effective_session_state(self, payload: Dict[str, Any], charger_id: str) -> tuple[str, float, str]:
         cfg = self.config
         sources = cfg.session_merge_map.get(charger_id) or [charger_id]
         session_rows: List[tuple[str, str, float]] = []
@@ -524,14 +527,41 @@ class IchargingBreakerRuntime:
             session_rows.append((source_id, ev_id, power))
 
         if not session_rows:
-            return "", 0.0
+            return "", 0.0, ""
 
         with_ev = [row for row in session_rows if row[1]]
         if with_ev:
             chosen = max(with_ev, key=lambda row: row[2])
         else:
             chosen = max(session_rows, key=lambda row: row[2])
-        return chosen[1], chosen[2]
+        return chosen[1], chosen[2], chosen[0]
+
+    def _project_actions_to_session_sources(
+        self,
+        actions: Dict[str, float],
+        states: Dict[str, ChargerState],
+    ) -> Dict[str, float]:
+        cfg = self.config
+        projected = {key: float(value) for key, value in actions.items()}
+        if not cfg.emit_session_source_actions:
+            return projected
+
+        for charger_id, sources in cfg.session_merge_map.items():
+            if charger_id not in projected:
+                continue
+            source_ids = [sid for sid in sources if sid]
+            if not source_ids:
+                continue
+
+            charger_kw = float(projected.pop(charger_id))
+            for source_id in source_ids:
+                projected[source_id] = 0.0
+
+            preferred_source = (states.get(charger_id).session_source_id if states.get(charger_id) else "") or ""
+            target_source = preferred_source if preferred_source in source_ids else source_ids[0]
+            projected[target_source] = charger_kw
+
+        return projected
 
     def _unmanaged_session_load_kw(self, payload: Dict[str, Any]) -> float:
         cfg = self.config
@@ -664,7 +694,7 @@ class IchargingBreakerRuntime:
                 _safe_float(meta.get("max_kw", cfg.charger_limit_kw), cfg.charger_limit_kw), base_min_kw
             )
             line = meta.get("line") or line_map.get(charger_id)
-            ev_id, session_power = self._effective_session_state(payload, charger_id)
+            ev_id, session_power, session_source_id = self._effective_session_state(payload, charger_id)
             session_power = _clamp(session_power, 0.0, max_kw)
             connected = bool(ev_id)
             min_kw = max(base_min_kw, cfg.min_connected_kw * (max(n_phases, 1) if connected else 1))
@@ -679,6 +709,7 @@ class IchargingBreakerRuntime:
                 connected=connected,
                 allow_flex=bool(meta.get("allow_flex_when_ev", True)),
                 session_power=session_power,
+                session_source_id=session_source_id,
             )
             states[charger_id] = state
             min_levels[charger_id] = min_kw
@@ -782,6 +813,8 @@ class IchargingBreakerRuntime:
             )
 
         # Runtime summary for debugging
+        external_actions = self._project_actions_to_session_sources(quantized, states)
+
         try:
             log = get_logger()
             log_actions = quantized
@@ -837,6 +870,7 @@ class IchargingBreakerRuntime:
                 "rbc.actions",
                 strategy="icharging_breaker",
                 actions=log_actions,
+                output_actions=external_actions,
                 connected=connected,
                 flex=flex_summary,
                 phase_totals=line_totals,
@@ -955,7 +989,7 @@ class IchargingBreakerRuntime:
         except Exception:
             get_logger().exception("rbc.action_logging_failed")
 
-        return quantized
+        return external_actions
 
     def _extract_price_series(self, payload: Dict[str, Any], prefix: str) -> List[float]:
         prefixes = [prefix]

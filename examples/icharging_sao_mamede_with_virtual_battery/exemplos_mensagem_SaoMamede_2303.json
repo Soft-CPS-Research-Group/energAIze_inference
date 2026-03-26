@@ -2,7 +2,13 @@
   {
     "timestamp": "2025-11-11T08:57:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 0,
@@ -122,7 +128,7 @@
               0.01402,
               0.005
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -185,7 +191,13 @@
   {
     "timestamp": "2025-11-24T14:11:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 89.7,
@@ -305,7 +317,7 @@
               0.00066,
               0.00066
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -368,7 +380,13 @@
   {
     "timestamp": "2025-11-24T14:29:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 77.2,
@@ -488,7 +506,7 @@
               0.00066,
               0.00083
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -551,7 +569,13 @@
   {
     "timestamp": "2026-01-07T16:38:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 96.5,
@@ -671,7 +695,7 @@
               0.0725,
               0.08127
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -734,7 +758,13 @@
   {
     "timestamp": "2026-01-07T17:03:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 64.5,
@@ -854,7 +884,7 @@
               0.0907,
               0.09893
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -917,7 +947,13 @@
   {
     "timestamp": "2026-01-07T17:27:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 47.3,
@@ -1037,7 +1073,7 @@
               0.09893,
               0.095
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -1100,7 +1136,13 @@
   {
     "timestamp": "2026-01-08T14:38:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 74.6,
@@ -1220,7 +1262,7 @@
               0.00796,
               0.01001
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -1283,7 +1325,13 @@
   {
     "timestamp": "2026-01-06T11:04:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 59.7,
@@ -1403,7 +1451,7 @@
               0.10004,
               0.09893
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -1466,7 +1514,13 @@
   {
     "timestamp": "2025-12-30T11:44:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 50.3,
@@ -1586,7 +1640,7 @@
               0.0833,
               0.082
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }
@@ -1649,7 +1703,13 @@
   {
     "timestamp": "2025-12-29T14:24:00Z",
     "observations": {
-      "batteries": {},
+      "batteries": {
+        "B01": {
+          "energy_in": 0.008,
+          "energy_out": 0.0,
+          "SoC": 25.0
+        }
+      },
       "grid_meters": {
         "GR01": {
           "energy_in_total": 77.5,
@@ -1769,7 +1829,7 @@
               0.07686,
               0.06673
             ],
-            "measurement_unit": "€/kWh",
+            "measurement_unit": "\u20ac/kWh",
             "horizon_seconds": 86400,
             "frequency_seconds": 900
           }

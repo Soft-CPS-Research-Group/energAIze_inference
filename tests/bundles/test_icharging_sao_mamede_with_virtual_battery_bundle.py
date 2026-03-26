@@ -17,7 +17,10 @@ MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
-ACTION_CHARGER = "BB000SMI"
+ACTION_PLUG_1 = "BB000SMI_1"
+ACTION_PLUG_2 = "BB000SMI_2"
+ACTION_PLUGS = {ACTION_PLUG_1, ACTION_PLUG_2}
+ACTION_BATTERY = "B01"
 
 
 @pytest.fixture
@@ -46,7 +49,13 @@ def _base_payload() -> dict:
         "M1123089-6_2": {"power": 0.0, "electric_vehicle": ""},
     }
     payload["observations"]["electric_vehicles"] = {}
-    payload["observations"]["virtual_battery"] = {"soc": 0.5}
+    payload["observations"]["batteries"] = {
+        "B01": {
+            "energy_in": 0.0,
+            "energy_out": 0.0,
+            "SoC": 50.0,
+        }
+    }
     payload["forecasts"] = {}
     return payload
 
@@ -82,9 +91,18 @@ def _run(client: TestClient, payload: dict) -> dict[str, float]:
     return response.json()["actions"]["0"]
 
 
+def _bb_total_kw(actions: dict[str, float]) -> float:
+    return float(actions.get(ACTION_PLUG_1, 0.0) + actions.get(ACTION_PLUG_2, 0.0))
+
+
+def _assert_single_active_bb_plug(actions: dict[str, float]) -> None:
+    active = [plug for plug in ACTION_PLUGS if actions.get(plug, 0.0) > 1e-6]
+    assert len(active) <= 1
+
+
 def test_actions_contract_includes_virtual_battery(sao_mamede_with_battery_client):
     actions = _run(sao_mamede_with_battery_client, _base_payload())
-    assert set(actions.keys()) == {ACTION_CHARGER, "virtual_battery_kw"}
+    assert set(actions.keys()) == ACTION_PLUGS | {ACTION_BATTERY}
 
 
 def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
@@ -110,7 +128,9 @@ def test_single_controllable_bb_charger_uses_merged_plugs(sao_mamede_with_batter
         departure_minutes_from_now=120,
     )
     actions = _run(sao_mamede_with_battery_client, payload)
-    assert actions[ACTION_CHARGER] >= 8.0
+    assert actions[ACTION_PLUG_1] == pytest.approx(0.0, rel=1e-6)
+    assert actions[ACTION_PLUG_2] >= 8.0
+    _assert_single_active_bb_plug(actions)
 
 
 def test_virtual_battery_responds_to_energy_tariffs_price_vector(
@@ -140,24 +160,24 @@ def test_virtual_battery_responds_to_energy_tariffs_price_vector(
     cheap_now["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.05] + [0.20] * 95
     cheap_actions = _run(sao_mamede_with_battery_client, cheap_now)
 
-    assert expensive_actions["virtual_battery_kw"] < -1e-6
-    assert cheap_actions["virtual_battery_kw"] > 1e-6
+    assert expensive_actions[ACTION_BATTERY] < -1e-6
+    assert cheap_actions[ACTION_BATTERY] > 1e-6
 
 
 def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):
     high_soc = _base_payload()
-    high_soc["observations"]["virtual_battery"]["soc"] = 1.0
+    high_soc["observations"]["batteries"]["B01"]["SoC"] = 100.0
     high_soc["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.08] + [0.22] * 95
     high_actions = _run(sao_mamede_with_battery_client, high_soc)
-    assert high_actions["virtual_battery_kw"] == pytest.approx(0.0, rel=1e-6)
+    assert high_actions[ACTION_BATTERY] == pytest.approx(0.0, rel=1e-6)
 
     low_soc = _base_payload()
-    low_soc["observations"]["virtual_battery"]["soc"] = 0.05
+    low_soc["observations"]["batteries"]["B01"]["SoC"] = 5.0
     low_soc["observations"]["solar_generation"] = 0.0
     low_soc["observations"]["non_shiftable_load"] = 0.0
     low_soc["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.25] + [0.08] * 95
     low_actions = _run(sao_mamede_with_battery_client, low_soc)
-    assert low_actions["virtual_battery_kw"] >= 0.0
+    assert low_actions[ACTION_BATTERY] >= 0.0
 
 
 def test_grid_meter_headroom_constrains_bb_dispatch(sao_mamede_with_battery_client):
@@ -183,14 +203,16 @@ def test_grid_meter_headroom_constrains_bb_dispatch(sao_mamede_with_battery_clie
 
     actions_low = _run(sao_mamede_with_battery_client, low_meter)
     actions_high = _run(sao_mamede_with_battery_client, high_meter)
-    assert actions_high[ACTION_CHARGER] < actions_low[ACTION_CHARGER]
+    assert _bb_total_kw(actions_high) < _bb_total_kw(actions_low)
+    _assert_single_active_bb_plug(actions_low)
+    _assert_single_active_bb_plug(actions_high)
 
 
 def test_virtual_battery_uses_pt_meter_net_import_for_local_dispatch(
     sao_mamede_with_battery_client,
 ):
     payload = _base_payload()
-    payload["observations"]["virtual_battery"]["soc"] = 0.7
+    payload["observations"]["batteries"]["B01"]["SoC"] = 70.0
     payload["observations"]["solar_generation"] = 0.0
     payload["observations"]["non_shiftable_load"] = 0.0
     payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 120.0
@@ -198,4 +220,4 @@ def test_virtual_battery_uses_pt_meter_net_import_for_local_dispatch(
     payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
 
     actions = _run(sao_mamede_with_battery_client, payload)
-    assert actions["virtual_battery_kw"] < -1e-6
+    assert actions[ACTION_BATTERY] < -1e-6

@@ -17,7 +17,9 @@ MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
-ACTION_CHARGER = "BB000SMI"
+ACTION_PLUG_1 = "BB000SMI_1"
+ACTION_PLUG_2 = "BB000SMI_2"
+ACTION_PLUGS = {ACTION_PLUG_1, ACTION_PLUG_2}
 MIN_TECHNICAL_KW = 8.0
 MAX_BB_KW = 50.0
 PHYSICAL_PLUGS = {
@@ -34,6 +36,15 @@ def _run(client: TestClient, payload: dict) -> dict[str, float]:
     response = client.post("/inference", json={"features": payload})
     assert response.status_code == 200
     return response.json()["actions"]["0"]
+
+
+def _bb_total_kw(actions: dict[str, float]) -> float:
+    return float(actions.get(ACTION_PLUG_1, 0.0) + actions.get(ACTION_PLUG_2, 0.0))
+
+
+def _assert_single_active_bb_plug(actions: dict[str, float]) -> None:
+    active = [plug for plug in ACTION_PLUGS if actions.get(plug, 0.0) > 1e-6]
+    assert len(active) <= 1
 
 
 @pytest.fixture
@@ -115,13 +126,14 @@ def test_payload_assets_reflect_three_physical_chargers(sao_mamede_client):
 def test_actions_contract_has_single_controllable_charger(sao_mamede_client):
     payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert set(actions.keys()) == {ACTION_CHARGER}
+    assert set(actions.keys()) == ACTION_PLUGS
 
 
 def test_idle_outputs_minimum_even_without_ev(sao_mamede_client):
     payload = _base_payload()
     actions = _run(sao_mamede_client, payload)
-    assert actions[ACTION_CHARGER] == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    assert _bb_total_kw(actions) == pytest.approx(MIN_TECHNICAL_KW, rel=1e-6)
+    _assert_single_active_bb_plug(actions)
 
 
 def test_connected_ev_on_second_plug_is_controlled(sao_mamede_client):
@@ -139,8 +151,10 @@ def test_connected_ev_on_second_plug_is_controlled(sao_mamede_client):
     )
 
     actions = _run(sao_mamede_client, payload)
-    assert MIN_TECHNICAL_KW <= actions[ACTION_CHARGER] <= MAX_BB_KW
-    assert actions[ACTION_CHARGER] > MIN_TECHNICAL_KW
+    assert MIN_TECHNICAL_KW <= _bb_total_kw(actions) <= MAX_BB_KW
+    assert actions[ACTION_PLUG_2] > MIN_TECHNICAL_KW
+    assert actions[ACTION_PLUG_1] == pytest.approx(0.0, rel=1e-6)
+    _assert_single_active_bb_plug(actions)
 
 
 def test_stale_power_on_other_bb_plug_does_not_mask_connected_ev(sao_mamede_client):
@@ -162,7 +176,9 @@ def test_stale_power_on_other_bb_plug_does_not_mask_connected_ev(sao_mamede_clie
     )
 
     actions = _run(sao_mamede_client, payload)
-    assert actions[ACTION_CHARGER] > MIN_TECHNICAL_KW
+    assert actions[ACTION_PLUG_2] > MIN_TECHNICAL_KW
+    assert actions[ACTION_PLUG_1] == pytest.approx(0.0, rel=1e-6)
+    _assert_single_active_bb_plug(actions)
 
 
 def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmanaged(
@@ -198,9 +214,11 @@ def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmana
 
     actions_low = _run(sao_mamede_client, low_meter)
     actions_high = _run(sao_mamede_client, high_meter)
-    assert set(actions_low.keys()) == {ACTION_CHARGER}
-    assert set(actions_high.keys()) == {ACTION_CHARGER}
-    assert actions_high[ACTION_CHARGER] < actions_low[ACTION_CHARGER]
+    assert set(actions_low.keys()) == ACTION_PLUGS
+    assert set(actions_high.keys()) == ACTION_PLUGS
+    assert _bb_total_kw(actions_high) < _bb_total_kw(actions_low)
+    _assert_single_active_bb_plug(actions_low)
+    _assert_single_active_bb_plug(actions_high)
 
 
 def test_price_forecast_do_not_change_dispatch_without_virtual_battery(sao_mamede_client):

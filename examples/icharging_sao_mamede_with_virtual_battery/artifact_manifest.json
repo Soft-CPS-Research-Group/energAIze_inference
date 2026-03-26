@@ -69,10 +69,12 @@
       [
         {
           "low": [
-            8.0,
+            0.0,
+            0.0,
             -50.0
           ],
           "high": [
+            50.0,
             50.0,
             50.0
           ]
@@ -80,8 +82,9 @@
       ]
     ],
     "action_names": [
-      "BB000SMI",
-      "virtual_battery_kw"
+      "BB000SMI_1",
+      "BB000SMI_2",
+      "B01"
     ],
     "reward_function": {
       "name": "RewardFunction",
@@ -133,6 +136,7 @@
               "BB000SMI_2"
             ]
           },
+          "emit_session_source_actions": true,
           "unmanaged_session_groups": {
             "M1123089-5": [
               "M1123089-5_1",
@@ -149,15 +153,15 @@
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
           },
           "require_observations_envelope": true,
-          "virtual_battery_action_name": "virtual_battery_kw",
+          "virtual_battery_action_name": "B01",
           "virtual_battery_nominal_power_kw": 50.0,
           "virtual_battery_capacity_kwh": 125.0,
           "virtual_battery_capacity_min_kwh": 125.0,
           "virtual_battery_capacity_max_kwh": 125.0,
           "virtual_battery_charge_power_max_kw": 50.0,
           "virtual_battery_discharge_power_max_kw": 50.0,
-          "virtual_battery_soc_key": "virtual_battery.soc",
-          "virtual_battery_soc_fallback_key": "electrical_storage.soc",
+          "virtual_battery_soc_key": "batteries.B01.SoC",
+          "virtual_battery_soc_fallback_key": "virtual_battery.soc",
           "virtual_battery_use_setpoint": false,
           "virtual_battery_use_community_signals": true,
           "virtual_battery_community_target_import_key": "community.target_net_import_kw",

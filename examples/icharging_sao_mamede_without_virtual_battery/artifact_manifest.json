@@ -69,16 +69,19 @@
       [
         {
           "low": [
-            8.0
+            0.0,
+            0.0
           ],
           "high": [
+            50.0,
             50.0
           ]
         }
       ]
     ],
     "action_names": [
-      "BB000SMI"
+      "BB000SMI_1",
+      "BB000SMI_2"
     ],
     "reward_function": {
       "name": "RewardFunction",
@@ -130,6 +133,7 @@
               "BB000SMI_2"
             ]
           },
+          "emit_session_source_actions": true,
           "unmanaged_session_groups": {
             "M1123089-5": [
               "M1123089-5_1",
