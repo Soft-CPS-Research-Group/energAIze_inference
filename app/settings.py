@@ -53,6 +53,11 @@ class Settings(BaseSettings):
         env="FEATURE_ALIAS_PATH",
         description="Optional path to JSON file with feature alias overrides",
     )
+    allowed_bundle_root: Path | None = Field(
+        default=None,
+        env="ALLOWED_BUNDLE_ROOT",
+        description="Optional root directory for /admin/load manifest and artifact paths",
+    )
     onnx_execution_providers: List[str] = Field(
         default=["CPUExecutionProvider"],
         env="ONNX_EXECUTION_PROVIDERS",
@@ -89,6 +94,12 @@ class Settings(BaseSettings):
     @validator("alias_mapping_path", pre=True)
     def _expand_alias_path(cls, value: str | Path | None) -> Path | None:
         if value is None:
+            return None
+        return Path(value).expanduser()
+
+    @validator("allowed_bundle_root", pre=True)
+    def _expand_allowed_bundle_root(cls, value: str | Path | None) -> Path | None:
+        if value in (None, ""):
             return None
         return Path(value).expanduser()
 

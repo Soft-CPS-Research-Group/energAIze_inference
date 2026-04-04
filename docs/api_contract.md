@@ -38,13 +38,13 @@ Single-agent example:
 }
 ```
 
-Multi-agent example with explicit default:
+Community-participation bundle example:
 
 ```json
 {
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
-  "agent_index": 1,
-  "artifacts_dir": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery",
+  "manifest_path": "/data/icharging_sao_mamede_with_virtual_battery_community/artifact_manifest.json",
+  "agent_index": 0,
+  "artifacts_dir": "/data/icharging_sao_mamede_with_virtual_battery_community",
   "alias_mapping_path": null
 }
 ```
@@ -54,10 +54,10 @@ Success response (`200`):
 ```json
 {
   "status": "loaded",
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
-  "agent_index": 1,
-  "default_agent_index": 1,
-  "loaded_agent_indices": [0, 1],
+  "manifest_path": "/data/icharging_sao_mamede_with_virtual_battery_community/artifact_manifest.json",
+  "agent_index": 0,
+  "default_agent_index": 0,
+  "loaded_agent_indices": [0],
   "loaded_at": "2026-02-22T12:00:00.000000Z"
 }
 ```
@@ -111,113 +111,61 @@ Example response:
 }
 ```
 
-### Inference Mode A: single-agent features
+### Inference Payload
 
-Use direct payload under `features`.
+Use direct payload under `features`. The service no longer supports `features.sites`.
 
 ```json
 {
   "features": {
     "timestamp": "2026-02-22T12:00:00Z",
-    "non_shiftable_load": 4.0,
-    "solar_generation": 1.5,
-    "energy_price": 0.1,
-    "charging_sessions": {
-      "AC000004_1": {
-        "power": 1.8,
-        "electric_vehicle": "11824"
-      }
-    },
-    "electric_vehicles": {
-      "11824": {
-        "SoC": 0.3,
-        "flexibility": {
-          "estimated_soc_at_departure": 0.8,
-          "estimated_time_at_departure": "2026-02-22T14:00:00Z"
+    "observations": {
+      "non_shiftable_load": 4.0,
+      "solar_generation": 1.5,
+      "charging_sessions": {
+        "AC000004_1": {
+          "power": 1.8,
+          "electric_vehicle": "11824"
+        }
+      },
+      "electric_vehicles": {
+        "11824": {
+          "SoC": 0.3,
+          "flexibility": {
+            "estimated_soc_at_departure": 0.8,
+            "estimated_time_at_departure": "2026-02-22T14:00:00Z"
+          }
         }
       }
-    }
+    },
+    "forecasts": {}
   }
 }
 ```
 
-### Inference Mode B: community features by site
+For bundles with `community_participation_enabled=true`, the following fields are mandatory:
 
-Use `features.sites.<input_site_key>`. Routing key is read from artifact config `input_site_key`.
+- `features.community.energy_in_total`
+- `features.community.energy_out_total`
 
-With explicit agent:
+Both are expected as `kWh` for the decision interval (typically 5 seconds).
+
+Community-participation example:
 
 ```json
 {
-  "agent_index": 1,
   "features": {
     "timestamp": "2026-02-22T12:00:00Z",
-    "sites": {
-      "boavista": {
-        "non_shiftable_load": 7.0,
-        "solar_generation": 2.0
-      },
-      "sao_mamede": {
-        "site": {
-          "pt_available_kw": 80.0
-        },
-        "solar_generation": 12.0,
-        "charging_sessions": {
-          "BB000SMI": {
-            "power": 0.0,
-            "electric_vehicle": "SM_EV_01"
-          }
-        },
-        "electric_vehicles": {
-          "SM_EV_01": {
-            "SoC": 0.35,
-            "flexibility": {
-              "estimated_soc_at_departure": 0.8,
-              "estimated_time_at_departure": "2026-02-22T16:00:00Z"
-            }
-          }
-        },
-        "electrical_storage": {
-          "soc": 0.5
-        },
-        "virtual_battery": {
-          "setpoint_kw": 18.0
-        }
-      }
-    },
     "community": {
-      "price_signal": 0.2
+      "energy_in_total": 0.0024,
+      "energy_out_total": 0.0003
+    },
+    "observations": {
+      "solar_generation": 12.0
     }
   }
 }
 ```
-
-Without `agent_index` (uses loaded default):
-
-```json
-{
-  "features": {
-    "timestamp": "2026-02-22T12:00:00Z",
-    "sites": {
-      "boavista": {
-        "non_shiftable_load": 7.0,
-        "solar_generation": 2.0
-      },
-      "sao_mamede": {
-        "site": {
-          "pt_available_kw": 80.0
-        },
-        "solar_generation": 12.0
-      }
-    }
-  }
-}
-```
-
-Timestamp fallback behavior:
-
-- If selected site payload does not include `timestamp`, top-level `features.timestamp` is copied in.
-- If `timestamp` and `timestamp.$date` are both absent at site level, top-level `timestamp.$date` is also considered.
 
 ## GET /info
 
@@ -227,19 +175,19 @@ Success response (`200`) example:
 
 ```json
 {
-  "algorithm": "RuleBasedCommunity",
+  "algorithm": "RuleBasedBreaker",
   "manifest_version": 1,
   "metadata": {
-    "experiment_name": "icharging_community_boavista_sao_mamede_with_virtual_battery"
+    "experiment_name": "icharging_sao_mamede_with_virtual_battery_community"
   },
   "topology": {
-    "num_agents": 2
+    "num_agents": 1
   },
   "service_version": "0.1.0",
-  "agent_index": 1,
-  "default_agent_index": 1,
-  "loaded_agent_indices": [0, 1],
-  "action_names": ["BB000SMI", "virtual_battery_kw"],
+  "agent_index": 0,
+  "default_agent_index": 0,
+  "loaded_agent_indices": [0],
+  "action_names": ["BB000SMI_1", "BB000SMI_2", "B01"],
   "uptime_seconds": 56.91,
   "loaded_at": "2026-02-22T12:00:00.000000Z",
   "alias_mapping_path": null
@@ -261,11 +209,11 @@ Example:
 {
   "status": "ok",
   "configured": true,
-  "agent_index": 1,
-  "default_agent_index": 1,
-  "loaded_agent_indices": [0, 1],
+  "agent_index": 0,
+  "default_agent_index": 0,
+  "loaded_agent_indices": [0],
   "providers": ["rule_based"],
-  "manifest_path": "/data/icharging_community_boavista_sao_mamede_with_virtual_battery_with_virtual_battery/artifact_manifest.json",
+  "manifest_path": "/data/icharging_sao_mamede_with_virtual_battery_community/artifact_manifest.json",
   "alias_mapping_path": null,
   "gpu_available": false
 }
@@ -276,17 +224,17 @@ Example:
 `POST /inference`:
 
 - `400`:
-  - invalid/missing community site object for selected `input_site_key`;
+  - missing required community fields when `community_participation_enabled=true`;
   - unknown `agent_index` requested;
   - other runtime `RuntimeError` cases not related to configuration state.
 - `503`: pipeline not configured.
 - `500`: unexpected execution failure.
 
-`POST /inference` missing-site example (`400`):
+`POST /inference` missing-community example (`400`):
 
 ```json
 {
-  "detail": "\"Missing required object 'features.sites.sao_mamede' for agent_index 1\""
+  "detail": "\"Missing required community field(s): 'community.energy_in_total'\""
 }
 ```
 
@@ -303,16 +251,15 @@ Example:
 
 - `409`: no model configured.
 
-## Multi-Agent Routing
+## Agent Routing
 
 Routing algorithm per request:
 
 1. Resolve target agent:
 2. If request has `agent_index`, use it.
 3. Otherwise use default agent loaded by `/admin/load`.
-4. If target artifact config has `input_site_key`, payload must provide `features.sites.<input_site_key>`.
-5. Selected site payload is flattened and sent to runtime.
-6. Exactly one agent result is returned in `actions` map for that request.
+4. Features payload is flattened and sent to runtime.
+5. Exactly one agent result is returned in `actions` map for that request.
 
 ## iCharging Operational Semantics
 
@@ -349,6 +296,10 @@ This behavior is specific to configured runtime strategy and manifest parameters
 | `site_available_headroom_key` | used in dispatch | Dynamic board headroom input key when provided. |
 | `site_available_headroom_fallback_kw` | used in dispatch | Fail-safe board limit if dynamic headroom key is absent or invalid. |
 | `site_available_headroom_includes_pv` | used in dispatch | Controls whether PV is added again when dynamic headroom is present. |
+| `community_participation_enabled` | used in dispatch | Enables local community balancing rules for per-building bundles. |
+| `community_energy_in_key` / `community_energy_out_key` | used in dispatch | Read community `kWh` signals and convert to `kW` by control interval. |
+| `community_energy_deadband_kw` | used in dispatch | Deadband for community deficit/surplus responses. |
+| `community_deficit_weight` / `community_surplus_weight` | used in dispatch | Scales board-limit bias and battery mandatory component. |
 | `virtual_battery_*` | used in dispatch | Optional virtual battery action generation and SOC guards. |
 | `flexible_urgency_threshold` | parsed/legacy-noop | Parsed from config but not currently used in allocation decisions. |
 | `inactive_power_threshold_kw` | parsed/legacy-noop | Parsed from config but not currently used in allocation decisions. |
@@ -374,6 +325,10 @@ See strategy-specific bundle docs for full field semantics. Core fields in activ
 
 - `grid_import_limit_kw`
 - `control_interval_minutes`
+- `community_participation_enabled`
+- `community_energy_in_key` / `community_energy_out_key`
+- `community_energy_deadband_kw`
+- `community_deficit_weight` / `community_surplus_weight`
 - `export_price_factor`
 - `ev_min_connected_kw`
 - `baseline_price_threshold_eur_kwh`
@@ -395,4 +350,3 @@ For production deployments:
 Collection reference:
 
 - `postman/EnergyFlexibilityInference.postman_collection.json`
-

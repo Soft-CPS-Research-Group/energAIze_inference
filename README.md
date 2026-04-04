@@ -41,7 +41,6 @@ bundle/
 - `topology`: number of agents.
 - `environment`: observation names, encoders, action names, and action bounds.
 - `agent`: list of artifacts with `path`, `format`, and optional `config`.
-  - In community mode, set `agent.artifacts[*].config.input_site_key` per agent.
   - `config.require_observations_envelope` controls whether input is read from `features.observations`.
 
 Supported artifact formats:
@@ -96,9 +95,7 @@ Full request/response contracts and error semantics:
 - Alias precedence at load time:
   - explicit `/admin/load.alias_mapping_path` (or `FEATURE_ALIAS_PATH`) takes priority.
   - fallback to `metadata.alias_mapping_path` in `artifact_manifest.json`.
-- Two request modes are supported:
-  - Single-agent mode: `features` contains direct feature fields.
-  - Community mode: `features.sites.<input_site_key>` is selected for the target agent.
+- For community-participation bundles, include `features.community.energy_in_total` and `features.community.energy_out_total` (`kWh` per decision interval).
 
 Example:
 ```json
@@ -112,21 +109,17 @@ Example:
 }
 ```
 
-Community example:
+Community-participation example:
 ```json
 {
-  "agent_index": 1,
   "features": {
     "timestamp": "2026-02-22T12:00:00Z",
-    "sites": {
-      "boavista": {
-        "non_shiftable_load": 7.0,
-        "solar_generation": 2.0
-      },
-      "sao_mamede": {
-        "site": {"pt_available_kw": 80.0},
-        "solar_generation": 12.0
-      }
+    "community": {
+      "energy_in_total": 0.0024,
+      "energy_out_total": 0.0003
+    },
+    "observations": {
+      "solar_generation": 12.0
     }
   }
 }
@@ -179,6 +172,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 - `LOG_FILE_ROTATION` (e.g., `50 MB` or `1 day`)
 - `LOG_FILE_RETENTION` (e.g., `7 days`)
 - `ONNX_EXECUTION_PROVIDERS` (e.g., `CPUExecutionProvider`)
+- `ALLOWED_BUNDLE_ROOT` (optional; restrict `/admin/load` to this root path)
 
 ## Logging
 - Console logging is always enabled.
@@ -193,15 +187,15 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 The test suite covers pipeline loading, API inference behavior, and example bundle scenarios. Use `-k` to run a focused test.
 
-Bundle and multi-agent suite example:
+Bundle suite example:
 ```bash
 ./.venv/bin/python -m pytest -q \
-  tests/test_multi_agent_store_api.py \
-  tests/bundles/test_community_boavista_sao_mamede_bundle.py \
-  tests/bundles/test_community_boavista_sao_mamede_rh1_bundle.py \
   tests/bundles/test_icharging_boavista_with_flex_bundle.py \
+  tests/bundles/test_icharging_boavista_with_flex_community_bundle.py \
   tests/bundles/test_icharging_boavista_without_flex_bundle.py \
   tests/bundles/test_icharging_sao_mamede_bundle.py \
+  tests/bundles/test_icharging_sao_mamede_with_virtual_battery_community_bundle.py \
+  tests/bundles/test_rh1_bundle_community.py \
   tests/bundles/test_rh1_bundle.py
 ```
 

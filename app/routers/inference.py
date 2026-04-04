@@ -6,12 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.models.requests import InferenceRequest
 from app.models.responses import InferenceResponse
 from app.logging import get_logger
-from app.services.rbc.community_optimizer import CommunityOptimizerRuntime
 from app.state import store
 from app.utils.flatten import flatten_payload
 
 router = APIRouter(prefix="/inference", tags=["inference"])
-community_optimizer = CommunityOptimizerRuntime()
 
 
 def _ensure_configured():
@@ -21,34 +19,8 @@ def _ensure_configured():
 
 
 def _select_agent_features(features: Dict[str, Any], pipeline) -> Dict[str, Any]:
-    artifact_cfg = pipeline.manifest.get_artifact(pipeline.agent_index).config or {}
-    site_key = str(artifact_cfg.get("input_site_key") or "").strip()
-    if not site_key:
-        return dict(features)
-
-    sites = features.get("sites")
-    if not isinstance(sites, dict):
-        raise KeyError(f"Missing required object 'features.sites' for agent site '{site_key}'")
-
-    site_payload = sites.get(site_key)
-    if not isinstance(site_payload, dict):
-        raise KeyError(f"Missing required object 'features.sites.{site_key}' for agent_index {pipeline.agent_index}")
-
-    selected = dict(site_payload)
-    top_community = features.get("community")
-    if isinstance(top_community, dict) and "community" not in selected:
-        selected["community"] = dict(top_community)
-    top_timestamp = features.get("timestamp")
-    if "timestamp" not in selected and top_timestamp is not None:
-        selected["timestamp"] = top_timestamp
-    top_timestamp_date = features.get("timestamp.$date")
-    if (
-        "timestamp" not in selected
-        and "timestamp.$date" not in selected
-        and top_timestamp_date is not None
-    ):
-        selected["timestamp.$date"] = top_timestamp_date
-    return selected
+    _ = pipeline
+    return dict(features)
 
 
 def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[str, Any]:
@@ -62,6 +34,9 @@ def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[
         raise KeyError("Missing required object 'observations' for this bundle")
 
     normalized = dict(observations)
+    top_community = selected_features.get("community")
+    if isinstance(top_community, dict) and "community" not in normalized:
+        normalized["community"] = dict(top_community)
     top_timestamp = selected_features.get("timestamp")
     if "timestamp" not in normalized and top_timestamp is not None:
         normalized["timestamp"] = top_timestamp
@@ -75,26 +50,30 @@ def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[
     return normalized
 
 
-def _is_community_mode(features: Dict[str, Any], record) -> bool:
-    if record is None or len(record.loaded_agent_indices) <= 1:
-        return False
-    sites = features.get("sites")
-    if not isinstance(sites, dict):
-        return False
+def _validate_required_community_fields(flattened: Dict[str, Any], pipeline) -> None:
+    artifact_cfg = pipeline.manifest.get_artifact(pipeline.agent_index).config or {}
+    if not bool(artifact_cfg.get("community_participation_enabled", False)):
+        return
 
-    manifest = record.pipelines[record.loaded_agent_indices[0]].manifest
-    has_site_mapping = True
-    optimization_enabled = False
-    for agent_index in record.loaded_agent_indices:
-        cfg = manifest.get_artifact(agent_index).config or {}
-        site_key = str(cfg.get("input_site_key") or "").strip()
-        if not site_key:
-            has_site_mapping = False
-            break
-        if bool(cfg.get("community_optimization_enabled", False)):
-            optimization_enabled = True
+    in_key = str(artifact_cfg.get("community_energy_in_key", "community.energy_in_total")).strip()
+    out_key = str(artifact_cfg.get("community_energy_out_key", "community.energy_out_total")).strip()
+    if not in_key:
+        in_key = "community.energy_in_total"
+    if not out_key:
+        out_key = "community.energy_out_total"
 
-    return has_site_mapping and optimization_enabled
+    missing: list[str] = []
+    for key in (in_key, out_key):
+        value = flattened.get(key)
+        if value is None:
+            missing.append(key)
+            continue
+        if isinstance(value, str) and not value.strip():
+            missing.append(key)
+
+    if missing:
+        quoted = ", ".join(repr(key) for key in missing)
+        raise KeyError(f"Missing required community field(s): {quoted}")
 
 
 def _log_single_agent_actions(pipeline, flattened: Dict[str, Any], actions: Dict[str, Dict[str, float]]) -> None:
@@ -139,19 +118,16 @@ async def run_inference(payload: InferenceRequest, request: Request, _ = Depends
     if request is not None:
         request_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
     try:
-        record = store.get_record()
-        if _is_community_mode(payload.features, record):
-            actions = community_optimizer.allocate(payload.features, record)
-        else:
-            pipeline = store.get_pipeline(payload.agent_index)
-            selected_features = _select_agent_features(payload.features, pipeline)
-            runtime_features = _normalize_agent_input(selected_features, pipeline)
-            flattened = flatten_payload(runtime_features)
-            actions = pipeline.inference(flattened)
-            try:
-                _log_single_agent_actions(pipeline, flattened, actions)
-            except Exception:
-                log.exception("inference.action_logging_failed")
+        pipeline = store.get_pipeline(payload.agent_index)
+        selected_features = _select_agent_features(payload.features, pipeline)
+        runtime_features = _normalize_agent_input(selected_features, pipeline)
+        flattened = flatten_payload(runtime_features)
+        _validate_required_community_fields(flattened, pipeline)
+        actions = pipeline.inference(flattened)
+        try:
+            _log_single_agent_actions(pipeline, flattened, actions)
+        except Exception:
+            log.exception("inference.action_logging_failed")
     except KeyError as exc:
         log.warning("Inference payload missing data", missing=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc

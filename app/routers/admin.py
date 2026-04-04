@@ -5,8 +5,29 @@ from pathlib import Path
 from fastapi import APIRouter, Body, HTTPException
 from app.state import store
 from app.logging import get_logger
+from app.settings import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"], responses={401: {"description": "Unauthorized"}})
+
+
+def _validate_path_within_allowed_root(path: Path, *, field_name: str) -> None:
+    root = settings.allowed_bundle_root
+    if root is None:
+        return
+
+    resolved_root = root.expanduser().resolve()
+    resolved_path = path.expanduser().resolve()
+
+    try:
+        resolved_path.relative_to(resolved_root)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{field_name} path '{resolved_path}' is outside ALLOWED_BUNDLE_ROOT "
+                f"'{resolved_root}'"
+            ),
+        ) from exc
 
 
 @router.post("/load")
@@ -17,6 +38,10 @@ async def admin_load(
     alias_mapping_path: Path | None = Body(default=None, embed=True),
 ):
     """Load a model pipeline from disk, replacing any currently active pipeline."""
+    _validate_path_within_allowed_root(manifest_path, field_name="manifest_path")
+    if artifacts_dir is not None:
+        _validate_path_within_allowed_root(artifacts_dir, field_name="artifacts_dir")
+
     try:
         record = store.load(manifest_path, artifacts_dir, agent_index, alias_mapping_path)
     except FileNotFoundError as exc:

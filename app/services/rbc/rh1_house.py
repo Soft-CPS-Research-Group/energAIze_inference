@@ -16,6 +16,7 @@ DEFAULT_EV_FLEX_FIELDS = {
     "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
     "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure",
 }
+MIN_CONTROL_INTERVAL_MINUTES = 1.0 / 60.0
 
 
 def _extract_battery_id_from_soc_key(key: str) -> str | None:
@@ -114,6 +115,13 @@ class Rh1HouseConfig:
     price_auto_mwh_threshold: float = 3.0
     soc_unit_mode: str = "auto"
     battery_soc_keys: List[str] = field(default_factory=lambda: ["electrical_storage.soc"])
+    community_participation_enabled: bool = False
+    community_energy_in_key: str = "community.energy_in_total"
+    community_energy_out_key: str = "community.energy_out_total"
+    community_energy_deadband_kw: float = 0.2
+    community_deficit_weight: float = 1.0
+    community_surplus_weight: float = 1.0
+    community_price_signal_key: str = "community.price_signal"
     ev_action_name: str = ""
     battery_action_name: str = ""
 
@@ -161,6 +169,15 @@ class Rh1HouseConfig:
 
         ev_action_name = str(data.pop("ev_action_name", "")).strip()
         battery_action_name = str(data.pop("battery_action_name", "")).strip()
+        community_energy_in_key = str(
+            data.pop("community_energy_in_key", "community.energy_in_total")
+        ).strip() or "community.energy_in_total"
+        community_energy_out_key = str(
+            data.pop("community_energy_out_key", "community.energy_out_total")
+        ).strip() or "community.energy_out_total"
+        community_price_signal_key = str(
+            data.pop("community_price_signal_key", "community.price_signal")
+        ).strip() or "community.price_signal"
 
         return cls(
             grid_import_limit_kw=grid_import_limit_kw,
@@ -197,6 +214,24 @@ class Rh1HouseConfig:
             ),
             soc_unit_mode=soc_unit_mode,
             battery_soc_keys=battery_soc_keys,
+            community_participation_enabled=bool(
+                data.pop("community_participation_enabled", False)
+            ),
+            community_energy_in_key=community_energy_in_key,
+            community_energy_out_key=community_energy_out_key,
+            community_energy_deadband_kw=max(
+                _safe_float(data.pop("community_energy_deadband_kw", 0.2), 0.2),
+                0.0,
+            ),
+            community_deficit_weight=max(
+                _safe_float(data.pop("community_deficit_weight", 1.0), 1.0),
+                0.0,
+            ),
+            community_surplus_weight=max(
+                _safe_float(data.pop("community_surplus_weight", 1.0), 1.0),
+                0.0,
+            ),
+            community_price_signal_key=community_price_signal_key,
             ev_action_name=ev_action_name,
             battery_action_name=battery_action_name,
         )
@@ -243,8 +278,11 @@ class Rh1HouseRuntime:
     def __init__(self, config: Rh1HouseConfig):
         self.config = config
 
-    def _meter_component_kw(self, payload: Dict[str, Any], component: str) -> float | None:
-        """Read RH01 grid meter import/export with support for total, legacy and phase schemas."""
+    def _decision_interval_hours(self) -> float:
+        return max(self.config.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
+
+    def _meter_component_kwh(self, payload: Dict[str, Any], component: str) -> float | None:
+        """Read RH01 grid meter import/export energy with support for total, legacy and phase schemas."""
         base = "grid_meters.GR01"
         if component == "energy_in":
             keys = [
@@ -283,13 +321,37 @@ class Rh1HouseRuntime:
 
         return None
 
+    def _meter_component_kw(self, payload: Dict[str, Any], component: str) -> float | None:
+        energy_kwh = self._meter_component_kwh(payload, component)
+        if energy_kwh is None:
+            return None
+        return energy_kwh / max(self._decision_interval_hours(), 1e-9)
+
+    def _community_component_kw(self, payload: Dict[str, Any], key: str) -> float | None:
+        if not key:
+            return None
+        energy_kwh = _maybe_float(payload.get(key))
+        if energy_kwh is None:
+            return None
+        return max(energy_kwh, 0.0) / max(self._decision_interval_hours(), 1e-9)
+
+    def _community_net_kw(self, payload: Dict[str, Any]) -> float | None:
+        cfg = self.config
+        if not cfg.community_participation_enabled:
+            return None
+        import_kw = self._community_component_kw(payload, cfg.community_energy_in_key)
+        export_kw = self._community_component_kw(payload, cfg.community_energy_out_key)
+        if import_kw is None or export_kw is None:
+            return None
+        return import_kw - export_kw
+
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
         log = get_logger()
         warnings: List[str] = []
         local_constraint_flags: Dict[str, bool] = {}
 
-        dt_hours = max(cfg.control_interval_minutes / 60.0, 1.0 / 60.0)
+        dt_hours = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
         now = _now_from_payload(payload)
 
         prices = self._extract_price_points(payload, warnings)
@@ -298,6 +360,9 @@ class Rh1HouseRuntime:
 
         non_shiftable_load = _safe_float(payload.get("non_shiftable_load"), 0.0)
         solar_generation = self._extract_solar_generation(payload, warnings)
+        community_import_kw = self._community_component_kw(payload, cfg.community_energy_in_key)
+        community_export_kw = self._community_component_kw(payload, cfg.community_energy_out_key)
+        community_net_kw = self._community_net_kw(payload)
 
         grid_import_limit_kw = _safe_float(
             payload.get("grid.import_limit_kw"),
@@ -329,6 +394,7 @@ class Rh1HouseRuntime:
             grid_import_limit_kw=grid_import_limit_kw,
             grid_export_limit_kw=grid_export_limit_kw,
             dt_hours=dt_hours,
+            community_net_kw=community_net_kw,
         )
 
         ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
@@ -425,11 +491,29 @@ class Rh1HouseRuntime:
         if net_grid_kw < -grid_export_limit_kw - 1e-6:
             local_constraint_flags["grid_export_limit_unmet"] = True
 
+        meter_import_kwh = self._meter_component_kwh(payload, "energy_in")
+        meter_export_kwh = self._meter_component_kwh(payload, "energy_out")
         meter_import_kw = self._meter_component_kw(payload, "energy_in")
         meter_export_kw = self._meter_component_kw(payload, "energy_out")
+        meter_net_kwh = None
+        if meter_import_kwh is not None or meter_export_kwh is not None:
+            meter_net_kwh = max(meter_import_kwh or 0.0, 0.0) - max(meter_export_kwh or 0.0, 0.0)
         meter_net_kw = None
         if meter_import_kw is not None or meter_export_kw is not None:
             meter_net_kw = max(meter_import_kw or 0.0, 0.0) - max(meter_export_kw or 0.0, 0.0)
+        community_import_kwh = (
+            _maybe_float(payload.get(cfg.community_energy_in_key))
+            if cfg.community_participation_enabled
+            else None
+        )
+        community_export_kwh = (
+            _maybe_float(payload.get(cfg.community_energy_out_key))
+            if cfg.community_participation_enabled
+            else None
+        )
+        community_net_kwh = None
+        if community_import_kwh is not None and community_export_kwh is not None:
+            community_net_kwh = max(community_import_kwh, 0.0) - max(community_export_kwh, 0.0)
 
         ev_action_name = cfg.resolve_ev_action_name()
         battery_action_name = cfg.resolve_battery_action_name()
@@ -454,7 +538,14 @@ class Rh1HouseRuntime:
             grid_export_limit_kw=grid_export_limit_kw,
             price_now_eur_kwh=price_now,
             avg_future_price_eur_kwh=future_avg_price,
+            meter_import_kwh=meter_import_kwh,
+            meter_export_kwh=meter_export_kwh,
+            meter_net_kwh=meter_net_kwh,
             meter_net_kw=meter_net_kw,
+            community_import_kwh=community_import_kwh,
+            community_export_kwh=community_export_kwh,
+            community_net_kwh=community_net_kwh,
+            community_net_kw=community_net_kw,
         )
 
         def fmt_kw(value: float) -> str:
@@ -465,6 +556,11 @@ class Rh1HouseRuntime:
                 return "-"
             return fmt_kw(value)
 
+        def fmt_meter(energy_kwh: float | None, power_kw: float | None) -> str:
+            if energy_kwh is None or power_kw is None:
+                return "-"
+            return f"{energy_kwh:.4f} kWh ({power_kw:.2f} kW)"
+
         def fmt_price(value: float) -> str:
             return f"{value:.4f}"
 
@@ -473,9 +569,9 @@ class Rh1HouseRuntime:
             (
                 f"Inputs: non_shiftable={fmt_kw(non_shiftable_load)} kW"
                 f" solar={fmt_kw(solar_generation)} kW"
-                f" meter_in={fmt_optional_kw(meter_import_kw)} kW"
-                f" meter_out={fmt_optional_kw(meter_export_kw)} kW"
-                f" meter_net={fmt_optional_kw(meter_net_kw)} kW"
+                f" meter_in={fmt_meter(meter_import_kwh, meter_import_kw)}"
+                f" meter_out={fmt_meter(meter_export_kwh, meter_export_kw)}"
+                f" meter_net={fmt_meter(meter_net_kwh, meter_net_kw)}"
             ),
             (
                 f"Prices (EUR/kWh): now={fmt_price(price_now)}"
@@ -503,8 +599,17 @@ class Rh1HouseRuntime:
                 f" export_limit={fmt_kw(grid_export_limit_kw)} kW"
                 f" net={fmt_kw(net_grid_kw)} kW"
             ),
-            "Objective: minimize_import_cost_with_free_local_pv_self_consumption",
+            "Objective: minimize_import_cost_with_free_local_pv_self_consumption + community_balance_bias",
         ]
+        if community_import_kw is not None and community_export_kw is not None:
+            summary_lines.append(
+                (
+                    f"Community: in={fmt_meter(community_import_kwh, community_import_kw)}"
+                    f" out={fmt_meter(community_export_kwh, community_export_kw)}"
+                    f" net={fmt_meter(community_net_kwh, community_net_kw)}"
+                    f" deadband={fmt_kw(cfg.community_energy_deadband_kw)} kW"
+                )
+            )
         if warnings:
             summary_lines.append(f"Fallbacks: {', '.join(warnings)}")
         if local_constraint_flags:
@@ -767,7 +872,7 @@ class Rh1HouseRuntime:
 
     def _ev_action_bounds(self, payload: Dict[str, Any], now: datetime, dt_hours: float) -> EvAggregate:
         cfg = self.config
-        control_minutes = max(cfg.control_interval_minutes, 1.0)
+        control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         hard_min_total = 0.0
         max_total = 0.0
         connected_any = False
@@ -916,6 +1021,7 @@ class Rh1HouseRuntime:
         grid_import_limit_kw: float,
         grid_export_limit_kw: float,
         dt_hours: float,
+        community_net_kw: float | None,
     ) -> float:
         cfg = self.config
         net_grid_kw = base_without_battery + battery_kw
@@ -941,6 +1047,25 @@ class Rh1HouseRuntime:
         import_violation = max(net_grid_kw - grid_import_limit_kw, 0.0)
         export_violation = max(-grid_export_limit_kw - net_grid_kw, 0.0)
         hard_violation_penalty = (import_violation + export_violation) * 1000.0 * dt_hours
+        community_penalty = 0.0
+        deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
+        if cfg.community_participation_enabled and community_net_kw is not None:
+            if community_net_kw > deadband_kw + 1e-9:
+                community_deficit_kw = community_net_kw - deadband_kw
+                community_penalty = (
+                    max(net_grid_kw, 0.0)
+                    * community_deficit_kw
+                    * max(cfg.community_deficit_weight, 0.0)
+                    * dt_hours
+                )
+            elif community_net_kw < -(deadband_kw + 1e-9):
+                community_surplus_kw = (-community_net_kw) - deadband_kw
+                community_penalty = (
+                    max(-net_grid_kw, 0.0)
+                    * community_surplus_kw
+                    * max(cfg.community_surplus_weight, 0.0)
+                    * dt_hours
+                )
 
         return (
             grid_cost
@@ -949,6 +1074,7 @@ class Rh1HouseRuntime:
             + ev_shift_value
             + exported_from_battery_penalty
             + hard_violation_penalty
+            + community_penalty
         )
 
     def _optimize_joint_dispatch(
@@ -964,6 +1090,7 @@ class Rh1HouseRuntime:
         grid_import_limit_kw: float,
         grid_export_limit_kw: float,
         dt_hours: float,
+        community_net_kw: float | None,
     ) -> tuple[float, float, float]:
         ev_min_kw = _clamp(ev.hard_min_kw, 0.0, ev.max_kw)
         if not ev.connected:
@@ -995,6 +1122,7 @@ class Rh1HouseRuntime:
                     grid_import_limit_kw=grid_import_limit_kw,
                     grid_export_limit_kw=grid_export_limit_kw,
                     dt_hours=dt_hours,
+                    community_net_kw=community_net_kw,
                 )
                 net_grid_kw = base_without_battery + battery_kw
                 candidate = (objective, ev_kw, battery_kw, base_without_battery, net_grid_kw)

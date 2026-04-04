@@ -1,0 +1,416 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "icharging_boavista_with_flex_community",
+    "run_name": "icharging_boavista_with_flex_community_v1",
+    "alias_mapping_path": "aliases.json",
+    "bundle_version": "2026-04-03-v1"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "RuleBasedBreaker",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "timestamp",
+        "non_shiftable_load",
+        "solar_generation",
+        "energy_price",
+        "charging_sessions.AC000001_1.power",
+        "charging_sessions.AC000002_1.power",
+        "charging_sessions.AC000003_1.power",
+        "charging_sessions.AC000004_1.power",
+        "charging_sessions.AC000005_1.power",
+        "charging_sessions.AC000006_1.power",
+        "charging_sessions.AC000007_1.power",
+        "charging_sessions.AC000008_1.power",
+        "charging_sessions.AC000009_1.power",
+        "charging_sessions.AC000010_1.power",
+        "charging_sessions.AC000011_1.power",
+        "charging_sessions.AC000012_1.power",
+        "charging_sessions.AC000013_1.power",
+        "charging_sessions.AC000014_1.power",
+        "charging_sessions.ACEXT001_1.power",
+        "charging_sessions.ACEXT002_1.power",
+        "charging_sessions.ACEXT003_1.power",
+        "charging_sessions.ACEXT004_1.power",
+        "charging_sessions.BB000018_1.power"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "high": [
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            4.6,
+            10.0,
+            3.0,
+            9.0
+          ]
+        }
+      ]
+    ],
+    "action_names": [
+      "AC000001_1",
+      "AC000002_1",
+      "AC000003_1",
+      "AC000004_1",
+      "AC000005_1",
+      "AC000006_1",
+      "AC000007_1",
+      "AC000008_1",
+      "AC000009_1",
+      "AC000010_1",
+      "AC000011_1",
+      "AC000012_1",
+      "AC000013_1",
+      "AC000014_1",
+      "ACEXT001_1",
+      "ACEXT002_1",
+      "ACEXT003_1",
+      "ACEXT004_1",
+      "BB000018_1",
+      "b_1",
+      "b_2"
+    ],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "icharging_breaker",
+          "max_board_kw": 55,
+          "charger_limit_kw": 4.6,
+          "control_interval_minutes": 0.0833,
+          "default_capacity_kwh": 75,
+          "default_departure_buffer_minutes": 60,
+          "flexible_urgency_threshold": 0.7,
+          "allow_departure_fallback": false,
+          "min_connected_kw": 1.6,
+          "per_phase_headroom_kw": 0.0,
+          "inactive_power_threshold_kw": 1.4,
+          "solar_generation_key": "solar_generation",
+          "vehicle_capacities": {
+            "2": 50,
+            "11823": 77
+          },
+          "chargers": {
+            "AC000001_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000003_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000004_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000005_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000006_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000007_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000008_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000009_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000010_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000011_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000012_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000013_1": {
+              "line": "L3",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "AC000014_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT001_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT002_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT003_1": {
+              "line": "L1",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "ACEXT004_1": {
+              "line": "L2",
+              "min_kw": 0.0,
+              "max_kw": 4.6,
+              "allow_flex_when_ev": true
+            },
+            "BB000018_1": {
+              "phases": [
+                "L1",
+                "L2",
+                "L3"
+              ],
+              "min_kw": 8.0,
+              "max_kw": 10.0,
+              "allow_flex_when_ev": true
+            }
+          },
+          "line_limits": {
+            "L1": {
+              "limit_kw": 18.333
+            },
+            "L2": {
+              "limit_kw": 18.333
+            },
+            "L3": {
+              "limit_kw": 18.333
+            }
+          },
+          "action_order": [
+            "AC000001_1",
+            "AC000002_1",
+            "AC000003_1",
+            "AC000004_1",
+            "AC000005_1",
+            "AC000006_1",
+            "AC000007_1",
+            "AC000008_1",
+            "AC000009_1",
+            "AC000010_1",
+            "AC000011_1",
+            "AC000012_1",
+            "AC000013_1",
+            "AC000014_1",
+            "ACEXT001_1",
+            "ACEXT002_1",
+            "ACEXT003_1",
+            "ACEXT004_1",
+            "BB000018_1",
+            "b_1",
+            "b_2"
+          ],
+          "flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          },
+          "non_flex_active_power_kw": 0.05,
+          "drop_inactive_non_flex": true,
+          "require_observations_envelope": true,
+          "community_participation_enabled": true,
+          "community_energy_in_key": "community.energy_in_total",
+          "community_energy_out_key": "community.energy_out_total",
+          "community_energy_deadband_kw": 0.2,
+          "community_deficit_weight": 1.0,
+          "community_surplus_weight": 1.0,
+          "community_price_signal_key": "community.price_signal"
+        }
+      }
+    ]
+  }
+}

@@ -22,6 +22,11 @@ ACTION_PLUG_2 = "BB000SMI_2"
 ACTION_PLUGS = {ACTION_PLUG_1, ACTION_PLUG_2}
 ACTION_BATTERY = "B01"
 MIN_TECHNICAL_KW = 8.0
+DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+
+
+def _kwh_for_interval(power_kw: float) -> float:
+    return power_kw * DECISION_INTERVAL_HOURS
 
 
 @pytest.fixture
@@ -228,7 +233,7 @@ def test_grid_meter_headroom_constrains_bb_dispatch(sao_mamede_with_battery_clie
     low_meter["observations"]["solar_generation"] = 0.0
 
     high_meter = copy.deepcopy(low_meter)
-    high_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 390.0
+    high_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = _kwh_for_interval(390.0)
     high_meter["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
 
     actions_low = _run(sao_mamede_with_battery_client, low_meter)
@@ -247,9 +252,24 @@ def test_virtual_battery_uses_pt_meter_net_import_for_local_dispatch(
     payload["observations"]["batteries"]["B01"]["SoC"] = 0.70
     payload["observations"]["solar_generation"] = 0.0
     payload["observations"]["non_shiftable_load"] = 0.0
-    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 120.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = _kwh_for_interval(120.0)
     payload["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
     payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
 
     actions = _run(sao_mamede_with_battery_client, payload)
     assert actions[ACTION_BATTERY] < -1e-6
+
+
+def test_virtual_battery_converts_small_meter_energy_to_power_dispatch(
+    sao_mamede_with_battery_client,
+):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.70
+    payload["observations"]["solar_generation"] = 0.0
+    payload["observations"]["non_shiftable_load"] = 0.0
+    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 0.0045
+    payload["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
+
+    actions = _run(sao_mamede_with_battery_client, payload)
+    assert actions[ACTION_BATTERY] <= -3.2 + 1e-6

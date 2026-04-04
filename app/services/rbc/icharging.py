@@ -112,6 +112,13 @@ def _round_down_one_decimal(value: float) -> float:
     return math.floor(value * 10.0) / 10.0
 
 
+def _round_one_decimal_towards_zero(value: float) -> float:
+    scaled = value * 10.0
+    if scaled >= 0.0:
+        return math.floor(scaled) / 10.0
+    return math.ceil(scaled) / 10.0
+
+
 def _line_chargers(cfg: "IchargingRuntimeConfig | BreakerOnlyConfig", line_name: str) -> List[str]:
     info = cfg.line_limits.get(line_name, {})
     preconfigured = info.get("chargers")
@@ -218,6 +225,13 @@ class IchargingRuntimeConfig:
     site_available_headroom_includes_pv: bool = True
     site_meter_import_key: Optional[str] = None
     site_meter_export_key: Optional[str] = None
+    community_participation_enabled: bool = False
+    community_energy_in_key: str = "community.energy_in_total"
+    community_energy_out_key: str = "community.energy_out_total"
+    community_energy_deadband_kw: float = 0.2
+    community_deficit_weight: float = 1.0
+    community_surplus_weight: float = 1.0
+    community_price_signal_key: str = "community.price_signal"
     virtual_battery_action_name: Optional[str] = None
     virtual_battery_nominal_power_kw: float = 15.0
     virtual_battery_capacity_kwh: float = 20.0
@@ -263,6 +277,9 @@ class IchargingRuntimeConfig:
         site_available_headroom_key = data.pop("site_available_headroom_key", None)
         site_meter_import_key = data.pop("site_meter_import_key", None)
         site_meter_export_key = data.pop("site_meter_export_key", None)
+        community_energy_in_key = data.pop("community_energy_in_key", "community.energy_in_total")
+        community_energy_out_key = data.pop("community_energy_out_key", "community.energy_out_total")
+        community_price_signal_key = data.pop("community_price_signal_key", "community.price_signal")
         virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
         virtual_battery_soc_unit_mode = (
             str(data.pop("virtual_battery_soc_unit_mode", "auto")).strip().lower() or "auto"
@@ -349,6 +366,30 @@ class IchargingRuntimeConfig:
             site_meter_export_key=str(site_meter_export_key).strip()
             if site_meter_export_key is not None and str(site_meter_export_key).strip()
             else None,
+            community_participation_enabled=bool(
+                data.pop("community_participation_enabled", False)
+            ),
+            community_energy_in_key=str(community_energy_in_key).strip()
+            if str(community_energy_in_key).strip()
+            else "community.energy_in_total",
+            community_energy_out_key=str(community_energy_out_key).strip()
+            if str(community_energy_out_key).strip()
+            else "community.energy_out_total",
+            community_energy_deadband_kw=max(
+                _safe_float(data.pop("community_energy_deadband_kw", 0.2), 0.2),
+                0.0,
+            ),
+            community_deficit_weight=max(
+                _safe_float(data.pop("community_deficit_weight", 1.0), 1.0),
+                0.0,
+            ),
+            community_surplus_weight=max(
+                _safe_float(data.pop("community_surplus_weight", 1.0), 1.0),
+                0.0,
+            ),
+            community_price_signal_key=str(community_price_signal_key).strip()
+            if str(community_price_signal_key).strip()
+            else "community.price_signal",
             virtual_battery_action_name=str(virtual_battery_action_name).strip()
             if virtual_battery_action_name is not None and str(virtual_battery_action_name).strip()
             else None,
@@ -399,7 +440,7 @@ class IchargingRuntimeConfig:
                 data.pop("virtual_battery_community_current_import_key", "community.current_net_import_kw")
             ),
             virtual_battery_community_price_prefix=str(
-                data.pop("virtual_battery_community_price_prefix", "community.price_signal")
+                data.pop("virtual_battery_community_price_prefix", community_price_signal_key)
             ),
             virtual_battery_local_price_prefix=str(
                 data.pop("virtual_battery_local_price_prefix", "energy_price")
@@ -465,13 +506,16 @@ class IchargingBreakerRuntime:
     def __init__(self, config: IchargingRuntimeConfig):
         self.config = config
 
-    def _site_meter_component_kw(
+    def _decision_interval_hours(self) -> float:
+        return max(self.config.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
+
+    def _site_meter_component_kwh(
         self,
         payload: Dict[str, Any],
         meter_key: Optional[str],
         component: str,
     ) -> Optional[float]:
-        """Read site meter import/export with support for legacy and per-phase schemas."""
+        """Read site meter import/export energy with support for legacy and per-phase schemas."""
         if not meter_key:
             return None
 
@@ -532,6 +576,38 @@ class IchargingBreakerRuntime:
             return sum(phase_values)
 
         return 0.0
+
+    def _site_meter_component_kw(
+        self,
+        payload: Dict[str, Any],
+        meter_key: Optional[str],
+        component: str,
+    ) -> Optional[float]:
+        energy_kwh = self._site_meter_component_kwh(payload, meter_key, component)
+        if energy_kwh is None:
+            return None
+        interval_hours = self._decision_interval_hours()
+        return energy_kwh / max(interval_hours, 1e-9)
+
+    def _community_component_kw(self, payload: Dict[str, Any], key: str) -> Optional[float]:
+        if not key:
+            return None
+        energy_kwh = _maybe_float(payload.get(key))
+        if energy_kwh is None:
+            return None
+        interval_hours = self._decision_interval_hours()
+        return max(energy_kwh, 0.0) / max(interval_hours, 1e-9)
+
+    def _community_net_kw(self, payload: Dict[str, Any]) -> Optional[float]:
+        cfg = self.config
+        if not cfg.community_participation_enabled:
+            return None
+
+        import_kw = self._community_component_kw(payload, cfg.community_energy_in_key)
+        export_kw = self._community_component_kw(payload, cfg.community_energy_out_key)
+        if import_kw is None or export_kw is None:
+            return None
+        return import_kw - export_kw
 
     def _effective_session_state(self, payload: Dict[str, Any], charger_id: str) -> tuple[str, float, str]:
         cfg = self.config
@@ -655,6 +731,10 @@ class IchargingBreakerRuntime:
         min_minutes = control_minutes
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
         unmanaged_load_kw = self._unmanaged_session_load_kw(payload)
+        community_import_kw = self._community_component_kw(payload, cfg.community_energy_in_key)
+        community_export_kw = self._community_component_kw(payload, cfg.community_energy_out_key)
+        community_net_kw = self._community_net_kw(payload)
+        community_board_adjust_kw = 0.0
         if cfg.site_available_headroom_key:
             headroom_raw = _maybe_float(payload.get(cfg.site_available_headroom_key))
             if headroom_raw is None or headroom_raw < 0.0:
@@ -684,6 +764,24 @@ class IchargingBreakerRuntime:
                 effective_board_limit -= net_import
             elif unmanaged_load_kw > 1e-6:
                 effective_board_limit -= unmanaged_load_kw
+        if community_net_kw is not None:
+            deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
+            if community_net_kw > deadband_kw:
+                deficit_kw = community_net_kw - deadband_kw
+                relief_kw = min(
+                    deficit_kw * max(cfg.community_deficit_weight, 0.0),
+                    max(cfg.max_board_kw, 0.0),
+                )
+                effective_board_limit -= relief_kw
+                community_board_adjust_kw = -relief_kw
+            elif community_net_kw < -deadband_kw:
+                surplus_kw = (-community_net_kw) - deadband_kw
+                lift_kw = min(
+                    surplus_kw * max(cfg.community_surplus_weight, 0.0),
+                    max(cfg.max_board_kw, 0.0),
+                )
+                effective_board_limit += lift_kw
+                community_board_adjust_kw = lift_kw
         effective_board_limit = max(effective_board_limit, 0.0)
         per_phase_limit = (
             effective_board_limit / max(len(cfg.line_limits), 1)
@@ -835,6 +933,7 @@ class IchargingBreakerRuntime:
                 quantized,
                 states,
                 effective_board_limit,
+                community_net_kw,
             )
 
         # Runtime summary for debugging
@@ -866,6 +965,17 @@ class IchargingBreakerRuntime:
                 }
                 for cid in flexible_chargers
             }
+            site_import_kwh = self._site_meter_component_kwh(
+                payload, cfg.site_meter_import_key, "energy_in"
+            )
+            site_export_kwh = self._site_meter_component_kwh(
+                payload, cfg.site_meter_export_key, "energy_out"
+            )
+            site_net_kwh = (
+                max(site_import_kwh - (site_export_kwh or 0.0), 0.0)
+                if site_import_kwh is not None
+                else None
+            )
             site_import_kw = self._site_meter_component_kw(
                 payload, cfg.site_meter_import_key, "energy_in"
             )
@@ -875,6 +985,21 @@ class IchargingBreakerRuntime:
             site_net_kw = (
                 max(site_import_kw - (site_export_kw or 0.0), 0.0)
                 if site_import_kw is not None
+                else None
+            )
+            community_import_kwh = (
+                _maybe_float(payload.get(cfg.community_energy_in_key))
+                if cfg.community_participation_enabled
+                else None
+            )
+            community_export_kwh = (
+                _maybe_float(payload.get(cfg.community_energy_out_key))
+                if cfg.community_participation_enabled
+                else None
+            )
+            community_net_kwh = (
+                max(community_import_kwh or 0.0, 0.0) - max(community_export_kwh or 0.0, 0.0)
+                if community_import_kwh is not None and community_export_kwh is not None
                 else None
             )
             virtual_battery_kw = (
@@ -909,10 +1034,18 @@ class IchargingBreakerRuntime:
                 board_total=connected_board_total,
                 command_total=commanded_board_total,
                 effective_board_limit_kw=effective_board_limit,
+                community_board_adjust_kw=community_board_adjust_kw,
                 per_phase_limit_kw=per_phase_limit,
                 solar_kw=solar_kw,
                 unmanaged_load_kw=unmanaged_load_kw,
+                site_meter_import_kwh=site_import_kwh,
+                site_meter_export_kwh=site_export_kwh,
+                site_meter_net_kwh=site_net_kwh,
                 site_meter_net_kw=site_net_kw,
+                community_meter_import_kwh=community_import_kwh,
+                community_meter_export_kwh=community_export_kwh,
+                community_meter_net_kwh=community_net_kwh,
+                community_meter_net_kw=community_net_kw,
                 virtual_battery_kw=virtual_battery_kw,
                 virtual_battery_soc_raw=virtual_battery_soc_raw,
                 virtual_battery_soc_norm=virtual_battery_soc,
@@ -924,6 +1057,11 @@ class IchargingBreakerRuntime:
 
             def fmt_optional_kw(value: Optional[float]) -> str:
                 return "-" if value is None else fmt_kw(value)
+
+            def fmt_meter(energy_kwh: Optional[float], power_kw: Optional[float]) -> str:
+                if energy_kwh is None or power_kw is None:
+                    return "-"
+                return f"{energy_kwh:.4f} kWh ({power_kw:.2f} kW)"
 
             def fmt_optional_pct(value: Optional[float]) -> str:
                 if value is None:
@@ -957,9 +1095,15 @@ class IchargingBreakerRuntime:
             )
             if site_import_kw is not None:
                 input_line += (
-                    f" meter_in={fmt_kw(site_import_kw)} kW"
-                    f" meter_out={fmt_optional_kw(site_export_kw)} kW"
-                    f" meter_net={fmt_optional_kw(site_net_kw)} kW"
+                    f" meter_in={fmt_meter(site_import_kwh, site_import_kw)}"
+                    f" meter_out={fmt_meter(site_export_kwh, site_export_kw)}"
+                    f" meter_net={fmt_meter(site_net_kwh, site_net_kw)}"
+                )
+            if community_import_kw is not None and community_export_kw is not None:
+                input_line += (
+                    f" community_in={fmt_meter(community_import_kwh, community_import_kw)}"
+                    f" community_out={fmt_meter(community_export_kwh, community_export_kw)}"
+                    f" community_net={fmt_meter(community_net_kwh, community_net_kw)}"
                 )
 
             summary_lines = [
@@ -967,6 +1111,7 @@ class IchargingBreakerRuntime:
                 input_line,
                 (
                     f"Limits: board_effective={fmt_kw(effective_board_limit)} kW"
+                    f" community_bias={fmt_kw(community_board_adjust_kw)} kW"
                     f" per_line_effective={fmt_kw(per_phase_limit)} kW"
                 ),
                 (
@@ -1130,6 +1275,7 @@ class IchargingBreakerRuntime:
         charger_actions: Dict[str, float],
         states: Dict[str, ChargerState],
         effective_board_limit: float,
+        community_net_kw: Optional[float],
     ) -> float:
         charge_cap_kw = max(cfg.virtual_battery_charge_power_max_kw, 0.0)
         discharge_cap_kw = max(cfg.virtual_battery_discharge_power_max_kw, 0.0)
@@ -1210,32 +1356,70 @@ class IchargingBreakerRuntime:
             if setpoint_kw is not None:
                 setpoint_dispatch_kw = setpoint_kw
 
-        # Solar-first local policy:
-        # 1) absorb local PV surplus in battery;
-        # 2) when importing from grid, allow discharge when price indicates it is unfavorable.
+        # Hybrid local policy:
+        # 1) enforce local physical relief first (absorb PV surplus / relieve site import);
+        # 2) enforce mandatory community support for deficit/surplus conditions;
+        # 3) apply economic target within the feasible mandatory interval.
         surplus_kw = max((-net for net in candidate_nets_kw if net < -1e-6), default=0.0)
         import_kw = max((net for net in candidate_nets_kw if net > 1e-6), default=0.0)
         if surplus_kw > 1e-6:
-            solar_first_dispatch_kw = min(charge_limit_kw, surplus_kw)
-        elif import_kw > 1e-6 and price_dispatch_kw < -1e-6:
-            solar_first_dispatch_kw = -min(discharge_limit_kw, import_kw)
+            local_mandatory_dispatch_kw = min(charge_limit_kw, surplus_kw)
+        elif import_kw > 1e-6:
+            local_mandatory_dispatch_kw = -min(discharge_limit_kw, import_kw)
         else:
-            solar_first_dispatch_kw = 0.0
+            local_mandatory_dispatch_kw = 0.0
 
-        dispatch_kw = (
+        community_mandatory_dispatch_kw = 0.0
+        if cfg.community_participation_enabled and community_net_kw is not None:
+            deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
+            if community_net_kw > deadband_kw:
+                deficit_kw = community_net_kw - deadband_kw
+                community_mandatory_dispatch_kw = -min(
+                    discharge_limit_kw,
+                    deficit_kw * max(cfg.community_deficit_weight, 0.0),
+                )
+            elif community_net_kw < -deadband_kw:
+                surplus_kw = (-community_net_kw) - deadband_kw
+                community_mandatory_dispatch_kw = min(
+                    charge_limit_kw,
+                    surplus_kw * max(cfg.community_surplus_weight, 0.0),
+                )
+
+        economic_dispatch_kw = (
             setpoint_dispatch_kw
             if setpoint_dispatch_kw is not None
-            else (target_dispatch_kw if target_dispatch_kw is not None else solar_first_dispatch_kw)
+            else (target_dispatch_kw if target_dispatch_kw is not None else price_dispatch_kw)
         )
-        if target_dispatch_kw is not None and abs(dispatch_kw) < 0.5:
-            dispatch_kw = solar_first_dispatch_kw
+        lower_bound_kw = -discharge_limit_kw
+        upper_bound_kw = charge_limit_kw
+
+        mandatory_dispatches = [
+            mandatory_kw
+            for mandatory_kw in (local_mandatory_dispatch_kw, community_mandatory_dispatch_kw)
+            if abs(mandatory_kw) > 1e-6
+        ]
+        for mandatory_kw in mandatory_dispatches:
+            if mandatory_kw > 0.0:
+                lower_bound_kw = max(lower_bound_kw, mandatory_kw)
+            else:
+                upper_bound_kw = min(upper_bound_kw, mandatory_kw)
+        if lower_bound_kw > upper_bound_kw and mandatory_dispatches:
+            dominant = max(mandatory_dispatches, key=lambda value: abs(value))
+            if dominant > 0.0:
+                lower_bound_kw = dominant
+                upper_bound_kw = charge_limit_kw
+            else:
+                lower_bound_kw = -discharge_limit_kw
+                upper_bound_kw = dominant
+
+        dispatch_kw = _clamp(economic_dispatch_kw, lower_bound_kw, upper_bound_kw)
 
         if dispatch_kw > 0.0:
             dispatch_kw = min(dispatch_kw, charge_limit_kw)
         elif dispatch_kw < 0.0:
             dispatch_kw = max(dispatch_kw, -discharge_limit_kw)
 
-        dispatch_kw = _round_down_one_decimal(dispatch_kw)
+        dispatch_kw = _round_one_decimal_towards_zero(dispatch_kw)
         if dispatch_kw > 0.0:
             dispatch_kw = min(dispatch_kw, charge_limit_kw)
         elif dispatch_kw < 0.0:

@@ -1,0 +1,185 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "experiment_name": "icharging_sao_mamede_with_virtual_battery_community",
+    "run_name": "icharging_sao_mamede_with_virtual_battery_community_v1",
+    "alias_mapping_path": "aliases.json",
+    "bundle_version": "2026-04-03-v1",
+    "description": "icharging_sao_mamede_with_virtual_battery_community bundle"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "RuleBasedBreaker",
+    "hyperparameters": {}
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "timestamp",
+        "solar_generation",
+        "charging_sessions.BB000SMI_1.power",
+        "charging_sessions.BB000SMI_2.power",
+        "charging_sessions.M1123089-5_1.power",
+        "charging_sessions.M1123089-5_2.power",
+        "charging_sessions.M1123089-6_1.power",
+        "charging_sessions.M1123089-6_2.power"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        },
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_bounds": [
+      [
+        {
+          "low": [
+            0.0,
+            0.0,
+            -50.0
+          ],
+          "high": [
+            50.0,
+            50.0,
+            50.0
+          ]
+        }
+      ]
+    ],
+    "action_names": [
+      "BB000SMI_1",
+      "BB000SMI_2",
+      "B01"
+    ],
+    "reward_function": {
+      "name": "RewardFunction",
+      "params": {}
+    }
+  },
+  "agent": {
+    "format": "rule_based",
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "path": "policy_agent_0.json",
+        "format": "rule_based",
+        "config": {
+          "use_preprocessor": false,
+          "strategy": "icharging_breaker",
+          "max_board_kw": 400.0,
+          "charger_limit_kw": 50.0,
+          "control_interval_minutes": 0.0833,
+          "default_capacity_kwh": 60.0,
+          "allow_departure_fallback": false,
+          "min_connected_kw": 0.0,
+          "per_phase_headroom_kw": 0.0,
+          "solar_generation_key": "solar_generation",
+          "site_meter_import_key": "grid_meters.GR01.energy_in_total",
+          "site_meter_export_key": "grid_meters.GR01.energy_out_total",
+          "chargers": {
+            "BB000SMI": {
+              "line": "PT",
+              "min_kw": 8.0,
+              "max_kw": 50.0,
+              "allow_flex_when_ev": true
+            }
+          },
+          "line_limits": {
+            "PT": {
+              "limit_kw": 400.0,
+              "chargers": [
+                "BB000SMI"
+              ]
+            }
+          },
+          "action_order": [
+            "BB000SMI"
+          ],
+          "session_merge_map": {
+            "BB000SMI": [
+              "BB000SMI_1",
+              "BB000SMI_2"
+            ]
+          },
+          "emit_session_source_actions": true,
+          "unmanaged_session_groups": {
+            "M1123089-5": [
+              "M1123089-5_1",
+              "M1123089-5_2"
+            ],
+            "M1123089-6": [
+              "M1123089-6_1",
+              "M1123089-6_2"
+            ]
+          },
+          "flexibility_fields": {
+            "soc": "electric_vehicles.{ev_id}.SoC",
+            "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
+            "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
+          },
+          "require_observations_envelope": true,
+          "community_participation_enabled": true,
+          "community_energy_in_key": "community.energy_in_total",
+          "community_energy_out_key": "community.energy_out_total",
+          "community_energy_deadband_kw": 0.2,
+          "community_deficit_weight": 1.0,
+          "community_surplus_weight": 1.0,
+          "community_price_signal_key": "community.price_signal",
+          "virtual_battery_action_name": "B01",
+          "virtual_battery_nominal_power_kw": 50.0,
+          "virtual_battery_capacity_kwh": 125.0,
+          "virtual_battery_capacity_min_kwh": 125.0,
+          "virtual_battery_capacity_max_kwh": 125.0,
+          "virtual_battery_charge_power_max_kw": 50.0,
+          "virtual_battery_discharge_power_max_kw": 50.0,
+          "virtual_battery_soc_key": "batteries.B01.SoC",
+          "virtual_battery_soc_fallback_key": "virtual_battery.soc",
+          "virtual_battery_soc_unit_mode": "fraction",
+          "virtual_battery_use_setpoint": false,
+          "virtual_battery_use_community_signals": true,
+          "virtual_battery_community_target_import_key": "community.target_net_import_kw",
+          "virtual_battery_community_current_import_key": "community.current_net_import_kw",
+          "virtual_battery_community_price_prefix": "community.price_signal",
+          "virtual_battery_local_price_prefix": "energy_tariffs.OMIE.energy_price",
+          "virtual_battery_soc_min": 0.1,
+          "virtual_battery_soc_max": 0.95
+        }
+      }
+    ]
+  }
+}
