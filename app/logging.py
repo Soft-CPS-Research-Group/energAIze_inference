@@ -118,6 +118,13 @@ def _ensure_log_dir(path: Path) -> None:
         logger.warning("Failed to create log directory", log_path=str(path))
 
 
+def _safe_add_file_sink(path: Path, **kwargs) -> None:
+    try:
+        logger.add(path, **kwargs)
+    except Exception:
+        logger.bind(log_path=str(path)).warning("logging.file_sink_unavailable")
+
+
 def init_logging() -> None:
     """Configure Loguru with structured output and request-aware extras."""
 
@@ -152,7 +159,7 @@ def init_logging() -> None:
         )
         if settings.log_file:
             _ensure_log_dir(settings.log_file)
-            logger.add(
+            _safe_add_file_sink(
                 settings.log_file,
                 level=settings.log_level.upper(),
                 serialize=True,
@@ -195,7 +202,7 @@ def init_logging() -> None:
         )
         if settings.log_file:
             _ensure_log_dir(settings.log_file)
-            logger.add(
+            _safe_add_file_sink(
                 settings.log_file,
                 level=settings.log_level.upper(),
                 format=default_fmt,
@@ -206,7 +213,7 @@ def init_logging() -> None:
                 backtrace=False,
                 diagnose=False,
             )
-            logger.add(
+            _safe_add_file_sink(
                 settings.log_file,
                 level=settings.log_level.upper(),
                 format=action_fmt,
