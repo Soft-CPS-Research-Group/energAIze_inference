@@ -12,14 +12,14 @@
       },
       "grid_meters": {
         "GR01": {
-          "energy_in_total": 0.004533333333333334,
-          "energy_in_l1": 0.001511111111,
-          "energy_in_l2": 0.001511111111,
-          "energy_in_l3": 0.0015111111113333337,
-          "energy_out_total": 0.004533333333333334,
-          "energy_out_l1": 0.001511111111,
-          "energy_out_l2": 0.001511111111,
-          "energy_out_l3": 0.0015111111113333337
+          "energy_in_total": 0.0136,
+          "energy_in_l1": 0.004533333333,
+          "energy_in_l2": 0.004533333333,
+          "energy_in_l3": 0.004533333334000001,
+          "energy_out_total": 0.0136,
+          "energy_out_l1": 0.004533333333,
+          "energy_out_l2": 0.004533333333,
+          "energy_out_l3": 0.004533333334000001
         }
       },
       "pv_panels": {

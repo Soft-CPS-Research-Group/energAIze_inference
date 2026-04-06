@@ -115,8 +115,8 @@ Community-participation example:
   "features": {
     "timestamp": "2026-02-22T12:00:00Z",
     "community": {
-      "energy_in_total": 0.0024,
-      "energy_out_total": 0.0003
+      "energy_in_total": 0.0072,
+      "energy_out_total": 0.0009
     },
     "observations": {
       "solar_generation": 12.0

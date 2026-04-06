@@ -17,7 +17,7 @@ MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_i-charging_headquarters_2303.json"
 
-DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+DECISION_INTERVAL_HOURS = 15.0 / 3600.0
 
 
 def _kwh_for_interval(power_kw: float) -> float:
@@ -158,7 +158,7 @@ def test_small_community_kwh_value_changes_dispatch(boavista_with_flex_community
     _connect_many_chargers_for_contention(no_community_gap)
 
     with_small_gap = copy.deepcopy(no_community_gap)
-    with_small_gap["community"]["energy_in_total"] = 0.0024641
+    with_small_gap["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
     with_small_gap["community"]["energy_out_total"] = 0.0
 
     no_gap_actions = _run(boavista_with_flex_community_client, no_community_gap)

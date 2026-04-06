@@ -208,7 +208,7 @@ class IchargingRuntimeConfig:
     charger_limit_kw: float
     chargers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     line_limits: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    control_interval_minutes: float = 15.0
+    control_interval_minutes: float = 0.25
     default_capacity_kwh: float = 75.0
     default_departure_buffer_minutes: float = 60.0
     flexible_urgency_threshold: float = 0.7
@@ -334,7 +334,7 @@ class IchargingRuntimeConfig:
             charger_limit_kw=_safe_float(data.pop("charger_limit_kw", 0.0)),
             chargers=dict(data.pop("chargers", {})),
             line_limits=dict(data.pop("line_limits", {})),
-            control_interval_minutes=_safe_float(data.pop("control_interval_minutes", 15.0)),
+            control_interval_minutes=_safe_float(data.pop("control_interval_minutes", 0.25)),
             default_capacity_kwh=_safe_float(data.pop("default_capacity_kwh", 75.0)),
             default_departure_buffer_minutes=_safe_float(
                 data.pop("default_departure_buffer_minutes", 60.0)

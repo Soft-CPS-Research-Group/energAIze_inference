@@ -15,7 +15,7 @@ MANIFEST_PATH = BUNDLE_DIR / "artifact_manifest.json"
 ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 ACTION_EV = "EVC01"
 ACTION_BATTERY = "B01"
-DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+DECISION_INTERVAL_HOURS = 15.0 / 3600.0
 
 
 def _kwh_for_interval(power_kw: float) -> float:
@@ -126,7 +126,7 @@ def test_small_community_energy_interval_converts_to_kw(rh1_community_client):
     neutral_actions = _run(rh1_community_client, neutral)
 
     deficit_small = _base_payload()
-    deficit_small["community"]["energy_in_total"] = 0.0024641
+    deficit_small["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
     deficit_small["community"]["energy_out_total"] = 0.0
     deficit_small_actions = _run(rh1_community_client, deficit_small)
 

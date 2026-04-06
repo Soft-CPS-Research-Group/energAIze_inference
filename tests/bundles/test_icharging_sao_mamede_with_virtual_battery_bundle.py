@@ -22,7 +22,7 @@ ACTION_PLUG_2 = "BB000SMI_2"
 ACTION_PLUGS = {ACTION_PLUG_1, ACTION_PLUG_2}
 ACTION_BATTERY = "B01"
 MIN_TECHNICAL_KW = 8.0
-DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+DECISION_INTERVAL_HOURS = 15.0 / 3600.0
 
 
 def _kwh_for_interval(power_kw: float) -> float:
@@ -267,7 +267,7 @@ def test_virtual_battery_converts_small_meter_energy_to_power_dispatch(
     payload["observations"]["batteries"]["B01"]["SoC"] = 0.70
     payload["observations"]["solar_generation"] = 0.0
     payload["observations"]["non_shiftable_load"] = 0.0
-    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 0.0045
+    payload["observations"]["grid_meters"]["GR01"]["energy_in_total"] = _kwh_for_interval(3.24)
     payload["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
     payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.30] + [0.08] * 95
 

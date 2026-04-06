@@ -195,7 +195,7 @@ def _build_icharging_subminute_bundle(tmp_path: Path) -> Path:
                     "config": {
                         "use_preprocessor": False,
                         "strategy": "icharging_breaker",
-                        "control_interval_minutes": 0.0833,
+                        "control_interval_minutes": 0.25,
                         "max_board_kw": 11.0,
                         "charger_limit_kw": 4.6,
                         "min_connected_kw": 1.6,
@@ -252,7 +252,7 @@ def _build_breaker_only_headroom_bundle(tmp_path: Path, per_phase_headroom_kw: f
                     "config": {
                         "use_preprocessor": False,
                         "strategy": "breaker_only",
-                        "control_interval_minutes": 1,
+                        "control_interval_minutes": 0.25,
                         "max_board_kw": BREAKER_ONLY_BASE_BOARD_LIMIT_KW,
                         "charger_limit_kw": 4.6,
                         "min_connected_kw": 1.6,
@@ -311,7 +311,7 @@ def _build_icharging_headroom_bundle(tmp_path: Path, per_phase_headroom_kw: floa
                     "config": {
                         "use_preprocessor": False,
                         "strategy": "icharging_breaker",
-                        "control_interval_minutes": 1,
+                        "control_interval_minutes": 0.25,
                         "max_board_kw": ICHARGING_BOARD_LIMIT_KW,
                         "charger_limit_kw": 4.6,
                         "min_connected_kw": 1.6,
@@ -375,7 +375,7 @@ def _build_icharging_pv_bundle(tmp_path: Path) -> Path:
                     "config": {
                         "use_preprocessor": False,
                         "strategy": "icharging_breaker",
-                        "control_interval_minutes": 1,
+                        "control_interval_minutes": 0.25,
                         "max_board_kw": base_board_kw,
                         "charger_limit_kw": 4.6,
                         "min_connected_kw": 1.6,

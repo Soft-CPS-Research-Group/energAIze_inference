@@ -97,7 +97,7 @@ def _round_one_decimal_towards_zero(value: float) -> float:
 @dataclass
 class Rh1HouseConfig:
     grid_import_limit_kw: float
-    control_interval_minutes: float = 1.0
+    control_interval_minutes: float = 0.25
     export_price_factor: float = 0.8
     ev_min_connected_kw: float = 0.0
     baseline_price_threshold_eur_kwh: float = 0.20
@@ -182,7 +182,7 @@ class Rh1HouseConfig:
         return cls(
             grid_import_limit_kw=grid_import_limit_kw,
             control_interval_minutes=max(
-                _safe_float(data.pop("control_interval_minutes", 1.0), 1.0),
+                _safe_float(data.pop("control_interval_minutes", 0.25), 0.25),
                 1.0 / 60.0,
             ),
             export_price_factor=_clamp(_safe_float(data.pop("export_price_factor", 0.8), 0.8), 0.0, 1.0),

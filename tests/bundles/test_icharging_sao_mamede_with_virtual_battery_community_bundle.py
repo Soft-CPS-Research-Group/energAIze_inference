@@ -17,7 +17,7 @@ ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_SaoMamede_2303.json"
 
 ACTION_BATTERY = "B01"
-DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+DECISION_INTERVAL_HOURS = 15.0 / 3600.0
 
 
 def _kwh_for_interval(power_kw: float) -> float:
@@ -125,7 +125,7 @@ def test_small_community_energy_interval_converts_to_kw(
     sao_mamede_with_battery_community_client,
 ):
     payload = _base_payload()
-    payload["community"]["energy_in_total"] = 0.0024641
+    payload["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
     payload["community"]["energy_out_total"] = 0.0
 
     actions = _run(sao_mamede_with_battery_community_client, payload)

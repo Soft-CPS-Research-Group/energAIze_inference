@@ -64,7 +64,7 @@
           "use_preprocessor": false,
           "strategy": "rh1_house_rbc_v1",
           "grid_import_limit_kw": 8.0,
-          "control_interval_minutes": 0.0833,
+          "control_interval_minutes": 0.25,
           "export_price_factor": 0.8,
           "ev_min_connected_kw": 1.6,
           "baseline_price_threshold_eur_kwh": 0.2,

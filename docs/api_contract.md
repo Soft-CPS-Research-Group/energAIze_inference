@@ -148,7 +148,7 @@ For bundles with `community_participation_enabled=true`, the following fields ar
 - `features.community.energy_in_total`
 - `features.community.energy_out_total`
 
-Both are expected as `kWh` for the decision interval (typically 5 seconds).
+Both are expected as `kWh` for the decision interval (typically 15 seconds).
 
 Community-participation example:
 
@@ -157,8 +157,8 @@ Community-participation example:
   "features": {
     "timestamp": "2026-02-22T12:00:00Z",
     "community": {
-      "energy_in_total": 0.0024,
-      "energy_out_total": 0.0003
+      "energy_in_total": 0.0072,
+      "energy_out_total": 0.0009
     },
     "observations": {
       "solar_generation": 12.0

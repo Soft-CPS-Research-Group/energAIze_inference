@@ -11,8 +11,8 @@
     },
     "grid_meters": {
       "GR01": {
-        "energy_in": 0.004533333333333334,
-        "energy_out": 0.004533333333333334
+        "energy_in": 0.0136,
+        "energy_out": 0.0136
       }
     },
     "pv_panels": {

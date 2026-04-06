@@ -19,7 +19,7 @@ ALIAS_PATH = BUNDLE_DIR / "aliases.json"
 MESSAGE_PATH = BUNDLE_DIR / "exemplos_mensagem_R-H-01_2303.json"
 ACTION_EV = "EVC01"
 ACTION_BATTERY = "B01"
-DECISION_INTERVAL_HOURS = 5.0 / 3600.0
+DECISION_INTERVAL_HOURS = 15.0 / 3600.0
 
 
 def _kwh_for_interval(power_kw: float) -> float:
@@ -307,7 +307,7 @@ def test_rh1_small_meter_energy_interval_drives_nonzero_battery_dispatch(rh1_cli
             "solar_generation": 0.0,
             "grid_meters": {
                 "GR01": {
-                    "energy_in_total": 0.0045,
+                    "energy_in_total": _kwh_for_interval(3.24),
                     "energy_out_total": 0.0,
                 }
             },

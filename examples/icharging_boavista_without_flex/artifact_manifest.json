@@ -224,7 +224,7 @@
         "config": {
           "use_preprocessor": false,
           "strategy": "breaker_only",
-          "control_interval_minutes": 1,
+          "control_interval_minutes": 0.25,
           "max_board_kw": 55,
           "charger_limit_kw": 4.6,
           "min_connected_kw": 1.6,
