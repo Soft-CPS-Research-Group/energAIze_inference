@@ -10,7 +10,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 0,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -199,7 +199,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 89.7,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -388,7 +388,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 77.2,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -577,7 +577,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 96.5,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -766,7 +766,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 64.5,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -955,7 +955,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 47.3,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -1144,7 +1144,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 74.6,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -1333,7 +1333,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 59.7,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -1522,7 +1522,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 50.3,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,
@@ -1711,7 +1711,7 @@
         }
       },
       "grid_meters": {
-        "GR01": {
+        "PT": {
           "energy_in_total": 77.5,
           "energy_in_l1": 0.0,
           "energy_in_l2": 0.0,

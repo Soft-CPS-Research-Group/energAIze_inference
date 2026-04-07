@@ -218,8 +218,8 @@ def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmana
         target_soc=0.90,
         departure_minutes_from_now=30,
     )
-    low_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 0.0
-    low_meter["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
+    low_meter["observations"]["grid_meters"]["PT"]["energy_in_total"] = 0.0
+    low_meter["observations"]["grid_meters"]["PT"]["energy_out_total"] = 0.0
     low_meter["observations"]["solar_generation"] = 0.0
     low_meter["observations"]["charging_sessions"]["M1123089-5_1"] = {
         "power": 22.0,
@@ -231,8 +231,8 @@ def test_grid_meter_headroom_reduces_dispatch_and_non_controllable_remain_unmana
     }
 
     high_meter = copy.deepcopy(low_meter)
-    high_meter["observations"]["grid_meters"]["GR01"]["energy_in_total"] = 390.0
-    high_meter["observations"]["grid_meters"]["GR01"]["energy_out_total"] = 0.0
+    high_meter["observations"]["grid_meters"]["PT"]["energy_in_total"] = 390.0
+    high_meter["observations"]["grid_meters"]["PT"]["energy_out_total"] = 0.0
 
     actions_low = _run(sao_mamede_client, low_meter)
     actions_high = _run(sao_mamede_client, high_meter)
