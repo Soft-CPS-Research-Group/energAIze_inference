@@ -129,4 +129,54 @@ def test_small_community_energy_interval_converts_to_kw(
     payload["community"]["energy_out_total"] = 0.0
 
     actions = _run(sao_mamede_with_battery_community_client, payload)
-    assert -2.0 <= actions[ACTION_BATTERY] <= -1.4
+    assert actions[ACTION_BATTERY] < -0.1
+
+
+def test_low_soc_does_not_force_aggressive_discharge_under_community_deficit(
+    sao_mamede_with_battery_community_client,
+):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.11
+    payload["community"]["energy_in_total"] = _kwh_for_interval(40.0)
+    payload["community"]["energy_out_total"] = 0.0
+
+    actions = _run(sao_mamede_with_battery_community_client, payload)
+    assert actions[ACTION_BATTERY] >= -0.1
+
+
+def test_low_soc_can_recharge_with_persistent_community_deficit_when_price_favors_charge(
+    sao_mamede_with_battery_community_client,
+):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.15
+    payload["community"]["energy_in_total"] = _kwh_for_interval(35.0)
+    payload["community"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.05] + [0.30] * 95
+
+    actions = _run(sao_mamede_with_battery_community_client, payload)
+    assert actions[ACTION_BATTERY] > 0.1
+
+
+def test_deadband_reduces_near_zero_dispatch_chattering(
+    sao_mamede_with_battery_community_client,
+):
+    base = _base_payload()
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.50
+
+    deficit_small = copy.deepcopy(base)
+    deficit_small["community"]["energy_in_total"] = _kwh_for_interval(0.4)
+    deficit_small["community"]["energy_out_total"] = 0.0
+
+    surplus_small = copy.deepcopy(base)
+    surplus_small["community"]["energy_in_total"] = 0.0
+    surplus_small["community"]["energy_out_total"] = _kwh_for_interval(0.4)
+
+    neutral = copy.deepcopy(base)
+
+    a_deficit = _run(sao_mamede_with_battery_community_client, deficit_small)[ACTION_BATTERY]
+    a_surplus = _run(sao_mamede_with_battery_community_client, surplus_small)[ACTION_BATTERY]
+    a_neutral = _run(sao_mamede_with_battery_community_client, neutral)[ACTION_BATTERY]
+
+    assert abs(a_deficit) <= 0.1
+    assert abs(a_surplus) <= 0.1
+    assert abs(a_neutral) <= 0.1

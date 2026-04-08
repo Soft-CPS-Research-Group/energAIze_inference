@@ -147,6 +147,10 @@ def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
     assert set(cfg.line_limits.keys()) == {"PT"}
     assert cfg.chargers["BB000SMI"]["line"] == "PT"
     assert cfg.virtual_battery_soc_unit_mode == "fraction"
+    assert cfg.virtual_battery_log_label == "Community battery"
+    assert cfg.virtual_battery_operating_soc_min == pytest.approx(0.2, rel=1e-6)
+    assert cfg.virtual_battery_operating_soc_max == pytest.approx(0.85, rel=1e-6)
+    assert cfg.virtual_battery_dispatch_deadband_kw == pytest.approx(0.5, rel=1e-6)
 
 
 def test_single_controllable_bb_charger_uses_merged_plugs(sao_mamede_with_battery_client):

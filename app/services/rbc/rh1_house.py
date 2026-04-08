@@ -121,6 +121,8 @@ class Rh1HouseConfig:
     community_energy_deadband_kw: float = 0.2
     community_deficit_weight: float = 1.0
     community_surplus_weight: float = 1.0
+    community_dispatch_weight: float = 0.2
+    community_dispatch_cap_kw: float = 0.0
     community_price_signal_key: str = "community.price_signal"
     ev_action_name: str = ""
     battery_action_name: str = ""
@@ -229,6 +231,14 @@ class Rh1HouseConfig:
             ),
             community_surplus_weight=max(
                 _safe_float(data.pop("community_surplus_weight", 1.0), 1.0),
+                0.0,
+            ),
+            community_dispatch_weight=max(
+                _safe_float(data.pop("community_dispatch_weight", 0.2), 0.2),
+                0.0,
+            ),
+            community_dispatch_cap_kw=max(
+                _safe_float(data.pop("community_dispatch_cap_kw", 0.0), 0.0),
                 0.0,
             ),
             community_price_signal_key=community_price_signal_key,
@@ -382,6 +392,10 @@ class Rh1HouseRuntime:
 
         ev = self._ev_action_bounds(payload, now, dt_hours)
         battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
+        community_target_kw = self._community_battery_target_kw(
+            battery_bounds=battery_bounds,
+            community_net_kw=community_net_kw,
+        )
         ev_kw, battery_kw, base_without_battery = self._optimize_joint_dispatch(
             payload=payload,
             ev=ev,
@@ -394,7 +408,7 @@ class Rh1HouseRuntime:
             grid_import_limit_kw=grid_import_limit_kw,
             grid_export_limit_kw=grid_export_limit_kw,
             dt_hours=dt_hours,
-            community_net_kw=community_net_kw,
+            community_target_kw=community_target_kw,
         )
 
         ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
@@ -526,6 +540,11 @@ class Rh1HouseRuntime:
             ev_action_name: quantized["ev_charge_kw"],
             battery_action_name: quantized["battery_kw"],
         }
+        community_alignment_penalty = self._community_alignment_penalty(
+            battery_kw=quantized["battery_kw"],
+            community_target_kw=community_target_kw,
+            dt_hours=dt_hours,
+        )
 
         log.info(
             "rbc.actions",
@@ -546,6 +565,8 @@ class Rh1HouseRuntime:
             community_export_kwh=community_export_kwh,
             community_net_kwh=community_net_kwh,
             community_net_kw=community_net_kw,
+            community_target_kw=community_target_kw,
+            community_alignment_penalty=community_alignment_penalty,
         )
 
         def fmt_kw(value: float) -> str:
@@ -599,7 +620,10 @@ class Rh1HouseRuntime:
                 f" export_limit={fmt_kw(grid_export_limit_kw)} kW"
                 f" net={fmt_kw(net_grid_kw)} kW"
             ),
-            "Objective: minimize_import_cost_with_free_local_pv_self_consumption + community_balance_bias",
+            (
+                "Objective: minimize_import_cost_with_free_local_pv_self_consumption"
+                " + community_battery_alignment"
+            ),
         ]
         if community_import_kw is not None and community_export_kw is not None:
             summary_lines.append(
@@ -608,6 +632,15 @@ class Rh1HouseRuntime:
                     f" out={fmt_meter(community_export_kwh, community_export_kw)}"
                     f" net={fmt_meter(community_net_kwh, community_net_kw)}"
                     f" deadband={fmt_kw(cfg.community_energy_deadband_kw)} kW"
+                    f" target_battery={fmt_kw(community_target_kw)} kW"
+                    f" alignment_penalty={community_alignment_penalty:.6f}"
+                )
+            )
+        else:
+            summary_lines.append(
+                (
+                    f"Community: target_battery={fmt_kw(community_target_kw)} kW"
+                    f" alignment_penalty={community_alignment_penalty:.6f}"
                 )
             )
         if warnings:
@@ -767,10 +800,9 @@ class Rh1HouseRuntime:
         return _clamp(normalized, 0.0, 1.0)
 
     def _extract_solar_generation(self, payload: Dict[str, Any], warnings: List[str]) -> float:
-        direct = _maybe_float(payload.get("solar_generation"))
-        if direct is not None:
-            return max(direct, 0.0)
-
+        # RH1 telemetry provides PV production as interval energy (kWh),
+        # so convert to power using the configured control interval.
+        interval_hours = max(self._decision_interval_hours(), 1e-9)
         total = 0.0
         found = False
         for key, raw in payload.items():
@@ -785,7 +817,11 @@ class Rh1HouseRuntime:
             total += numeric
 
         if found:
-            return max(total, 0.0)
+            return max(total, 0.0) / interval_hours
+
+        direct = _maybe_float(payload.get("solar_generation"))
+        if direct is not None:
+            return max(direct, 0.0)
 
         warnings.append("missing_solar_generation_defaulted")
         return 0.0
@@ -1010,6 +1046,44 @@ class Rh1HouseRuntime:
             return battery_kw * dt_hours * eff
         return battery_kw * dt_hours / eff
 
+    def _community_battery_target_kw(
+        self,
+        battery_bounds: BatteryPowerBounds,
+        community_net_kw: float | None,
+    ) -> float:
+        cfg = self.config
+        if not cfg.community_participation_enabled or community_net_kw is None:
+            return 0.0
+
+        deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
+        raw_target_kw = 0.0
+        if community_net_kw > deadband_kw + 1e-9:
+            community_deficit_kw = community_net_kw - deadband_kw
+            raw_target_kw = -community_deficit_kw * max(cfg.community_deficit_weight, 0.0)
+        elif community_net_kw < -(deadband_kw + 1e-9):
+            community_surplus_kw = (-community_net_kw) - deadband_kw
+            raw_target_kw = community_surplus_kw * max(cfg.community_surplus_weight, 0.0)
+
+        cap_kw = max(cfg.community_dispatch_cap_kw, 0.0)
+        if cap_kw > 1e-9:
+            raw_target_kw = _clamp(raw_target_kw, -cap_kw, cap_kw)
+
+        return _clamp(raw_target_kw, battery_bounds.min_kw, battery_bounds.max_kw)
+
+    def _community_alignment_penalty(
+        self,
+        battery_kw: float,
+        community_target_kw: float,
+        dt_hours: float,
+    ) -> float:
+        if not self.config.community_participation_enabled:
+            return 0.0
+        weight = max(self.config.community_dispatch_weight, 0.0)
+        if weight <= 1e-9:
+            return 0.0
+        alignment_error_kw = battery_kw - community_target_kw
+        return weight * (alignment_error_kw ** 2) * dt_hours
+
     def _joint_dispatch_objective(
         self,
         ev_kw: float,
@@ -1021,7 +1095,7 @@ class Rh1HouseRuntime:
         grid_import_limit_kw: float,
         grid_export_limit_kw: float,
         dt_hours: float,
-        community_net_kw: float | None,
+        community_target_kw: float,
     ) -> float:
         cfg = self.config
         net_grid_kw = base_without_battery + battery_kw
@@ -1047,25 +1121,11 @@ class Rh1HouseRuntime:
         import_violation = max(net_grid_kw - grid_import_limit_kw, 0.0)
         export_violation = max(-grid_export_limit_kw - net_grid_kw, 0.0)
         hard_violation_penalty = (import_violation + export_violation) * 1000.0 * dt_hours
-        community_penalty = 0.0
-        deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
-        if cfg.community_participation_enabled and community_net_kw is not None:
-            if community_net_kw > deadband_kw + 1e-9:
-                community_deficit_kw = community_net_kw - deadband_kw
-                community_penalty = (
-                    max(net_grid_kw, 0.0)
-                    * community_deficit_kw
-                    * max(cfg.community_deficit_weight, 0.0)
-                    * dt_hours
-                )
-            elif community_net_kw < -(deadband_kw + 1e-9):
-                community_surplus_kw = (-community_net_kw) - deadband_kw
-                community_penalty = (
-                    max(-net_grid_kw, 0.0)
-                    * community_surplus_kw
-                    * max(cfg.community_surplus_weight, 0.0)
-                    * dt_hours
-                )
+        community_penalty = self._community_alignment_penalty(
+            battery_kw=battery_kw,
+            community_target_kw=community_target_kw,
+            dt_hours=dt_hours,
+        )
 
         return (
             grid_cost
@@ -1090,7 +1150,7 @@ class Rh1HouseRuntime:
         grid_import_limit_kw: float,
         grid_export_limit_kw: float,
         dt_hours: float,
-        community_net_kw: float | None,
+        community_target_kw: float,
     ) -> tuple[float, float, float]:
         ev_min_kw = _clamp(ev.hard_min_kw, 0.0, ev.max_kw)
         if not ev.connected:
@@ -1122,7 +1182,7 @@ class Rh1HouseRuntime:
                     grid_import_limit_kw=grid_import_limit_kw,
                     grid_export_limit_kw=grid_export_limit_kw,
                     dt_hours=dt_hours,
-                    community_net_kw=community_net_kw,
+                    community_target_kw=community_target_kw,
                 )
                 net_grid_kw = base_without_battery + battery_kw
                 candidate = (objective, ev_kw, battery_kw, base_without_battery, net_grid_kw)

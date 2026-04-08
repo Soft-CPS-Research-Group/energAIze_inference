@@ -161,6 +161,7 @@
           "community_surplus_weight": 1.0,
           "community_price_signal_key": "community.price_signal",
           "virtual_battery_action_name": "B01",
+          "virtual_battery_log_label": "Community battery",
           "virtual_battery_nominal_power_kw": 50.0,
           "virtual_battery_capacity_kwh": 125.0,
           "virtual_battery_capacity_min_kwh": 125.0,
@@ -177,7 +178,13 @@
           "virtual_battery_community_price_prefix": "community.price_signal",
           "virtual_battery_local_price_prefix": "energy_tariffs.OMIE.energy_price",
           "virtual_battery_soc_min": 0.1,
-          "virtual_battery_soc_max": 0.95
+          "virtual_battery_soc_max": 0.95,
+          "virtual_battery_operating_soc_min": 0.2,
+          "virtual_battery_operating_soc_max": 0.85,
+          "virtual_battery_soc_hysteresis": 0.02,
+          "virtual_battery_dispatch_deadband_kw": 0.5,
+          "virtual_battery_community_weight": 0.5,
+          "virtual_battery_price_weight": 0.35
         }
       }
     ]

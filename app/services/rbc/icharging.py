@@ -233,6 +233,7 @@ class IchargingRuntimeConfig:
     community_surplus_weight: float = 1.0
     community_price_signal_key: str = "community.price_signal"
     virtual_battery_action_name: Optional[str] = None
+    virtual_battery_log_label: str = "Virtual battery"
     virtual_battery_nominal_power_kw: float = 15.0
     virtual_battery_capacity_kwh: float = 20.0
     virtual_battery_capacity_min_kwh: float = 20.0
@@ -251,6 +252,12 @@ class IchargingRuntimeConfig:
     virtual_battery_local_price_prefix: str = "energy_price"
     virtual_battery_soc_min: float = 0.1
     virtual_battery_soc_max: float = 1.0
+    virtual_battery_operating_soc_min: float = 0.20
+    virtual_battery_operating_soc_max: float = 0.85
+    virtual_battery_soc_hysteresis: float = 0.02
+    virtual_battery_dispatch_deadband_kw: float = 0.5
+    virtual_battery_community_weight: float = 0.5
+    virtual_battery_price_weight: float = 0.35
     session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
     emit_session_source_actions: bool = False
     session_merge_power_key: str = "power"
@@ -281,6 +288,7 @@ class IchargingRuntimeConfig:
         community_energy_out_key = data.pop("community_energy_out_key", "community.energy_out_total")
         community_price_signal_key = data.pop("community_price_signal_key", "community.price_signal")
         virtual_battery_action_name = data.pop("virtual_battery_action_name", None)
+        virtual_battery_log_label = data.pop("virtual_battery_log_label", "Virtual battery")
         virtual_battery_soc_unit_mode = (
             str(data.pop("virtual_battery_soc_unit_mode", "auto")).strip().lower() or "auto"
         )
@@ -393,6 +401,9 @@ class IchargingRuntimeConfig:
             virtual_battery_action_name=str(virtual_battery_action_name).strip()
             if virtual_battery_action_name is not None and str(virtual_battery_action_name).strip()
             else None,
+            virtual_battery_log_label=str(virtual_battery_log_label).strip()
+            if str(virtual_battery_log_label).strip()
+            else "Virtual battery",
             virtual_battery_nominal_power_kw=max(
                 _safe_float(data.pop("virtual_battery_nominal_power_kw", 15.0), 15.0),
                 0.0,
@@ -455,6 +466,32 @@ class IchargingRuntimeConfig:
                 0.0,
                 1.0,
             ),
+            virtual_battery_operating_soc_min=_clamp(
+                _safe_float(data.pop("virtual_battery_operating_soc_min", 0.20), 0.20),
+                0.0,
+                1.0,
+            ),
+            virtual_battery_operating_soc_max=_clamp(
+                _safe_float(data.pop("virtual_battery_operating_soc_max", 0.85), 0.85),
+                0.0,
+                1.0,
+            ),
+            virtual_battery_soc_hysteresis=max(
+                _safe_float(data.pop("virtual_battery_soc_hysteresis", 0.02), 0.02),
+                0.0,
+            ),
+            virtual_battery_dispatch_deadband_kw=max(
+                _safe_float(data.pop("virtual_battery_dispatch_deadband_kw", 0.5), 0.5),
+                0.0,
+            ),
+            virtual_battery_community_weight=max(
+                _safe_float(data.pop("virtual_battery_community_weight", 0.5), 0.5),
+                0.0,
+            ),
+            virtual_battery_price_weight=max(
+                _safe_float(data.pop("virtual_battery_price_weight", 0.35), 0.35),
+                0.0,
+            ),
             session_merge_map=session_merge_map,
             emit_session_source_actions=bool(data.pop("emit_session_source_actions", False)),
             session_merge_power_key=str(data.pop("session_merge_power_key", "power") or "power"),
@@ -468,6 +505,21 @@ class IchargingRuntimeConfig:
         )
         if cfg.virtual_battery_soc_max < cfg.virtual_battery_soc_min:
             cfg.virtual_battery_soc_max = cfg.virtual_battery_soc_min
+        cfg.virtual_battery_operating_soc_min = _clamp(
+            cfg.virtual_battery_operating_soc_min,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.virtual_battery_operating_soc_max = _clamp(
+            cfg.virtual_battery_operating_soc_max,
+            cfg.virtual_battery_operating_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        max_hysteresis = max(
+            (cfg.virtual_battery_operating_soc_max - cfg.virtual_battery_operating_soc_min) / 2.0,
+            0.0,
+        )
+        cfg.virtual_battery_soc_hysteresis = min(cfg.virtual_battery_soc_hysteresis, max_hysteresis)
         if cfg.virtual_battery_capacity_max_kwh < cfg.virtual_battery_capacity_min_kwh:
             cfg.virtual_battery_capacity_max_kwh = cfg.virtual_battery_capacity_min_kwh
         if cfg.virtual_battery_charge_power_max_kw <= 0.0 and cfg.virtual_battery_nominal_power_kw > 0.0:
@@ -734,23 +786,23 @@ class IchargingBreakerRuntime:
         community_import_kw = self._community_component_kw(payload, cfg.community_energy_in_key)
         community_export_kw = self._community_component_kw(payload, cfg.community_energy_out_key)
         community_net_kw = self._community_net_kw(payload)
-        community_board_adjust_kw = 0.0
+        community_flex_adjust_kw = 0.0
         if cfg.site_available_headroom_key:
             headroom_raw = _maybe_float(payload.get(cfg.site_available_headroom_key))
             if headroom_raw is None or headroom_raw < 0.0:
-                effective_board_limit = max(cfg.site_available_headroom_fallback_kw, 0.0)
+                physical_board_limit = max(cfg.site_available_headroom_fallback_kw, 0.0)
                 get_logger().warning(
                     "rbc.site_headroom_fallback",
                     strategy="icharging_breaker",
                     key=cfg.site_available_headroom_key,
-                    fallback_kw=effective_board_limit,
+                    fallback_kw=physical_board_limit,
                 )
             else:
-                effective_board_limit = headroom_raw
+                physical_board_limit = headroom_raw
             if not cfg.site_available_headroom_includes_pv:
-                effective_board_limit += solar_kw
+                physical_board_limit += solar_kw
         else:
-            effective_board_limit = cfg.max_board_kw + solar_kw
+            physical_board_limit = cfg.max_board_kw + solar_kw
             site_import = self._site_meter_component_kw(
                 payload, cfg.site_meter_import_key, "energy_in"
             )
@@ -761,9 +813,9 @@ class IchargingBreakerRuntime:
                 site_export = 0.0
             if site_import is not None:
                 net_import = max(site_import - site_export, 0.0)
-                effective_board_limit -= net_import
+                physical_board_limit -= net_import
             elif unmanaged_load_kw > 1e-6:
-                effective_board_limit -= unmanaged_load_kw
+                physical_board_limit -= unmanaged_load_kw
         if community_net_kw is not None:
             deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
             if community_net_kw > deadband_kw:
@@ -772,17 +824,15 @@ class IchargingBreakerRuntime:
                     deficit_kw * max(cfg.community_deficit_weight, 0.0),
                     max(cfg.max_board_kw, 0.0),
                 )
-                effective_board_limit -= relief_kw
-                community_board_adjust_kw = -relief_kw
+                community_flex_adjust_kw = -relief_kw
             elif community_net_kw < -deadband_kw:
                 surplus_kw = (-community_net_kw) - deadband_kw
                 lift_kw = min(
                     surplus_kw * max(cfg.community_surplus_weight, 0.0),
                     max(cfg.max_board_kw, 0.0),
                 )
-                effective_board_limit += lift_kw
-                community_board_adjust_kw = lift_kw
-        effective_board_limit = max(effective_board_limit, 0.0)
+                community_flex_adjust_kw = lift_kw
+        effective_board_limit = max(physical_board_limit, 0.0)
         per_phase_limit = (
             effective_board_limit / max(len(cfg.line_limits), 1)
             if cfg.line_limits
@@ -801,8 +851,8 @@ class IchargingBreakerRuntime:
         max_levels: Dict[str, float] = {}
         states: Dict[str, ChargerState] = {}
         flexible_chargers: List[str] = []
-        charger_priority: Dict[str, float] = {}
         nonflex_by_line: Dict[str, List[str]] = {}
+        community_priority_mode = cfg.community_participation_enabled
 
         now = self._current_timestamp(payload)
         flexible_whitelist = (
@@ -838,7 +888,6 @@ class IchargingBreakerRuntime:
             min_levels[charger_id] = min_kw
             max_levels[charger_id] = max_kw
             actions[charger_id] = min_kw
-            charger_priority[charger_id] = 0.0
 
         self._apply_exclusive_groups(states)
 
@@ -860,11 +909,9 @@ class IchargingBreakerRuntime:
                     min_minutes,
                     flexible_whitelist,
                 ):
-                    actions[charger_id] = state.required_kw
-                    # `required_kw` is a soft target. Keep the technical minimum as hard floor so
-                    # line/board enforcement can still reduce infeasible flex plans.
+                    if not community_priority_mode:
+                        actions[charger_id] = state.required_kw
                     min_levels[charger_id] = state.min_kw
-                    charger_priority[charger_id] = state.priority
                     flexible_chargers.append(charger_id)
                     continue
 
@@ -873,25 +920,30 @@ class IchargingBreakerRuntime:
                 for ln in state.phases:
                     nonflex_by_line.setdefault(ln, []).append(charger_id)
 
-        self._distribute_nonflex(cfg, states, nonflex_by_line, actions, per_phase_limit)
-        self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
+        self._distribute_nonflex(
+            cfg=cfg,
+            states=states,
+            nonflex_by_line=nonflex_by_line,
+            actions=actions,
+            limit_per_line=per_phase_limit,
+            include_existing_line_loads=not community_priority_mode,
+        )
+        if community_priority_mode:
+            self._allocate_flex_budget(
+                cfg=cfg,
+                states=states,
+                actions=actions,
+                flexible_chargers=flexible_chargers,
+                limit_per_line=per_phase_limit,
+                board_limit=effective_board_limit,
+                community_flex_adjust_kw=community_flex_adjust_kw,
+            )
+        else:
+            self._apply_solar_bonus(states, flexible_chargers, solar_kw, actions, max_levels)
         self._enforce_line_limits(
             cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
         )
-        self._fill_remaining_headroom(
-            cfg,
-            states,
-            actions,
-            min_levels,
-            flexible_chargers,
-            per_phase_limit,
-            effective_board_limit,
-        )
-        # Top-up can increase allocations after an earlier phase-limit pass.
-        # Re-enforce line limits unconditionally to keep hard phase constraints.
-        self._enforce_line_limits(
-            cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
-        )
+        self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers, per_phase_limit)
 
         board_total = sum(
             value for cid, value in actions.items() if states.get(cid) and states[cid].connected
@@ -1034,7 +1086,8 @@ class IchargingBreakerRuntime:
                 board_total=connected_board_total,
                 command_total=commanded_board_total,
                 effective_board_limit_kw=effective_board_limit,
-                community_board_adjust_kw=community_board_adjust_kw,
+                physical_board_limit_kw=physical_board_limit,
+                community_flex_adjust_kw=community_flex_adjust_kw,
                 per_phase_limit_kw=per_phase_limit,
                 solar_kw=solar_kw,
                 unmanaged_load_kw=unmanaged_load_kw,
@@ -1111,7 +1164,7 @@ class IchargingBreakerRuntime:
                 input_line,
                 (
                     f"Limits: board_effective={fmt_kw(effective_board_limit)} kW"
-                    f" community_bias={fmt_kw(community_board_adjust_kw)} kW"
+                    f" community_flex_bias={fmt_kw(community_flex_adjust_kw)} kW"
                     f" per_line_effective={fmt_kw(per_phase_limit)} kW"
                 ),
                 (
@@ -1162,7 +1215,7 @@ class IchargingBreakerRuntime:
             if cfg.virtual_battery_action_name:
                 summary_lines.append(
                     (
-                        f"Virtual battery ({cfg.virtual_battery_action_name}):"
+                        f"{cfg.virtual_battery_log_label} ({cfg.virtual_battery_action_name}):"
                         f" action={fmt_optional_kw(virtual_battery_kw)} kW"
                         f" soc_raw={fmt_optional_num(virtual_battery_soc_raw)}"
                         f" soc_key={virtual_battery_soc_key_used or '-'}"
@@ -1341,7 +1394,11 @@ class IchargingBreakerRuntime:
             target_import = _maybe_float(payload.get(cfg.virtual_battery_community_target_import_key))
             current_import = _maybe_float(payload.get(cfg.virtual_battery_community_current_import_key))
             if target_import is not None and current_import is not None:
-                target_dispatch_kw = -(current_import - target_import)
+                target_dispatch_kw = _clamp(
+                    -(current_import - target_import),
+                    -discharge_limit_kw,
+                    charge_limit_kw,
+                )
 
         price_dispatch_kw = self._price_based_virtual_battery_dispatch(
             cfg,
@@ -1356,68 +1413,91 @@ class IchargingBreakerRuntime:
             if setpoint_kw is not None:
                 setpoint_dispatch_kw = setpoint_kw
 
-        # Hybrid local policy:
-        # 1) enforce local physical relief first (absorb PV surplus / relieve site import);
-        # 2) enforce mandatory community support for deficit/surplus conditions;
-        # 3) apply economic target within the feasible mandatory interval.
+        # Blended policy:
+        # 1) local balancing (site import/export relief),
+        # 2) community support,
+        # 3) price signal,
+        # 4) SOC operating-band recovery.
         surplus_kw = max((-net for net in candidate_nets_kw if net < -1e-6), default=0.0)
         import_kw = max((net for net in candidate_nets_kw if net > 1e-6), default=0.0)
         if surplus_kw > 1e-6:
-            local_mandatory_dispatch_kw = min(charge_limit_kw, surplus_kw)
+            local_signal_kw = min(charge_limit_kw, surplus_kw)
         elif import_kw > 1e-6:
-            local_mandatory_dispatch_kw = -min(discharge_limit_kw, import_kw)
+            local_signal_kw = -min(discharge_limit_kw, import_kw)
         else:
-            local_mandatory_dispatch_kw = 0.0
+            local_signal_kw = 0.0
 
-        community_mandatory_dispatch_kw = 0.0
-        if cfg.community_participation_enabled and community_net_kw is not None:
-            deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
-            if community_net_kw > deadband_kw:
-                deficit_kw = community_net_kw - deadband_kw
-                community_mandatory_dispatch_kw = -min(
-                    discharge_limit_kw,
-                    deficit_kw * max(cfg.community_deficit_weight, 0.0),
-                )
-            elif community_net_kw < -deadband_kw:
-                surplus_kw = (-community_net_kw) - deadband_kw
-                community_mandatory_dispatch_kw = min(
-                    charge_limit_kw,
-                    surplus_kw * max(cfg.community_surplus_weight, 0.0),
-                )
+        community_signal_kw = 0.0
+        if cfg.community_participation_enabled:
+            if target_dispatch_kw is not None:
+                community_signal_kw = target_dispatch_kw
+            elif community_net_kw is not None:
+                deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
+                if community_net_kw > deadband_kw:
+                    deficit_kw = community_net_kw - deadband_kw
+                    community_signal_kw = -min(
+                        discharge_limit_kw,
+                        deficit_kw * max(cfg.community_deficit_weight, 0.0),
+                    )
+                elif community_net_kw < -deadband_kw:
+                    community_surplus_kw = (-community_net_kw) - deadband_kw
+                    community_signal_kw = min(
+                        charge_limit_kw,
+                        community_surplus_kw * max(cfg.community_surplus_weight, 0.0),
+                    )
 
-        economic_dispatch_kw = (
-            setpoint_dispatch_kw
-            if setpoint_dispatch_kw is not None
-            else (target_dispatch_kw if target_dispatch_kw is not None else price_dispatch_kw)
+        operating_soc_min = _clamp(
+            cfg.virtual_battery_operating_soc_min,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
         )
-        lower_bound_kw = -discharge_limit_kw
-        upper_bound_kw = charge_limit_kw
+        operating_soc_max = _clamp(
+            cfg.virtual_battery_operating_soc_max,
+            operating_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        hysteresis_soc = min(
+            max(cfg.virtual_battery_soc_hysteresis, 0.0),
+            max((operating_soc_max - operating_soc_min) / 2.0, 0.0),
+        )
+        if community_signal_kw < 0.0 and soc < operating_soc_min:
+            community_signal_kw = 0.0
+        elif community_signal_kw > 0.0 and soc > operating_soc_max:
+            community_signal_kw = 0.0
 
-        mandatory_dispatches = [
-            mandatory_kw
-            for mandatory_kw in (local_mandatory_dispatch_kw, community_mandatory_dispatch_kw)
-            if abs(mandatory_kw) > 1e-6
-        ]
-        for mandatory_kw in mandatory_dispatches:
-            if mandatory_kw > 0.0:
-                lower_bound_kw = max(lower_bound_kw, mandatory_kw)
-            else:
-                upper_bound_kw = min(upper_bound_kw, mandatory_kw)
-        if lower_bound_kw > upper_bound_kw and mandatory_dispatches:
-            dominant = max(mandatory_dispatches, key=lambda value: abs(value))
-            if dominant > 0.0:
-                lower_bound_kw = dominant
-                upper_bound_kw = charge_limit_kw
-            else:
-                lower_bound_kw = -discharge_limit_kw
-                upper_bound_kw = dominant
+        charge_soft_limit_kw = charge_limit_kw
+        discharge_soft_limit_kw = discharge_limit_kw
+        if soc <= operating_soc_min + 1e-9:
+            discharge_soft_limit_kw = 0.0
+        elif hysteresis_soc > 1e-9 and soc < operating_soc_min + hysteresis_soc:
+            discharge_soft_limit_kw *= _clamp(
+                (soc - operating_soc_min) / hysteresis_soc,
+                0.0,
+                1.0,
+            )
+        if soc >= operating_soc_max - 1e-9:
+            charge_soft_limit_kw = 0.0
+        elif hysteresis_soc > 1e-9 and soc > operating_soc_max - hysteresis_soc:
+            charge_soft_limit_kw *= _clamp(
+                (operating_soc_max - soc) / hysteresis_soc,
+                0.0,
+                1.0,
+            )
 
-        dispatch_kw = _clamp(economic_dispatch_kw, lower_bound_kw, upper_bound_kw)
+        if setpoint_dispatch_kw is not None:
+            raw_dispatch_kw = setpoint_dispatch_kw
+        else:
+            raw_dispatch_kw = (
+                local_signal_kw
+                + (cfg.virtual_battery_community_weight * community_signal_kw)
+                + (cfg.virtual_battery_price_weight * price_dispatch_kw)
+            )
 
-        if dispatch_kw > 0.0:
-            dispatch_kw = min(dispatch_kw, charge_limit_kw)
-        elif dispatch_kw < 0.0:
-            dispatch_kw = max(dispatch_kw, -discharge_limit_kw)
+        dispatch_kw = _clamp(raw_dispatch_kw, -discharge_soft_limit_kw, charge_soft_limit_kw)
+
+        deadband_kw = max(cfg.virtual_battery_dispatch_deadband_kw, 0.0)
+        if abs(dispatch_kw) < deadband_kw:
+            dispatch_kw = 0.0
 
         dispatch_kw = _round_one_decimal_towards_zero(dispatch_kw)
         if dispatch_kw > 0.0:
@@ -1486,10 +1566,14 @@ class IchargingBreakerRuntime:
         nonflex_by_line: Dict[str, List[str]],
         actions: Dict[str, float],
         limit_per_line: float,
+        include_existing_line_loads: bool = False,
     ) -> None:
         for line_name, charger_ids in nonflex_by_line.items():
             limit = limit_per_line
-            line_chargers = _line_chargers(cfg, line_name)
+            if include_existing_line_loads:
+                line_chargers = _line_chargers(cfg, line_name)
+            else:
+                line_chargers = charger_ids
             current = sum(
                 actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
                 for cid in line_chargers
@@ -1503,8 +1587,9 @@ class IchargingBreakerRuntime:
                 next_queue: List[str] = []
                 for cid in alloc_queue:
                     state = states[cid]
+                    already_line = actions.get(cid, 0.0) / max(state.n_phases, 1)
                     per_line_cap = state.max_kw / max(state.n_phases, 1)
-                    capacity = per_line_cap
+                    capacity = max(per_line_cap - already_line, 0.0)
                     addition = min(share, capacity)
                     assigned[cid] += addition
                     remaining -= addition
@@ -1514,78 +1599,108 @@ class IchargingBreakerRuntime:
                     break
                 alloc_queue = next_queue
             for cid, value in assigned.items():
-                actions[cid] = max(actions.get(cid, 0.0), value * max(states[cid].n_phases, 1))
+                actions[cid] = actions.get(cid, 0.0) + (value * max(states[cid].n_phases, 1))
 
-    def _fill_remaining_headroom(
+    def _connected_board_total(
+        self,
+        states: Dict[str, ChargerState],
+        actions: Dict[str, float],
+    ) -> float:
+        return sum(actions.get(cid, 0.0) for cid, st in states.items() if st.connected)
+
+    def _line_addition_capacity_kw(
         self,
         cfg: IchargingRuntimeConfig,
         states: Dict[str, ChargerState],
         actions: Dict[str, float],
-        min_levels: Dict[str, float],
+        charger_id: str,
+        limit_per_line: float,
+    ) -> float:
+        state = states.get(charger_id)
+        if state is None or not state.connected:
+            return 0.0
+
+        phases = [phase for phase in (state.phases or ([state.line] if state.line else [])) if phase]
+        constrained_phases = [phase for phase in phases if phase in cfg.line_limits]
+        if not constrained_phases:
+            return float("inf")
+
+        n_phases = max(state.n_phases, 1)
+        line_capacity_kw = float("inf")
+        for phase in constrained_phases:
+            phase_total = 0.0
+            for cid, candidate in states.items():
+                if not candidate.connected:
+                    continue
+                candidate_phases = [
+                    p for p in (candidate.phases or ([candidate.line] if candidate.line else [])) if p
+                ]
+                if phase not in candidate_phases:
+                    continue
+                phase_total += actions.get(cid, 0.0) / max(candidate.n_phases, 1)
+            remaining_phase = max(limit_per_line - phase_total, 0.0)
+            line_capacity_kw = min(line_capacity_kw, remaining_phase * n_phases)
+        return max(line_capacity_kw, 0.0)
+
+    def _allocate_flex_budget(
+        self,
+        cfg: IchargingRuntimeConfig,
+        states: Dict[str, ChargerState],
+        actions: Dict[str, float],
         flexible_chargers: List[str],
         limit_per_line: float,
         board_limit: float,
+        community_flex_adjust_kw: float,
     ) -> None:
-        """
-        After flexible requirements are applied, if there is remaining headroom on a line and
-        board, top-up non-flex chargers (and flexible chargers up to their max) until limits
-        are hit. This prevents leaving unused capacity when a flexible EV requires little power.
-        """
-        # Board headroom considering connected chargers only
-        board_used = sum(actions.get(cid, 0.0) for cid, st in states.items() if st.connected)
-        board_remaining = max(board_limit - board_used, 0.0)
-        if board_remaining <= 1e-6:
+        flex_ids = [cid for cid in flexible_chargers if cid in states and states[cid].connected]
+        if not flex_ids:
             return
 
-        # Work line by line
-        for line_name in cfg.line_limits:
-            limit = limit_per_line
-            line_chargers = [
-                cid for cid, st in states.items() if st.connected and st.line == line_name
-            ]
-            if not line_chargers:
-                continue
-            current = sum(actions.get(cid, 0.0) / max(states[cid].n_phases, 1) for cid in line_chargers)
-            remaining_line = max(limit - current, 0.0)
-            if remaining_line <= 1e-6:
-                continue
+        nonflex_total_kw = sum(
+            actions.get(cid, 0.0)
+            for cid, st in states.items()
+            if st.connected and not st.flexible
+        )
+        flex_floor_total_kw = sum(states[cid].min_kw for cid in flex_ids)
+        physical_flex_budget_kw = max(board_limit - nonflex_total_kw, 0.0)
+        flex_budget_kw = _clamp(
+            physical_flex_budget_kw + community_flex_adjust_kw,
+            0.0,
+            physical_flex_budget_kw,
+        )
+        additional_budget_kw = max(flex_budget_kw - flex_floor_total_kw, 0.0)
+        if additional_budget_kw <= 1e-6:
+            return
 
-            # Chargers eligible for top-up: connected chargers on this line with available headroom
-            topup_candidates = []
-            for cid in line_chargers:
-                st = states[cid]
-                max_allowed = st.max_kw
-                already = actions.get(cid, 0.0)
-                if already + 1e-6 >= max_allowed:
+        ordered_flex = sorted(flex_ids, key=lambda cid: states[cid].priority, reverse=True)
+        for target_mode in ("required", "max"):
+            for cid in ordered_flex:
+                if additional_budget_kw <= 1e-6:
+                    return
+                state = states[cid]
+                current_kw = actions.get(cid, 0.0)
+                target_kw = state.required_kw if target_mode == "required" else state.max_kw
+                if target_kw <= current_kw + 1e-6:
                     continue
-                topup_candidates.append(cid)
-            if not topup_candidates:
-                continue
 
-            # Distribute min(board_remaining, remaining_line) across candidates proportionally
-            distributable = min(remaining_line, board_remaining)
-            while distributable > 1e-6 and topup_candidates:
-                share = distributable / len(topup_candidates)
-                next_round: List[str] = []
-                for cid in topup_candidates:
-                    st = states[cid]
-                    max_allowed = st.max_kw
-                    already = actions.get(cid, 0.0)
-                    add = min(share, max_allowed - already)
-                    actions[cid] = already + add
-                    distributable -= add
-                    board_remaining = max(board_remaining - add, 0.0)
-                    if board_remaining <= 1e-6:
-                        break
-                    if already + add + 1e-6 < max_allowed:
-                        next_round.append(cid)
-                if board_remaining <= 1e-6:
-                    break
-                if next_round == topup_candidates:
-                    # No one could accept more
-                    break
-                topup_candidates = next_round
-
+                board_remaining_kw = max(board_limit - self._connected_board_total(states, actions), 0.0)
+                line_remaining_kw = self._line_addition_capacity_kw(
+                    cfg=cfg,
+                    states=states,
+                    actions=actions,
+                    charger_id=cid,
+                    limit_per_line=limit_per_line,
+                )
+                addition_kw = min(
+                    target_kw - current_kw,
+                    additional_budget_kw,
+                    board_remaining_kw,
+                    line_remaining_kw,
+                )
+                if addition_kw <= 1e-6:
+                    continue
+                actions[cid] = current_kw + addition_kw
+                additional_budget_kw -= addition_kw
 
     def _apply_solar_bonus(
         self,
@@ -1595,17 +1710,20 @@ class IchargingBreakerRuntime:
         actions: Dict[str, float],
         max_levels: Dict[str, float],
     ) -> None:
-        if solar_kw <= 1e-6 or not flexible_chargers:
+        if solar_kw <= 1e-6:
             return
         remaining = solar_kw
-        ordered = sorted(flexible_chargers, key=lambda cid: states[cid].priority)
+        ordered = sorted(
+            [cid for cid in flexible_chargers if cid in states and states[cid].connected],
+            key=lambda cid: states[cid].priority,
+        )
         for cid in ordered:
-            headroom = max_levels[cid] - actions.get(cid, 0.0)
+            headroom = max(max_levels.get(cid, states[cid].max_kw) - actions.get(cid, 0.0), 0.0)
             if headroom <= 1e-6:
                 continue
             addition = min(headroom, remaining)
             if addition <= 1e-6:
-                break
+                continue
             actions[cid] = actions.get(cid, 0.0) + addition
             remaining -= addition
             if remaining <= 1e-6:

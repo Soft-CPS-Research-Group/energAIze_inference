@@ -111,6 +111,35 @@ def _connected_total_kw(payload: dict, actions: dict[str, float]) -> float:
     return total
 
 
+def _connect_charger(payload: dict, charger_id: str, ev_id: str, *, flexible: bool) -> None:
+    payload["observations"]["charging_sessions"][charger_id] = {
+        "power": 0.0,
+        "electric_vehicle": ev_id,
+    }
+    if flexible:
+        _set_flex(
+            payload,
+            ev_id=ev_id,
+            soc=0.15,
+            target_soc=0.90,
+            departure_minutes_from_now=45,
+        )
+
+
+def _line_total_kw(payload: dict, actions: dict[str, float], line: str) -> float:
+    cfg = store.get_pipeline().agent._icharging_runtime.config  # noqa: SLF001
+    sessions = payload["observations"]["charging_sessions"]
+    total = 0.0
+    for charger_id, meta in cfg.chargers.items():
+        if str(meta.get("line", "")) != line:
+            continue
+        ev_id = str((sessions.get(charger_id) or {}).get("electric_vehicle") or "").strip()
+        if not ev_id:
+            continue
+        total += float(actions.get(charger_id, 0.0))
+    return total
+
+
 def test_bundle_loads_boavista_with_flex_community(boavista_with_flex_community_client):
     pipeline = store.get_pipeline()
     assert pipeline.agent.strategy == "icharging_breaker"
@@ -167,3 +196,53 @@ def test_small_community_kwh_value_changes_dispatch(boavista_with_flex_community
     no_gap_total = _connected_total_kw(no_community_gap, no_gap_actions)
     small_gap_total = _connected_total_kw(with_small_gap, small_gap_actions)
     assert small_gap_total < no_gap_total
+
+
+def test_nonflex_is_prioritized_and_flex_respects_floor_under_community_deficit(
+    boavista_with_flex_community_client,
+):
+    payload_neutral = _base_payload()
+    payload_deficit = _base_payload()
+
+    nonflex_ids = [
+        "AC000002_1",
+        "AC000003_1",
+        "AC000004_1",
+        "AC000005_1",
+        "AC000006_1",
+        "AC000007_1",
+        "AC000008_1",
+        "AC000009_1",
+    ]
+    flex_ids = ["AC000001_1", "AC000010_1", "AC000011_1", "AC000012_1", "AC000013_1"]
+
+    for idx, charger_id in enumerate(nonflex_ids):
+        ev_id = f"NF_{idx}"
+        _connect_charger(payload_neutral, charger_id, ev_id, flexible=False)
+        _connect_charger(payload_deficit, charger_id, ev_id, flexible=False)
+    for idx, charger_id in enumerate(flex_ids):
+        ev_id = f"F_{idx}"
+        _connect_charger(payload_neutral, charger_id, ev_id, flexible=True)
+        _connect_charger(payload_deficit, charger_id, ev_id, flexible=True)
+
+    payload_deficit["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    payload_deficit["community"]["energy_out_total"] = 0.0
+
+    neutral_actions = _run(boavista_with_flex_community_client, payload_neutral)
+    deficit_actions = _run(boavista_with_flex_community_client, payload_deficit)
+
+    nonflex_neutral = [float(neutral_actions[cid]) for cid in nonflex_ids]
+    nonflex_deficit = [float(deficit_actions[cid]) for cid in nonflex_ids]
+    flex_neutral = [float(neutral_actions[cid]) for cid in flex_ids]
+    flex_deficit = [float(deficit_actions[cid]) for cid in flex_ids]
+
+    assert min(nonflex_deficit) >= 4.5
+    assert min(flex_deficit) >= 1.6
+    assert max(flex_deficit) <= 4.6 + 1e-6
+    assert sum(nonflex_deficit) == pytest.approx(sum(nonflex_neutral), rel=1e-3)
+    assert sum(flex_deficit) < sum(flex_neutral)
+
+    assert _connected_total_kw(payload_deficit, deficit_actions) <= 55.0 + 1e-3
+    assert _line_total_kw(payload_deficit, deficit_actions, "L1") <= 18.333 + 1e-3
+    assert _line_total_kw(payload_deficit, deficit_actions, "L2") <= 18.333 + 1e-3
+    assert _line_total_kw(payload_deficit, deficit_actions, "L3") <= 18.333 + 1e-3

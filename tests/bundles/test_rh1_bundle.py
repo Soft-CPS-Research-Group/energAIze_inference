@@ -322,6 +322,26 @@ def test_rh1_small_meter_energy_interval_drives_nonzero_battery_dispatch(rh1_cli
     assert actions[ACTION_BATTERY] < -0.1
 
 
+def test_rh1_pv_panel_energy_interval_converts_to_solar_power_kw(rh1_client):
+    runtime = store.get_pipeline().agent._rh1_runtime  # noqa: SLF001
+    assert runtime is not None
+
+    payload = flatten_payload(
+        {
+            "pv_panels": {
+                "PV01": {
+                    "energy": _kwh_for_interval(6.0),
+                }
+            }
+        }
+    )
+    warnings: list[str] = []
+    solar_kw = runtime._extract_solar_generation(payload, warnings)  # noqa: SLF001
+
+    assert solar_kw == pytest.approx(6.0, rel=1e-6)
+    assert warnings == []
+
+
 def test_rh1_quantization_keeps_grid_import_within_limit(rh1_client):
     payload = {
         "timestamp": "2026-03-01T10:00:00Z",
