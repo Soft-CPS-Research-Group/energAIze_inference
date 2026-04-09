@@ -160,3 +160,36 @@ def test_price_signal_still_trades_off_with_community_target(rh1_community_clien
     expensive_actions = _run(rh1_community_client, expensive_now)
 
     assert expensive_actions[ACTION_BATTERY] < cheap_actions[ACTION_BATTERY]
+
+
+def test_connected_ev_keeps_minimum_and_is_not_modulated_by_community(rh1_community_client):
+    base = _base_payload()
+    base["observations"]["charging_sessions"]["EVC01"] = {
+        "power": 0.0,
+        "electric_vehicle": "EV01",
+    }
+    base["observations"]["electric_vehicles"] = {
+        "EV01": {
+            "SoC": 0.4,
+            "flexibility": {
+                "estimated_soc_at_departure": 0.9,
+                "estimated_time_at_departure": "2026-03-01T12:00:00Z",
+            },
+        }
+    }
+    base["observations"]["energy_price"] = _price_curve(0.35, 0.25, 0.23, 0.22, 0.20, 0.18)
+
+    deficit = copy.deepcopy(base)
+    deficit["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    deficit["community"]["energy_out_total"] = 0.0
+
+    surplus = copy.deepcopy(base)
+    surplus["community"]["energy_in_total"] = 0.0
+    surplus["community"]["energy_out_total"] = _kwh_for_interval(30.0)
+
+    deficit_actions = _run(rh1_community_client, deficit)
+    surplus_actions = _run(rh1_community_client, surplus)
+
+    assert deficit_actions[ACTION_EV] >= 1.6 - 1e-6
+    assert surplus_actions[ACTION_EV] >= 1.6 - 1e-6
+    assert deficit_actions[ACTION_EV] == pytest.approx(surplus_actions[ACTION_EV], rel=1e-6)

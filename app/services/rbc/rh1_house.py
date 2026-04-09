@@ -111,6 +111,8 @@ class Rh1HouseConfig:
     chargers: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     vehicle_capacities: Dict[str, float] = field(default_factory=dict)
     ev_flexibility_fields: Dict[str, str] = field(default_factory=lambda: dict(DEFAULT_EV_FLEX_FIELDS))
+    ev_use_flexibility: bool = True
+    ev_always_on_when_connected: bool = False
     price_unit_mode: str = "auto"
     price_auto_mwh_threshold: float = 3.0
     soc_unit_mode: str = "auto"
@@ -209,6 +211,8 @@ class Rh1HouseConfig:
             chargers=chargers,
             vehicle_capacities=vehicle_capacities,
             ev_flexibility_fields=flex_fields,
+            ev_use_flexibility=bool(data.pop("ev_use_flexibility", True)),
+            ev_always_on_when_connected=bool(data.pop("ev_always_on_when_connected", False)),
             price_unit_mode=price_unit_mode,
             price_auto_mwh_threshold=max(
                 _safe_float(data.pop("price_auto_mwh_threshold", 3.0), 3.0),
@@ -396,22 +400,53 @@ class Rh1HouseRuntime:
             battery_bounds=battery_bounds,
             community_net_kw=community_net_kw,
         )
-        ev_kw, battery_kw, base_without_battery = self._optimize_joint_dispatch(
-            payload=payload,
-            ev=ev,
-            battery_soc=battery_soc,
-            battery_bounds=battery_bounds,
-            non_shiftable_load=non_shiftable_load,
-            solar_generation=solar_generation,
-            price_now=price_now,
-            future_avg_price=future_avg_price,
-            grid_import_limit_kw=grid_import_limit_kw,
-            grid_export_limit_kw=grid_export_limit_kw,
-            dt_hours=dt_hours,
-            community_target_kw=community_target_kw,
-        )
+        if cfg.community_participation_enabled:
+            ev_kw, _, _ = self._optimize_joint_dispatch(
+                payload=payload,
+                ev=ev,
+                battery_soc=battery_soc,
+                battery_bounds=battery_bounds,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                grid_import_limit_kw=grid_import_limit_kw,
+                grid_export_limit_kw=grid_export_limit_kw,
+                dt_hours=dt_hours,
+                community_target_kw=0.0,
+            )
+            battery_kw, base_without_battery = self._optimize_battery_dispatch_for_fixed_ev(
+                payload=payload,
+                ev_kw=ev_kw,
+                ev_hard_min_kw=ev.hard_min_kw,
+                battery_bounds=battery_bounds,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                grid_import_limit_kw=grid_import_limit_kw,
+                grid_export_limit_kw=grid_export_limit_kw,
+                dt_hours=dt_hours,
+                community_target_kw=community_target_kw,
+            )
+        else:
+            ev_kw, battery_kw, base_without_battery = self._optimize_joint_dispatch(
+                payload=payload,
+                ev=ev,
+                battery_soc=battery_soc,
+                battery_bounds=battery_bounds,
+                non_shiftable_load=non_shiftable_load,
+                solar_generation=solar_generation,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                grid_import_limit_kw=grid_import_limit_kw,
+                grid_export_limit_kw=grid_export_limit_kw,
+                dt_hours=dt_hours,
+                community_target_kw=community_target_kw,
+            )
 
-        ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
+        ev_floor_kw = ev.hard_min_kw if (ev.connected and cfg.ev_always_on_when_connected) else 0.0
+        ev_kw = _clamp(ev_kw, ev_floor_kw, ev.max_kw)
         battery_kw = _clamp(battery_kw, battery_bounds.min_kw, battery_bounds.max_kw)
         battery_kw = self._fit_battery_to_grid(
             base_without_battery,
@@ -425,10 +460,10 @@ class Rh1HouseRuntime:
 
         if net_grid_kw > grid_import_limit_kw + 1e-6:
             shortfall = net_grid_kw - grid_import_limit_kw
-            reduced = min(shortfall, ev_kw)
+            ev_reducible_kw = max(ev_kw - ev_floor_kw, 0.0)
+            reduced = min(shortfall, ev_reducible_kw)
             ev_kw -= reduced
-            shortfall -= reduced
-            if ev_kw + 1e-6 < ev.hard_min_kw:
+            if ev_floor_kw <= 1e-6 and ev_kw + 1e-6 < ev.hard_min_kw:
                 local_constraint_flags["ev_hard_min_unmet"] = True
 
             base_without_battery = self._estimate_base_without_battery(
@@ -447,6 +482,8 @@ class Rh1HouseRuntime:
             net_grid_kw = base_without_battery + battery_kw
             if net_grid_kw > grid_import_limit_kw + 1e-6:
                 local_constraint_flags["grid_import_limit_unmet"] = True
+                if ev_floor_kw > 1e-6:
+                    local_constraint_flags["ev_floor_forced_connected"] = True
 
         if net_grid_kw < -grid_export_limit_kw - 1e-6:
             excess_export = -grid_export_limit_kw - net_grid_kw
@@ -472,7 +509,7 @@ class Rh1HouseRuntime:
             if net_grid_kw < -grid_export_limit_kw - 1e-6:
                 local_constraint_flags["grid_export_limit_unmet"] = True
 
-        ev_kw = _clamp(ev_kw, 0.0, ev.max_kw)
+        ev_kw = _clamp(ev_kw, ev_floor_kw, ev.max_kw)
         battery_kw = _clamp(battery_kw, battery_bounds.min_kw, battery_bounds.max_kw)
 
         actions = {
@@ -481,7 +518,7 @@ class Rh1HouseRuntime:
         }
 
         quantized = {key: float(_round_one_decimal_towards_zero(value)) for key, value in actions.items()}
-        quantized["ev_charge_kw"] = float(_clamp(quantized["ev_charge_kw"], 0.0, ev.max_kw))
+        quantized["ev_charge_kw"] = float(_clamp(quantized["ev_charge_kw"], ev_floor_kw, ev.max_kw))
         quantized["battery_kw"] = float(
             _clamp(quantized["battery_kw"], battery_bounds.min_kw, battery_bounds.max_kw)
         )
@@ -606,6 +643,7 @@ class Rh1HouseRuntime:
             (
                 f"EV: connected={'yes' if ev.connected else 'no'}"
                 f" hard_min={fmt_kw(ev.hard_min_kw)} kW"
+                f" floor={fmt_kw(ev_floor_kw)} kW"
                 f" max={fmt_kw(ev.max_kw)} kW"
                 f" dispatch={fmt_kw(quantized['ev_charge_kw'])} kW"
             ),
@@ -924,15 +962,18 @@ class Rh1HouseRuntime:
             charger_max = max(_safe_float(meta.get("max_kw"), 22.0), charger_min)
             max_total += charger_max
 
-            required_kw = self._required_ev_power(
-                payload=payload,
-                ev_id=ev_id,
-                charger_min_kw=charger_min,
-                charger_max_kw=charger_max,
-                now=now,
-                control_minutes=control_minutes,
-                dt_hours=dt_hours,
-            )
+            if cfg.ev_use_flexibility:
+                required_kw = self._required_ev_power(
+                    payload=payload,
+                    ev_id=ev_id,
+                    charger_min_kw=charger_min,
+                    charger_max_kw=charger_max,
+                    now=now,
+                    control_minutes=control_minutes,
+                    dt_hours=dt_hours,
+                )
+            else:
+                required_kw = charger_min
             hard_min_total += max(required_kw, charger_min)
 
         if not connected_any:
@@ -1222,6 +1263,77 @@ class Rh1HouseRuntime:
             return fallback_ev_kw, fallback_battery_kw, fallback_base
 
         return best_choice[1], best_choice[2], best_choice[3]
+
+    def _optimize_battery_dispatch_for_fixed_ev(
+        self,
+        payload: Dict[str, Any],
+        ev_kw: float,
+        ev_hard_min_kw: float,
+        battery_bounds: BatteryPowerBounds,
+        non_shiftable_load: float,
+        solar_generation: float,
+        price_now: float,
+        future_avg_price: float,
+        grid_import_limit_kw: float,
+        grid_export_limit_kw: float,
+        dt_hours: float,
+        community_target_kw: float,
+    ) -> tuple[float, float]:
+        base_without_battery = self._estimate_base_without_battery(
+            payload=payload,
+            ev_kw=ev_kw,
+            non_shiftable_load=non_shiftable_load,
+            solar_generation=solar_generation,
+        )
+        battery_values = self._candidate_values(battery_bounds.min_kw, battery_bounds.max_kw)
+        if not battery_values:
+            return 0.0, base_without_battery
+
+        best_choice: tuple[float, float, float] | None = None
+        # tuple: (objective, battery_kw, net_grid_kw)
+        for battery_kw in battery_values:
+            objective = self._joint_dispatch_objective(
+                ev_kw=ev_kw,
+                ev_hard_min_kw=ev_hard_min_kw,
+                base_without_battery=base_without_battery,
+                battery_kw=battery_kw,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                grid_import_limit_kw=grid_import_limit_kw,
+                grid_export_limit_kw=grid_export_limit_kw,
+                dt_hours=dt_hours,
+                community_target_kw=community_target_kw,
+            )
+            net_grid_kw = base_without_battery + battery_kw
+            candidate = (objective, battery_kw, net_grid_kw)
+            if best_choice is None:
+                best_choice = candidate
+                continue
+            if objective < best_choice[0] - 1e-9:
+                best_choice = candidate
+                continue
+            if abs(objective - best_choice[0]) <= 1e-9:
+                exported = max(-net_grid_kw, 0.0)
+                best_exported = max(-best_choice[2], 0.0)
+                if exported < best_exported - 1e-9:
+                    best_choice = candidate
+                    continue
+                if abs(exported - best_exported) <= 1e-9:
+                    imported = max(net_grid_kw, 0.0)
+                    best_imported = max(best_choice[2], 0.0)
+                    if imported < best_imported - 1e-9:
+                        best_choice = candidate
+
+        if best_choice is None:
+            fallback_battery_kw = self._battery_dispatch(
+                base_without_battery=base_without_battery,
+                price_now=price_now,
+                future_avg_price=future_avg_price,
+                bounds=battery_bounds,
+            )
+            return fallback_battery_kw, base_without_battery
+
+        return best_choice[1], base_without_battery
 
     def _fit_battery_to_grid(
         self,

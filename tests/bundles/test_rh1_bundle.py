@@ -414,7 +414,7 @@ def test_rh1_real_payload_tariffs_drive_decisions(rh1_client):
     assert cheap_actions[ACTION_BATTERY] > 0.0
 
 
-def test_rh1_ev_hard_deadline_behavior(rh1_client):
+def test_rh1_ev_flexibility_fields_do_not_change_dispatch_when_disabled_in_bundle(rh1_client):
     payload = {
         "timestamp": "2026-03-01T10:00:00Z",
         "observations": {
@@ -436,17 +436,16 @@ def test_rh1_ev_hard_deadline_behavior(rh1_client):
         "forecasts": {},
     }
 
-    actions = _run(rh1_client, payload)
-    now = datetime.fromisoformat(payload["timestamp"].replace("Z", "+00:00"))
-    departure = datetime.fromisoformat(
-        payload["observations"]["electric_vehicles"]["EV01"]["flexibility"]["estimated_time_at_departure"].replace("Z", "+00:00")
-    )
-    gap_kwh = (0.90 - 0.30) * 60.0
-    minutes_remaining = max((departure - now).total_seconds() / 60.0, 1.0)
-    required_kw = gap_kwh / (minutes_remaining / 60.0)
-    expected_floor = min(max(required_kw, 0.0), 4.6)
+    payload_without_flex = copy.deepcopy(payload)
+    payload_without_flex["observations"]["electric_vehicles"] = {}
 
-    assert actions[ACTION_EV] + 0.11 >= expected_floor
+    actions_with_flex_data = _run(rh1_client, payload)
+    actions_without_flex_data = _run(rh1_client, payload_without_flex)
+
+    assert actions_with_flex_data[ACTION_EV] == pytest.approx(
+        actions_without_flex_data[ACTION_EV], rel=1e-6
+    )
+    assert actions_with_flex_data[ACTION_EV] >= 1.6 - 1e-6
 
 
 def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
@@ -473,6 +472,32 @@ def test_rh1_ev_without_flex_is_treated_as_non_flex(rh1_client):
 
     actions = _run(rh1_client, payload)
     assert actions[ACTION_EV] == pytest.approx(1.6, rel=1e-6)
+
+
+def test_rh1_connected_ev_keeps_minimum_charge_even_with_high_price(rh1_client):
+    payload = {
+        "timestamp": "2026-03-01T20:00:00Z",
+        "observations": {
+            "non_shiftable_load": 2.0,
+            "solar_generation": 0.0,
+            "energy_price": _price_curve(0.45, 0.30, 0.28, 0.25, 0.22, 0.20),
+            "batteries": {"B01": {"SoC": 0.7}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": "EV01"}},
+            "electric_vehicles": {
+                "EV01": {
+                    "SoC": 0.50,
+                    "flexibility": {
+                        "estimated_soc_at_departure": 0.95,
+                        "estimated_time_at_departure": "2026-03-01T21:00:00Z",
+                    },
+                }
+            },
+        },
+        "forecasts": {},
+    }
+
+    actions = _run(rh1_client, payload)
+    assert actions[ACTION_EV] >= 1.6 - 1e-6
 
 
 def test_rh1_cost_is_better_than_baseline_on_synthetic_sequence(rh1_client):

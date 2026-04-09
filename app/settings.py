@@ -48,6 +48,11 @@ class Settings(BaseSettings):
         env="LOG_FILE_RETENTION",
         description="Retention policy for log files (e.g. '7 days')",
     )
+    log_file_compression: str | None = Field(
+        default=None,
+        env="LOG_FILE_COMPRESSION",
+        description="Optional compression for rotated log files (e.g. 'gz' or 'zip')",
+    )
     alias_mapping_path: Path | None = Field(
         default=None,
         env="FEATURE_ALIAS_PATH",

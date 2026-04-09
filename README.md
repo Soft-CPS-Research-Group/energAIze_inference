@@ -171,6 +171,7 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 - `LOG_FILE` (optional path for file logging)
 - `LOG_FILE_ROTATION` (e.g., `50 MB` or `1 day`)
 - `LOG_FILE_RETENTION` (e.g., `7 days`)
+- `LOG_FILE_COMPRESSION` (optional, e.g., `gz` or `zip`)
 - `ONNX_EXECUTION_PROVIDERS` (e.g., `CPUExecutionProvider`)
 - `ALLOWED_BUNDLE_ROOT` (optional; restrict `/admin/load` to this root path)
 
@@ -179,7 +180,13 @@ docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 - `LOG_JSON=true` switches to JSON logs (single-line entries).
 - `LOG_FILE` enables file logging in addition to console output.
 - Rotation and retention are controlled by `LOG_FILE_ROTATION` and `LOG_FILE_RETENTION`.
+- Rotated files can be compressed with `LOG_FILE_COMPRESSION` (e.g., `gz`).
 - In Docker, mount a host folder to persist logs (e.g., `./logs:/var/log/energaize`).
+- `docker-compose.yml` now defaults to persistent file logs:
+  - `LOG_FILE=/var/log/energaize/inference.log`
+  - `LOG_FILE_ROTATION=250 MB`
+  - `LOG_FILE_RETENTION=30 days`
+  - `LOG_FILE_COMPRESSION=gz`
 
 ## Tests
 ```bash
