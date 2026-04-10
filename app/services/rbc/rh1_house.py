@@ -115,6 +115,8 @@ class Rh1HouseConfig:
     ev_always_on_when_connected: bool = False
     price_unit_mode: str = "auto"
     price_auto_mwh_threshold: float = 3.0
+    price_quantile_cheap: float = 0.35
+    price_quantile_expensive: float = 0.70
     soc_unit_mode: str = "auto"
     battery_soc_keys: List[str] = field(default_factory=lambda: ["electrical_storage.soc"])
     community_participation_enabled: bool = False
@@ -126,6 +128,12 @@ class Rh1HouseConfig:
     community_dispatch_weight: float = 0.2
     community_dispatch_cap_kw: float = 0.0
     community_price_signal_key: str = "community.price_signal"
+    reserve_soc_cheap: float = 0.35
+    reserve_soc_neutral: float = 0.30
+    reserve_soc_expensive: float = 0.25
+    target_soc_cheap: float = 0.85
+    target_soc_neutral: float = 0.70
+    target_soc_expensive: float = 0.60
     ev_action_name: str = ""
     battery_action_name: str = ""
 
@@ -183,7 +191,7 @@ class Rh1HouseConfig:
             data.pop("community_price_signal_key", "community.price_signal")
         ).strip() or "community.price_signal"
 
-        return cls(
+        cfg = cls(
             grid_import_limit_kw=grid_import_limit_kw,
             control_interval_minutes=max(
                 _safe_float(data.pop("control_interval_minutes", 0.25), 0.25),
@@ -218,6 +226,16 @@ class Rh1HouseConfig:
                 _safe_float(data.pop("price_auto_mwh_threshold", 3.0), 3.0),
                 0.0,
             ),
+            price_quantile_cheap=_clamp(
+                _safe_float(data.pop("price_quantile_cheap", 0.35), 0.35),
+                0.0,
+                1.0,
+            ),
+            price_quantile_expensive=_clamp(
+                _safe_float(data.pop("price_quantile_expensive", 0.70), 0.70),
+                0.0,
+                1.0,
+            ),
             soc_unit_mode=soc_unit_mode,
             battery_soc_keys=battery_soc_keys,
             community_participation_enabled=bool(
@@ -246,9 +264,79 @@ class Rh1HouseConfig:
                 0.0,
             ),
             community_price_signal_key=community_price_signal_key,
+            reserve_soc_cheap=_clamp(
+                _safe_float(data.pop("reserve_soc_cheap", 0.35), 0.35),
+                0.0,
+                1.0,
+            ),
+            reserve_soc_neutral=_clamp(
+                _safe_float(data.pop("reserve_soc_neutral", 0.30), 0.30),
+                0.0,
+                1.0,
+            ),
+            reserve_soc_expensive=_clamp(
+                _safe_float(data.pop("reserve_soc_expensive", 0.25), 0.25),
+                0.0,
+                1.0,
+            ),
+            target_soc_cheap=_clamp(
+                _safe_float(data.pop("target_soc_cheap", 0.85), 0.85),
+                0.0,
+                1.0,
+            ),
+            target_soc_neutral=_clamp(
+                _safe_float(data.pop("target_soc_neutral", 0.70), 0.70),
+                0.0,
+                1.0,
+            ),
+            target_soc_expensive=_clamp(
+                _safe_float(data.pop("target_soc_expensive", 0.60), 0.60),
+                0.0,
+                1.0,
+            ),
             ev_action_name=ev_action_name,
             battery_action_name=battery_action_name,
         )
+        if cfg.battery_soc_max < cfg.battery_soc_min:
+            cfg.battery_soc_max = cfg.battery_soc_min
+
+        cfg.price_quantile_cheap = _clamp(cfg.price_quantile_cheap, 0.0, 1.0)
+        cfg.price_quantile_expensive = _clamp(cfg.price_quantile_expensive, 0.0, 1.0)
+        if cfg.price_quantile_expensive < cfg.price_quantile_cheap:
+            cfg.price_quantile_expensive = cfg.price_quantile_cheap
+
+        cfg.reserve_soc_cheap = _clamp(
+            cfg.reserve_soc_cheap,
+            cfg.battery_soc_min,
+            cfg.battery_soc_max,
+        )
+        cfg.reserve_soc_neutral = _clamp(
+            cfg.reserve_soc_neutral,
+            cfg.battery_soc_min,
+            cfg.battery_soc_max,
+        )
+        cfg.reserve_soc_expensive = _clamp(
+            cfg.reserve_soc_expensive,
+            cfg.battery_soc_min,
+            cfg.battery_soc_max,
+        )
+
+        cfg.target_soc_cheap = _clamp(
+            cfg.target_soc_cheap,
+            cfg.reserve_soc_cheap,
+            cfg.battery_soc_max,
+        )
+        cfg.target_soc_neutral = _clamp(
+            cfg.target_soc_neutral,
+            cfg.reserve_soc_neutral,
+            cfg.battery_soc_max,
+        )
+        cfg.target_soc_expensive = _clamp(
+            cfg.target_soc_expensive,
+            cfg.reserve_soc_expensive,
+            cfg.battery_soc_max,
+        )
+        return cfg
 
     def resolve_ev_field(self, key: str, ev_id: str) -> str:
         template = self.ev_flexibility_fields.get(key)
@@ -286,6 +374,13 @@ class EvAggregate:
     connected: bool
     hard_min_kw: float
     max_kw: float
+
+
+@dataclass
+class CommunityTargetDecision:
+    raw_target_kw: float
+    effective_target_kw: float
+    reserve_limited: bool
 
 
 class Rh1HouseRuntime:
@@ -371,6 +466,7 @@ class Rh1HouseRuntime:
         prices = self._extract_price_points(payload, warnings)
         price_now = prices[0.0]
         future_avg_price = self._average_interpolated_price(prices)
+        price_regime = self._price_regime(payload, prices, price_now)
 
         non_shiftable_load = _safe_float(payload.get("non_shiftable_load"), 0.0)
         solar_generation = self._extract_solar_generation(payload, warnings)
@@ -393,13 +489,19 @@ class Rh1HouseRuntime:
         grid_export_limit_kw = max(grid_export_limit_kw, 0.0)
 
         battery_soc = self._extract_battery_soc(payload, warnings)
+        reserve_floor_soc, charge_target_soc = self._soc_profile_for_regime(price_regime)
 
         ev = self._ev_action_bounds(payload, now, dt_hours)
         battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
-        community_target_kw = self._community_battery_target_kw(
+        community_target = self._community_battery_target_kw(
             battery_bounds=battery_bounds,
+            soc=battery_soc,
+            dt_hours=dt_hours,
             community_net_kw=community_net_kw,
+            reserve_floor_soc=reserve_floor_soc,
+            charge_target_soc=charge_target_soc,
         )
+        community_target_kw = community_target.effective_target_kw
         if cfg.community_participation_enabled:
             ev_kw, _, _ = self._optimize_joint_dispatch(
                 payload=payload,
@@ -603,7 +705,13 @@ class Rh1HouseRuntime:
             community_net_kwh=community_net_kwh,
             community_net_kw=community_net_kw,
             community_target_kw=community_target_kw,
+            community_target_raw_kw=community_target.raw_target_kw,
+            effective_community_target_kw=community_target.effective_target_kw,
+            community_reserve_limited=community_target.reserve_limited,
             community_alignment_penalty=community_alignment_penalty,
+            price_regime=price_regime,
+            reserve_floor_soc=reserve_floor_soc,
+            charge_target_soc=charge_target_soc,
         )
 
         def fmt_kw(value: float) -> str:
@@ -641,6 +749,11 @@ class Rh1HouseRuntime:
                 f" avg_24h={fmt_price(future_avg_price)}"
             ),
             (
+                f"Policy: price_regime={price_regime}"
+                f" reserve_floor_soc={reserve_floor_soc * 100.0:.1f}%"
+                f" charge_target_soc={charge_target_soc * 100.0:.1f}%"
+            ),
+            (
                 f"EV: connected={'yes' if ev.connected else 'no'}"
                 f" hard_min={fmt_kw(ev.hard_min_kw)} kW"
                 f" floor={fmt_kw(ev_floor_kw)} kW"
@@ -670,14 +783,18 @@ class Rh1HouseRuntime:
                     f" out={fmt_meter(community_export_kwh, community_export_kw)}"
                     f" net={fmt_meter(community_net_kwh, community_net_kw)}"
                     f" deadband={fmt_kw(cfg.community_energy_deadband_kw)} kW"
-                    f" target_battery={fmt_kw(community_target_kw)} kW"
+                    f" target_battery_raw={fmt_kw(community_target.raw_target_kw)} kW"
+                    f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
+                    f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
                 )
             )
         else:
             summary_lines.append(
                 (
-                    f"Community: target_battery={fmt_kw(community_target_kw)} kW"
+                    f"Community: target_battery_raw={fmt_kw(community_target.raw_target_kw)} kW"
+                    f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
+                    f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
                 )
             )
@@ -944,6 +1061,81 @@ class Rh1HouseRuntime:
             return points[0.0]
         return float(sum(samples) / len(samples))
 
+    def _extract_price_series_for_quantiles(
+        self,
+        payload: Dict[str, Any],
+        fallback_points: Dict[float, float],
+    ) -> List[float]:
+        prefixes = ("energy_tariffs.OMIE.energy_price", "energy_price")
+        for prefix in prefixes:
+            entries: List[tuple[int, float]] = []
+            value_prefix = f"{prefix}.values["
+            for key, raw in payload.items():
+                if not isinstance(key, str):
+                    continue
+                if not key.startswith(value_prefix) or not key.endswith("]"):
+                    continue
+                idx_raw = key[len(value_prefix) : -1]
+                if not idx_raw.isdigit():
+                    continue
+                value = _maybe_float(raw)
+                if value is None:
+                    continue
+                entries.append((int(idx_raw), value))
+            if entries:
+                unit_hint = payload.get(f"{prefix}.measurement_unit")
+                return [
+                    max(self._normalize_price(value, unit_hint=unit_hint), 0.0)
+                    for _, value in sorted(entries, key=lambda item: item[0])
+                ]
+        return [max(value, 0.0) for value in fallback_points.values()]
+
+    def _quantile(self, values: List[float], q: float) -> float:
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        if len(ordered) == 1:
+            return ordered[0]
+        quantile = _clamp(q, 0.0, 1.0)
+        position = quantile * (len(ordered) - 1)
+        lower = int(math.floor(position))
+        upper = int(math.ceil(position))
+        if lower == upper:
+            return ordered[lower]
+        alpha = position - lower
+        return ordered[lower] + alpha * (ordered[upper] - ordered[lower])
+
+    def _price_regime(
+        self,
+        payload: Dict[str, Any],
+        price_points: Dict[float, float],
+        price_now: float,
+    ) -> str:
+        cfg = self.config
+        series = self._extract_price_series_for_quantiles(payload, price_points)
+        cheap_threshold = self._quantile(series, cfg.price_quantile_cheap)
+        expensive_threshold = self._quantile(series, cfg.price_quantile_expensive)
+        if price_now <= cheap_threshold + 1e-9:
+            return "cheap"
+        if price_now >= expensive_threshold - 1e-9:
+            return "expensive"
+        return "neutral"
+
+    def _soc_profile_for_regime(self, price_regime: str) -> tuple[float, float]:
+        cfg = self.config
+        if price_regime == "cheap":
+            reserve_floor_soc = cfg.reserve_soc_cheap
+            charge_target_soc = cfg.target_soc_cheap
+        elif price_regime == "expensive":
+            reserve_floor_soc = cfg.reserve_soc_expensive
+            charge_target_soc = cfg.target_soc_expensive
+        else:
+            reserve_floor_soc = cfg.reserve_soc_neutral
+            charge_target_soc = cfg.target_soc_neutral
+        reserve_floor_soc = _clamp(reserve_floor_soc, cfg.battery_soc_min, cfg.battery_soc_max)
+        charge_target_soc = _clamp(charge_target_soc, reserve_floor_soc, cfg.battery_soc_max)
+        return reserve_floor_soc, charge_target_soc
+
     def _ev_action_bounds(self, payload: Dict[str, Any], now: datetime, dt_hours: float) -> EvAggregate:
         cfg = self.config
         control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
@@ -1090,11 +1282,19 @@ class Rh1HouseRuntime:
     def _community_battery_target_kw(
         self,
         battery_bounds: BatteryPowerBounds,
+        soc: float,
+        dt_hours: float,
         community_net_kw: float | None,
-    ) -> float:
+        reserve_floor_soc: float,
+        charge_target_soc: float,
+    ) -> CommunityTargetDecision:
         cfg = self.config
         if not cfg.community_participation_enabled or community_net_kw is None:
-            return 0.0
+            return CommunityTargetDecision(
+                raw_target_kw=0.0,
+                effective_target_kw=0.0,
+                reserve_limited=False,
+            )
 
         deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
         raw_target_kw = 0.0
@@ -1109,7 +1309,49 @@ class Rh1HouseRuntime:
         if cap_kw > 1e-9:
             raw_target_kw = _clamp(raw_target_kw, -cap_kw, cap_kw)
 
-        return _clamp(raw_target_kw, battery_bounds.min_kw, battery_bounds.max_kw)
+        raw_target_kw = _clamp(raw_target_kw, battery_bounds.min_kw, battery_bounds.max_kw)
+        effective_target_kw = raw_target_kw
+        reserve_limited = False
+
+        battery_capacity_kwh = max(cfg.battery_capacity_kwh, 1e-6)
+        battery_efficiency = _clamp(cfg.battery_efficiency, 1e-6, 1.0)
+        interval_hours = max(dt_hours, 1e-9)
+
+        reserve_floor_soc = _clamp(reserve_floor_soc, cfg.battery_soc_min, cfg.battery_soc_max)
+        charge_target_soc = _clamp(charge_target_soc, reserve_floor_soc, cfg.battery_soc_max)
+
+        if raw_target_kw < -1e-9:
+            reserve_discharge_room_kwh = max(soc - reserve_floor_soc, 0.0) * battery_capacity_kwh
+            reserve_discharge_limit_kw = (
+                reserve_discharge_room_kwh * battery_efficiency / interval_hours
+            )
+            allowed_discharge_kw = min(
+                max(-battery_bounds.min_kw, 0.0),
+                max(reserve_discharge_limit_kw, 0.0),
+            )
+            effective_target_kw = -min(abs(raw_target_kw), allowed_discharge_kw)
+            reserve_limited = abs(effective_target_kw) + 1e-9 < abs(raw_target_kw)
+        elif raw_target_kw > 1e-9:
+            reserve_charge_room_kwh = max(charge_target_soc - soc, 0.0) * battery_capacity_kwh
+            reserve_charge_limit_kw = (
+                reserve_charge_room_kwh / max(interval_hours * battery_efficiency, 1e-9)
+            )
+            allowed_charge_kw = min(
+                max(battery_bounds.max_kw, 0.0),
+                max(reserve_charge_limit_kw, 0.0),
+            )
+            effective_target_kw = min(raw_target_kw, allowed_charge_kw)
+
+        effective_target_kw = _clamp(
+            effective_target_kw,
+            battery_bounds.min_kw,
+            battery_bounds.max_kw,
+        )
+        return CommunityTargetDecision(
+            raw_target_kw=raw_target_kw,
+            effective_target_kw=effective_target_kw,
+            reserve_limited=reserve_limited,
+        )
 
     def _community_alignment_penalty(
         self,

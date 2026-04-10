@@ -88,6 +88,17 @@ def _net_grid_kw(payload: dict, actions: dict[str, float]) -> float:
 def test_bundle_loads_rh1_community(rh1_community_client):
     pipeline = store.get_pipeline()
     assert pipeline.agent.strategy == "rh1_house_rbc_v1"
+    runtime = pipeline.agent._rh1_runtime  # noqa: SLF001
+    assert runtime is not None
+    cfg = runtime.config
+    assert cfg.price_quantile_cheap == pytest.approx(0.35, rel=1e-6)
+    assert cfg.price_quantile_expensive == pytest.approx(0.7, rel=1e-6)
+    assert cfg.reserve_soc_cheap == pytest.approx(0.35, rel=1e-6)
+    assert cfg.reserve_soc_neutral == pytest.approx(0.3, rel=1e-6)
+    assert cfg.reserve_soc_expensive == pytest.approx(0.25, rel=1e-6)
+    assert cfg.target_soc_cheap == pytest.approx(0.85, rel=1e-6)
+    assert cfg.target_soc_neutral == pytest.approx(0.7, rel=1e-6)
+    assert cfg.target_soc_expensive == pytest.approx(0.6, rel=1e-6)
 
 
 def test_missing_required_community_fields_returns_400(rh1_community_client):
@@ -160,6 +171,28 @@ def test_price_signal_still_trades_off_with_community_target(rh1_community_clien
     expensive_actions = _run(rh1_community_client, expensive_now)
 
     assert expensive_actions[ACTION_BATTERY] < cheap_actions[ACTION_BATTERY]
+
+
+def test_cheap_price_and_low_soc_prefers_charging_before_community_discharge(rh1_community_client):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.30
+    payload["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    payload["community"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_price"] = _price_curve(0.02, 0.20, 0.20, 0.20, 0.20, 0.20)
+
+    actions = _run(rh1_community_client, payload)
+    assert actions[ACTION_BATTERY] > 0.1
+
+
+def test_reserve_floor_blocks_discharge_near_target_soc_band(rh1_community_client):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.30
+    payload["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    payload["community"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_price"] = _price_curve(0.10, 0.05, 0.15, 0.15, 0.05, 0.15)
+
+    actions = _run(rh1_community_client, payload)
+    assert actions[ACTION_BATTERY] >= -0.1
 
 
 def test_connected_ev_keeps_minimum_and_is_not_modulated_by_community(rh1_community_client):

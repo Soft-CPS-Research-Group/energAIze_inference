@@ -124,12 +124,15 @@ def test_community_surplus_forces_virtual_battery_charge(
 def test_small_community_energy_interval_converts_to_kw(
     sao_mamede_with_battery_community_client,
 ):
-    payload = _base_payload()
-    payload["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
-    payload["community"]["energy_out_total"] = 0.0
+    neutral = _base_payload()
+    neutral_actions = _run(sao_mamede_with_battery_community_client, neutral)
 
-    actions = _run(sao_mamede_with_battery_community_client, payload)
-    assert actions[ACTION_BATTERY] < -0.1
+    deficit_small = _base_payload()
+    deficit_small["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
+    deficit_small["community"]["energy_out_total"] = 0.0
+    deficit_small_actions = _run(sao_mamede_with_battery_community_client, deficit_small)
+
+    assert deficit_small_actions[ACTION_BATTERY] < neutral_actions[ACTION_BATTERY]
 
 
 def test_low_soc_does_not_force_aggressive_discharge_under_community_deficit(
@@ -161,7 +164,8 @@ def test_deadband_reduces_near_zero_dispatch_chattering(
     sao_mamede_with_battery_community_client,
 ):
     base = _base_payload()
-    base["observations"]["batteries"]["B01"]["SoC"] = 0.50
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.85
+    base["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.10] * 96
 
     deficit_small = copy.deepcopy(base)
     deficit_small["community"]["energy_in_total"] = _kwh_for_interval(0.4)
@@ -180,3 +184,27 @@ def test_deadband_reduces_near_zero_dispatch_chattering(
     assert abs(a_deficit) <= 0.1
     assert abs(a_surplus) <= 0.1
     assert abs(a_neutral) <= 0.1
+
+
+def test_sign_flip_requires_extra_magnitude_threshold(
+    sao_mamede_with_battery_community_client,
+):
+    first_payload = _base_payload()
+    first_payload["observations"]["batteries"]["B01"]["SoC"] = 0.84
+    first_payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.10] * 96
+    first_payload["observations"]["solar_generation"] = 2.0
+    first_payload["community"]["energy_in_total"] = 0.0
+    first_payload["community"]["energy_out_total"] = 0.0
+
+    second_payload = _base_payload()
+    second_payload["observations"]["batteries"]["B01"]["SoC"] = 0.84
+    second_payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.10] * 96
+    second_payload["observations"]["solar_generation"] = 0.0
+    second_payload["community"]["energy_in_total"] = _kwh_for_interval(3.0)
+    second_payload["community"]["energy_out_total"] = 0.0
+
+    first = _run(sao_mamede_with_battery_community_client, first_payload)[ACTION_BATTERY]
+    second = _run(sao_mamede_with_battery_community_client, second_payload)[ACTION_BATTERY]
+
+    assert first > 0.5
+    assert abs(second) <= 0.1

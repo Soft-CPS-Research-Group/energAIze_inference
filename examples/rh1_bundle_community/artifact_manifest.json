@@ -109,7 +109,15 @@
           "community_surplus_weight": 1.0,
           "community_dispatch_weight": 0.2,
           "community_dispatch_cap_kw": 2.4,
-          "community_price_signal_key": "community.price_signal"
+          "community_price_signal_key": "community.price_signal",
+          "price_quantile_cheap": 0.35,
+          "price_quantile_expensive": 0.7,
+          "reserve_soc_cheap": 0.35,
+          "reserve_soc_neutral": 0.3,
+          "reserve_soc_expensive": 0.25,
+          "target_soc_cheap": 0.85,
+          "target_soc_neutral": 0.7,
+          "target_soc_expensive": 0.6
         }
       }
     ]

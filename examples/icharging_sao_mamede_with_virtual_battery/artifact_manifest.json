@@ -170,6 +170,14 @@
           "virtual_battery_community_current_import_key": "community.current_net_import_kw",
           "virtual_battery_community_price_prefix": "community.price_signal",
           "virtual_battery_local_price_prefix": "energy_tariffs.OMIE.energy_price",
+          "price_quantile_cheap": 0.35,
+          "price_quantile_expensive": 0.7,
+          "reserve_soc_cheap": 0.35,
+          "reserve_soc_neutral": 0.3,
+          "reserve_soc_expensive": 0.25,
+          "target_soc_cheap": 0.85,
+          "target_soc_neutral": 0.7,
+          "target_soc_expensive": 0.6,
           "virtual_battery_soc_min": 0.1,
           "virtual_battery_soc_max": 0.95,
           "virtual_battery_operating_soc_min": 0.2,
@@ -177,7 +185,9 @@
           "virtual_battery_soc_hysteresis": 0.02,
           "virtual_battery_dispatch_deadband_kw": 0.5,
           "virtual_battery_community_weight": 0.5,
-          "virtual_battery_price_weight": 0.35
+          "virtual_battery_price_weight": 0.35,
+          "virtual_battery_soc_recovery_gain": 1.0,
+          "virtual_battery_sign_flip_extra_kw": 0.3
         }
       }
     ]

@@ -151,6 +151,16 @@ def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
     assert cfg.virtual_battery_operating_soc_min == pytest.approx(0.2, rel=1e-6)
     assert cfg.virtual_battery_operating_soc_max == pytest.approx(0.85, rel=1e-6)
     assert cfg.virtual_battery_dispatch_deadband_kw == pytest.approx(0.5, rel=1e-6)
+    assert cfg.price_quantile_cheap == pytest.approx(0.35, rel=1e-6)
+    assert cfg.price_quantile_expensive == pytest.approx(0.7, rel=1e-6)
+    assert cfg.reserve_soc_cheap == pytest.approx(0.35, rel=1e-6)
+    assert cfg.reserve_soc_neutral == pytest.approx(0.3, rel=1e-6)
+    assert cfg.reserve_soc_expensive == pytest.approx(0.25, rel=1e-6)
+    assert cfg.target_soc_cheap == pytest.approx(0.85, rel=1e-6)
+    assert cfg.target_soc_neutral == pytest.approx(0.7, rel=1e-6)
+    assert cfg.target_soc_expensive == pytest.approx(0.6, rel=1e-6)
+    assert cfg.virtual_battery_soc_recovery_gain == pytest.approx(1.0, rel=1e-6)
+    assert cfg.virtual_battery_sign_flip_extra_kw == pytest.approx(0.3, rel=1e-6)
 
 
 def test_single_controllable_bb_charger_uses_merged_plugs(sao_mamede_with_battery_client):

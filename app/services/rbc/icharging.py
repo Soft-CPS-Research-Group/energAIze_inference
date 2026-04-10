@@ -250,6 +250,14 @@ class IchargingRuntimeConfig:
     virtual_battery_community_current_import_key: str = "community.current_net_import_kw"
     virtual_battery_community_price_prefix: str = "community.price_signal"
     virtual_battery_local_price_prefix: str = "energy_price"
+    price_quantile_cheap: float = 0.35
+    price_quantile_expensive: float = 0.70
+    reserve_soc_cheap: float = 0.35
+    reserve_soc_neutral: float = 0.30
+    reserve_soc_expensive: float = 0.25
+    target_soc_cheap: float = 0.85
+    target_soc_neutral: float = 0.70
+    target_soc_expensive: float = 0.60
     virtual_battery_soc_min: float = 0.1
     virtual_battery_soc_max: float = 1.0
     virtual_battery_operating_soc_min: float = 0.20
@@ -258,6 +266,8 @@ class IchargingRuntimeConfig:
     virtual_battery_dispatch_deadband_kw: float = 0.5
     virtual_battery_community_weight: float = 0.5
     virtual_battery_price_weight: float = 0.35
+    virtual_battery_soc_recovery_gain: float = 1.0
+    virtual_battery_sign_flip_extra_kw: float = 0.3
     session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
     emit_session_source_actions: bool = False
     session_merge_power_key: str = "power"
@@ -456,6 +466,46 @@ class IchargingRuntimeConfig:
             virtual_battery_local_price_prefix=str(
                 data.pop("virtual_battery_local_price_prefix", "energy_price")
             ),
+            price_quantile_cheap=_clamp(
+                _safe_float(data.pop("price_quantile_cheap", 0.35), 0.35),
+                0.0,
+                1.0,
+            ),
+            price_quantile_expensive=_clamp(
+                _safe_float(data.pop("price_quantile_expensive", 0.70), 0.70),
+                0.0,
+                1.0,
+            ),
+            reserve_soc_cheap=_clamp(
+                _safe_float(data.pop("reserve_soc_cheap", 0.35), 0.35),
+                0.0,
+                1.0,
+            ),
+            reserve_soc_neutral=_clamp(
+                _safe_float(data.pop("reserve_soc_neutral", 0.30), 0.30),
+                0.0,
+                1.0,
+            ),
+            reserve_soc_expensive=_clamp(
+                _safe_float(data.pop("reserve_soc_expensive", 0.25), 0.25),
+                0.0,
+                1.0,
+            ),
+            target_soc_cheap=_clamp(
+                _safe_float(data.pop("target_soc_cheap", 0.85), 0.85),
+                0.0,
+                1.0,
+            ),
+            target_soc_neutral=_clamp(
+                _safe_float(data.pop("target_soc_neutral", 0.70), 0.70),
+                0.0,
+                1.0,
+            ),
+            target_soc_expensive=_clamp(
+                _safe_float(data.pop("target_soc_expensive", 0.60), 0.60),
+                0.0,
+                1.0,
+            ),
             virtual_battery_soc_min=_clamp(
                 _safe_float(data.pop("virtual_battery_soc_min", 0.1), 0.1),
                 0.0,
@@ -492,6 +542,14 @@ class IchargingRuntimeConfig:
                 _safe_float(data.pop("virtual_battery_price_weight", 0.35), 0.35),
                 0.0,
             ),
+            virtual_battery_soc_recovery_gain=max(
+                _safe_float(data.pop("virtual_battery_soc_recovery_gain", 1.0), 1.0),
+                0.0,
+            ),
+            virtual_battery_sign_flip_extra_kw=max(
+                _safe_float(data.pop("virtual_battery_sign_flip_extra_kw", 0.3), 0.3),
+                0.0,
+            ),
             session_merge_map=session_merge_map,
             emit_session_source_actions=bool(data.pop("emit_session_source_actions", False)),
             session_merge_power_key=str(data.pop("session_merge_power_key", "power") or "power"),
@@ -513,6 +571,40 @@ class IchargingRuntimeConfig:
         cfg.virtual_battery_operating_soc_max = _clamp(
             cfg.virtual_battery_operating_soc_max,
             cfg.virtual_battery_operating_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.price_quantile_cheap = _clamp(cfg.price_quantile_cheap, 0.0, 1.0)
+        cfg.price_quantile_expensive = _clamp(cfg.price_quantile_expensive, 0.0, 1.0)
+        if cfg.price_quantile_expensive < cfg.price_quantile_cheap:
+            cfg.price_quantile_expensive = cfg.price_quantile_cheap
+        cfg.reserve_soc_cheap = _clamp(
+            cfg.reserve_soc_cheap,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.reserve_soc_neutral = _clamp(
+            cfg.reserve_soc_neutral,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.reserve_soc_expensive = _clamp(
+            cfg.reserve_soc_expensive,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.target_soc_cheap = _clamp(
+            cfg.target_soc_cheap,
+            cfg.reserve_soc_cheap,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.target_soc_neutral = _clamp(
+            cfg.target_soc_neutral,
+            cfg.reserve_soc_neutral,
+            cfg.virtual_battery_soc_max,
+        )
+        cfg.target_soc_expensive = _clamp(
+            cfg.target_soc_expensive,
+            cfg.reserve_soc_expensive,
             cfg.virtual_battery_soc_max,
         )
         max_hysteresis = max(
@@ -557,6 +649,7 @@ class ChargerState:
 class IchargingBreakerRuntime:
     def __init__(self, config: IchargingRuntimeConfig):
         self.config = config
+        self._last_virtual_battery_dispatch_kw = 0.0
 
     def _decision_interval_hours(self) -> float:
         return max(self.config.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
@@ -978,8 +1071,9 @@ class IchargingBreakerRuntime:
             q = _clamp(q, min_levels.get(cid, 0.0), max_levels.get(cid, states[cid].max_kw))
             quantized[cid] = float(q)
 
+        virtual_battery_diagnostics: Dict[str, Any] = {}
         if cfg.virtual_battery_action_name:
-            quantized[cfg.virtual_battery_action_name] = self._virtual_battery_dispatch(
+            virtual_battery_dispatch_kw, virtual_battery_diagnostics = self._virtual_battery_dispatch(
                 cfg,
                 payload,
                 quantized,
@@ -987,6 +1081,7 @@ class IchargingBreakerRuntime:
                 effective_board_limit,
                 community_net_kw,
             )
+            quantized[cfg.virtual_battery_action_name] = virtual_battery_dispatch_kw
 
         # Runtime summary for debugging
         external_actions = self._project_actions_to_session_sources(quantized, states, payload)
@@ -1062,6 +1157,27 @@ class IchargingBreakerRuntime:
             virtual_battery_soc_raw: Optional[float] = None
             virtual_battery_soc_key_used: Optional[str] = None
             virtual_battery_soc: Optional[float] = None
+            virtual_battery_price_regime = str(
+                virtual_battery_diagnostics.get("price_regime", "-")
+            )
+            virtual_battery_soc_target = _maybe_float(
+                virtual_battery_diagnostics.get("soc_target")
+            )
+            virtual_battery_soc_reserve_floor = _maybe_float(
+                virtual_battery_diagnostics.get("reserve_floor_soc")
+            )
+            virtual_battery_soc_recovery_signal_kw = _maybe_float(
+                virtual_battery_diagnostics.get("soc_recovery_signal_kw")
+            )
+            virtual_battery_community_signal_raw_kw = _maybe_float(
+                virtual_battery_diagnostics.get("community_signal_raw_kw")
+            )
+            virtual_battery_community_signal_limited_kw = _maybe_float(
+                virtual_battery_diagnostics.get("community_signal_limited_kw")
+            )
+            virtual_battery_sign_flip_blocked = bool(
+                virtual_battery_diagnostics.get("sign_flip_blocked", False)
+            )
             if cfg.virtual_battery_action_name:
                 virtual_battery_soc_raw = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
                 if virtual_battery_soc_raw is not None:
@@ -1103,6 +1219,13 @@ class IchargingBreakerRuntime:
                 virtual_battery_soc_raw=virtual_battery_soc_raw,
                 virtual_battery_soc_norm=virtual_battery_soc,
                 virtual_battery_soc_key=virtual_battery_soc_key_used,
+                virtual_battery_price_regime=virtual_battery_price_regime,
+                virtual_battery_soc_target=virtual_battery_soc_target,
+                virtual_battery_soc_reserve_floor=virtual_battery_soc_reserve_floor,
+                virtual_battery_soc_recovery_signal_kw=virtual_battery_soc_recovery_signal_kw,
+                virtual_battery_community_signal_raw_kw=virtual_battery_community_signal_raw_kw,
+                virtual_battery_community_signal_limited_kw=virtual_battery_community_signal_limited_kw,
+                virtual_battery_sign_flip_blocked=virtual_battery_sign_flip_blocked,
             )
 
             def fmt_kw(value: float) -> str:
@@ -1225,6 +1348,18 @@ class IchargingBreakerRuntime:
                         f" discharge_cap={fmt_kw(cfg.virtual_battery_discharge_power_max_kw)} kW"
                     )
                 )
+                summary_lines.append(
+                    (
+                        f"{cfg.virtual_battery_log_label} policy:"
+                        f" price_regime={virtual_battery_price_regime}"
+                        f" reserve_floor_soc={fmt_optional_pct(virtual_battery_soc_reserve_floor)}"
+                        f" soc_target={fmt_optional_pct(virtual_battery_soc_target)}"
+                        f" soc_recovery_signal_kw={fmt_optional_kw(virtual_battery_soc_recovery_signal_kw)}"
+                        f" community_signal_raw_kw={fmt_optional_kw(virtual_battery_community_signal_raw_kw)}"
+                        f" community_signal_limited_kw={fmt_optional_kw(virtual_battery_community_signal_limited_kw)}"
+                        f" sign_flip_blocked={'yes' if virtual_battery_sign_flip_blocked else 'no'}"
+                    )
+                )
 
             if cfg.emit_session_source_actions and cfg.session_merge_map:
                 summary_lines.append("Session source actions:")
@@ -1289,6 +1424,64 @@ class IchargingBreakerRuntime:
                 return [current]
         return []
 
+    def _quantile(self, values: List[float], q: float) -> float:
+        if not values:
+            return 0.0
+        ordered = sorted(values)
+        if len(ordered) == 1:
+            return ordered[0]
+        quantile = _clamp(q, 0.0, 1.0)
+        position = quantile * (len(ordered) - 1)
+        lower = int(math.floor(position))
+        upper = int(math.ceil(position))
+        if lower == upper:
+            return ordered[lower]
+        alpha = position - lower
+        return ordered[lower] + alpha * (ordered[upper] - ordered[lower])
+
+    def _virtual_battery_price_regime(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+    ) -> str:
+        series = self._extract_price_series(payload, cfg.virtual_battery_local_price_prefix)
+        if not series:
+            series = self._extract_price_series(payload, cfg.virtual_battery_community_price_prefix)
+        if not series:
+            return "neutral"
+
+        current = series[0]
+        cheap_threshold = self._quantile(series, cfg.price_quantile_cheap)
+        expensive_threshold = self._quantile(series, cfg.price_quantile_expensive)
+        if current <= cheap_threshold + 1e-9:
+            return "cheap"
+        if current >= expensive_threshold - 1e-9:
+            return "expensive"
+        return "neutral"
+
+    def _virtual_battery_soc_profile(
+        self,
+        cfg: IchargingRuntimeConfig,
+        price_regime: str,
+    ) -> tuple[float, float]:
+        if price_regime == "cheap":
+            reserve_floor_soc = cfg.reserve_soc_cheap
+            soc_target = cfg.target_soc_cheap
+        elif price_regime == "expensive":
+            reserve_floor_soc = cfg.reserve_soc_expensive
+            soc_target = cfg.target_soc_expensive
+        else:
+            reserve_floor_soc = cfg.reserve_soc_neutral
+            soc_target = cfg.target_soc_neutral
+
+        reserve_floor_soc = _clamp(
+            reserve_floor_soc,
+            cfg.virtual_battery_soc_min,
+            cfg.virtual_battery_soc_max,
+        )
+        soc_target = _clamp(soc_target, reserve_floor_soc, cfg.virtual_battery_soc_max)
+        return reserve_floor_soc, soc_target
+
     def _price_based_virtual_battery_dispatch(
         self,
         cfg: IchargingRuntimeConfig,
@@ -1329,11 +1522,11 @@ class IchargingBreakerRuntime:
         states: Dict[str, ChargerState],
         effective_board_limit: float,
         community_net_kw: Optional[float],
-    ) -> float:
+    ) -> tuple[float, Dict[str, Any]]:
         charge_cap_kw = max(cfg.virtual_battery_charge_power_max_kw, 0.0)
         discharge_cap_kw = max(cfg.virtual_battery_discharge_power_max_kw, 0.0)
         if charge_cap_kw <= 1e-6 and discharge_cap_kw <= 1e-6:
-            return 0.0
+            return 0.0, {}
 
         soc = _maybe_float(payload.get(cfg.virtual_battery_soc_key))
         if soc is None:
@@ -1348,7 +1541,7 @@ class IchargingBreakerRuntime:
             cfg.virtual_battery_capacity_max_kwh,
         )
         if capacity_kwh <= 1e-6:
-            return 0.0
+            return 0.0, {}
 
         dt_hours = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
         charge_soc_cap = max((cfg.virtual_battery_soc_max - soc) * capacity_kwh / dt_hours, 0.0)
@@ -1413,11 +1606,14 @@ class IchargingBreakerRuntime:
             if setpoint_kw is not None:
                 setpoint_dispatch_kw = setpoint_kw
 
+        price_regime = self._virtual_battery_price_regime(cfg, payload)
+        reserve_floor_soc, soc_target = self._virtual_battery_soc_profile(cfg, price_regime)
+
         # Blended policy:
         # 1) local balancing (site import/export relief),
         # 2) community support,
         # 3) price signal,
-        # 4) SOC operating-band recovery.
+        # 4) SOC target recovery.
         surplus_kw = max((-net for net in candidate_nets_kw if net < -1e-6), default=0.0)
         import_kw = max((net for net in candidate_nets_kw if net > 1e-6), default=0.0)
         if surplus_kw > 1e-6:
@@ -1427,24 +1623,46 @@ class IchargingBreakerRuntime:
         else:
             local_signal_kw = 0.0
 
-        community_signal_kw = 0.0
+        soc_recovery_signal_kw = 0.0
+        if charge_limit_kw > 1e-6 and soc < soc_target - 1e-9:
+            soc_gap = max(soc_target - soc, 0.0)
+            soc_reference = max(soc_target - cfg.virtual_battery_soc_min, 1e-6)
+            soc_gap_ratio = _clamp(soc_gap / soc_reference, 0.0, 1.0)
+            soc_recovery_signal_kw = min(
+                charge_limit_kw,
+                max(cfg.virtual_battery_soc_recovery_gain, 0.0) * charge_limit_kw * soc_gap_ratio,
+            )
+
+        community_signal_raw_kw = 0.0
+        community_signal_limited_kw = 0.0
         if cfg.community_participation_enabled:
             if target_dispatch_kw is not None:
-                community_signal_kw = target_dispatch_kw
+                community_signal_raw_kw = target_dispatch_kw
             elif community_net_kw is not None:
                 deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
                 if community_net_kw > deadband_kw:
                     deficit_kw = community_net_kw - deadband_kw
-                    community_signal_kw = -min(
+                    community_signal_raw_kw = -min(
                         discharge_limit_kw,
                         deficit_kw * max(cfg.community_deficit_weight, 0.0),
                     )
                 elif community_net_kw < -deadband_kw:
                     community_surplus_kw = (-community_net_kw) - deadband_kw
-                    community_signal_kw = min(
+                    community_signal_raw_kw = min(
                         charge_limit_kw,
                         community_surplus_kw * max(cfg.community_surplus_weight, 0.0),
                     )
+
+        if community_signal_raw_kw < -1e-9:
+            reserve_discharge_room_kwh = max(soc - reserve_floor_soc, 0.0) * capacity_kwh
+            reserve_discharge_limit_kw = reserve_discharge_room_kwh / max(dt_hours, 1e-9)
+            allowed_discharge_kw = min(discharge_limit_kw, max(reserve_discharge_limit_kw, 0.0))
+            community_signal_limited_kw = -min(abs(community_signal_raw_kw), allowed_discharge_kw)
+        elif community_signal_raw_kw > 1e-9:
+            reserve_charge_room_kwh = max(soc_target - soc, 0.0) * capacity_kwh
+            reserve_charge_limit_kw = reserve_charge_room_kwh / max(dt_hours, 1e-9)
+            allowed_charge_kw = min(charge_limit_kw, max(reserve_charge_limit_kw, 0.0))
+            community_signal_limited_kw = min(community_signal_raw_kw, allowed_charge_kw)
 
         operating_soc_min = _clamp(
             cfg.virtual_battery_operating_soc_min,
@@ -1460,10 +1678,10 @@ class IchargingBreakerRuntime:
             max(cfg.virtual_battery_soc_hysteresis, 0.0),
             max((operating_soc_max - operating_soc_min) / 2.0, 0.0),
         )
-        if community_signal_kw < 0.0 and soc < operating_soc_min:
-            community_signal_kw = 0.0
-        elif community_signal_kw > 0.0 and soc > operating_soc_max:
-            community_signal_kw = 0.0
+        if community_signal_limited_kw < 0.0 and soc < operating_soc_min:
+            community_signal_limited_kw = 0.0
+        elif community_signal_limited_kw > 0.0 and soc > operating_soc_max:
+            community_signal_limited_kw = 0.0
 
         charge_soft_limit_kw = charge_limit_kw
         discharge_soft_limit_kw = discharge_limit_kw
@@ -1489,15 +1707,26 @@ class IchargingBreakerRuntime:
         else:
             raw_dispatch_kw = (
                 local_signal_kw
-                + (cfg.virtual_battery_community_weight * community_signal_kw)
+                + (cfg.virtual_battery_community_weight * community_signal_limited_kw)
                 + (cfg.virtual_battery_price_weight * price_dispatch_kw)
+                + soc_recovery_signal_kw
             )
 
         dispatch_kw = _clamp(raw_dispatch_kw, -discharge_soft_limit_kw, charge_soft_limit_kw)
 
         deadband_kw = max(cfg.virtual_battery_dispatch_deadband_kw, 0.0)
+        sign_flip_blocked = False
         if abs(dispatch_kw) < deadband_kw:
             dispatch_kw = 0.0
+        else:
+            last_dispatch_kw = self._last_virtual_battery_dispatch_kw
+            flip_threshold_kw = deadband_kw + max(cfg.virtual_battery_sign_flip_extra_kw, 0.0)
+            if (
+                last_dispatch_kw * dispatch_kw < -1e-9
+                and abs(dispatch_kw) < flip_threshold_kw
+            ):
+                dispatch_kw = 0.0
+                sign_flip_blocked = True
 
         dispatch_kw = _round_one_decimal_towards_zero(dispatch_kw)
         if dispatch_kw > 0.0:
@@ -1505,7 +1734,20 @@ class IchargingBreakerRuntime:
         elif dispatch_kw < 0.0:
             dispatch_kw = max(dispatch_kw, -discharge_limit_kw)
 
-        return float(dispatch_kw)
+        if abs(dispatch_kw) > 1e-9:
+            self._last_virtual_battery_dispatch_kw = float(dispatch_kw)
+
+        diagnostics = {
+            "price_regime": price_regime,
+            "reserve_floor_soc": reserve_floor_soc,
+            "soc_target": soc_target,
+            "soc_recovery_signal_kw": soc_recovery_signal_kw,
+            "community_signal_raw_kw": community_signal_raw_kw,
+            "community_signal_limited_kw": community_signal_limited_kw,
+            "sign_flip_blocked": sign_flip_blocked,
+        }
+
+        return float(dispatch_kw), diagnostics
 
     def _populate_flexible_state(
         self,
