@@ -381,6 +381,7 @@ class CommunityTargetDecision:
     raw_target_kw: float
     effective_target_kw: float
     reserve_limited: bool
+    soc_recovery_target_kw: float
 
 
 class Rh1HouseRuntime:
@@ -500,6 +501,7 @@ class Rh1HouseRuntime:
             community_net_kw=community_net_kw,
             reserve_floor_soc=reserve_floor_soc,
             charge_target_soc=charge_target_soc,
+            price_regime=price_regime,
         )
         community_target_kw = community_target.effective_target_kw
         if cfg.community_participation_enabled:
@@ -708,6 +710,7 @@ class Rh1HouseRuntime:
             community_target_raw_kw=community_target.raw_target_kw,
             effective_community_target_kw=community_target.effective_target_kw,
             community_reserve_limited=community_target.reserve_limited,
+            soc_recovery_target_kw=community_target.soc_recovery_target_kw,
             community_alignment_penalty=community_alignment_penalty,
             price_regime=price_regime,
             reserve_floor_soc=reserve_floor_soc,
@@ -784,6 +787,7 @@ class Rh1HouseRuntime:
                     f" net={fmt_meter(community_net_kwh, community_net_kw)}"
                     f" deadband={fmt_kw(cfg.community_energy_deadband_kw)} kW"
                     f" target_battery_raw={fmt_kw(community_target.raw_target_kw)} kW"
+                    f" soc_recovery_target_kw={fmt_kw(community_target.soc_recovery_target_kw)} kW"
                     f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
                     f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
@@ -793,6 +797,7 @@ class Rh1HouseRuntime:
             summary_lines.append(
                 (
                     f"Community: target_battery_raw={fmt_kw(community_target.raw_target_kw)} kW"
+                    f" soc_recovery_target_kw={fmt_kw(community_target.soc_recovery_target_kw)} kW"
                     f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
                     f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
@@ -1287,6 +1292,7 @@ class Rh1HouseRuntime:
         community_net_kw: float | None,
         reserve_floor_soc: float,
         charge_target_soc: float,
+        price_regime: str,
     ) -> CommunityTargetDecision:
         cfg = self.config
         if not cfg.community_participation_enabled or community_net_kw is None:
@@ -1294,6 +1300,7 @@ class Rh1HouseRuntime:
                 raw_target_kw=0.0,
                 effective_target_kw=0.0,
                 reserve_limited=False,
+                soc_recovery_target_kw=0.0,
             )
 
         deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
@@ -1319,6 +1326,7 @@ class Rh1HouseRuntime:
 
         reserve_floor_soc = _clamp(reserve_floor_soc, cfg.battery_soc_min, cfg.battery_soc_max)
         charge_target_soc = _clamp(charge_target_soc, reserve_floor_soc, cfg.battery_soc_max)
+        soc_recovery_target_kw = 0.0
 
         if raw_target_kw < -1e-9:
             reserve_discharge_room_kwh = max(soc - reserve_floor_soc, 0.0) * battery_capacity_kwh
@@ -1342,6 +1350,17 @@ class Rh1HouseRuntime:
             )
             effective_target_kw = min(raw_target_kw, allowed_charge_kw)
 
+        if price_regime == "cheap" and charge_target_soc > soc + 1e-9:
+            recovery_charge_room_kwh = max(charge_target_soc - soc, 0.0) * battery_capacity_kwh
+            recovery_charge_limit_kw = (
+                recovery_charge_room_kwh / max(interval_hours * battery_efficiency, 1e-9)
+            )
+            soc_recovery_target_kw = min(
+                max(battery_bounds.max_kw, 0.0),
+                max(recovery_charge_limit_kw, 0.0),
+            )
+            effective_target_kw = max(effective_target_kw, soc_recovery_target_kw)
+
         effective_target_kw = _clamp(
             effective_target_kw,
             battery_bounds.min_kw,
@@ -1351,6 +1370,7 @@ class Rh1HouseRuntime:
             raw_target_kw=raw_target_kw,
             effective_target_kw=effective_target_kw,
             reserve_limited=reserve_limited,
+            soc_recovery_target_kw=soc_recovery_target_kw,
         )
 
     def _community_alignment_penalty(

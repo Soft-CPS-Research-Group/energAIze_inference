@@ -134,9 +134,21 @@ def test_community_deficit_bias_reduces_import_vs_surplus(rh1_community_client):
 
 def test_small_community_energy_interval_converts_to_kw(rh1_community_client):
     neutral = _base_payload()
+    neutral["observations"]["energy_price"] = {
+        "values": [0.30] + [0.10] * 95,
+        "measurement_unit": "€/kWh",
+        "frequency_seconds": 900,
+        "horizon_seconds": 86400,
+    }
     neutral_actions = _run(rh1_community_client, neutral)
 
     deficit_small = _base_payload()
+    deficit_small["observations"]["energy_price"] = {
+        "values": [0.30] + [0.10] * 95,
+        "measurement_unit": "€/kWh",
+        "frequency_seconds": 900,
+        "horizon_seconds": 86400,
+    }
     deficit_small["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
     deficit_small["community"]["energy_out_total"] = 0.0
     deficit_small_actions = _run(rh1_community_client, deficit_small)
@@ -181,7 +193,7 @@ def test_cheap_price_and_low_soc_prefers_charging_before_community_discharge(rh1
     payload["observations"]["energy_price"] = _price_curve(0.02, 0.20, 0.20, 0.20, 0.20, 0.20)
 
     actions = _run(rh1_community_client, payload)
-    assert actions[ACTION_BATTERY] > 0.1
+    assert actions[ACTION_BATTERY] >= 1.0
 
 
 def test_reserve_floor_blocks_discharge_near_target_soc_band(rh1_community_client):
