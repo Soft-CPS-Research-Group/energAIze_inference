@@ -1175,6 +1175,9 @@ class IchargingBreakerRuntime:
             virtual_battery_community_signal_limited_kw = _maybe_float(
                 virtual_battery_diagnostics.get("community_signal_limited_kw")
             )
+            virtual_battery_community_signal_applied_kw = _maybe_float(
+                virtual_battery_diagnostics.get("community_signal_applied_kw")
+            )
             virtual_battery_sign_flip_blocked = bool(
                 virtual_battery_diagnostics.get("sign_flip_blocked", False)
             )
@@ -1357,6 +1360,7 @@ class IchargingBreakerRuntime:
                         f" soc_recovery_signal_kw={fmt_optional_kw(virtual_battery_soc_recovery_signal_kw)}"
                         f" community_signal_raw_kw={fmt_optional_kw(virtual_battery_community_signal_raw_kw)}"
                         f" community_signal_limited_kw={fmt_optional_kw(virtual_battery_community_signal_limited_kw)}"
+                        f" community_signal_applied_kw={fmt_optional_kw(virtual_battery_community_signal_applied_kw)}"
                         f" sign_flip_blocked={'yes' if virtual_battery_sign_flip_blocked else 'no'}"
                     )
                 )
@@ -1683,6 +1687,11 @@ class IchargingBreakerRuntime:
         elif community_signal_limited_kw > 0.0 and soc > operating_soc_max:
             community_signal_limited_kw = 0.0
 
+        deadband_kw = max(cfg.virtual_battery_dispatch_deadband_kw, 0.0)
+        community_signal_applied_kw = cfg.virtual_battery_community_weight * community_signal_limited_kw
+        if abs(community_signal_applied_kw) < deadband_kw:
+            community_signal_applied_kw = 0.0
+
         charge_soft_limit_kw = charge_limit_kw
         discharge_soft_limit_kw = discharge_limit_kw
         if soc <= operating_soc_min + 1e-9:
@@ -1707,14 +1716,13 @@ class IchargingBreakerRuntime:
         else:
             raw_dispatch_kw = (
                 local_signal_kw
-                + (cfg.virtual_battery_community_weight * community_signal_limited_kw)
+                + community_signal_applied_kw
                 + (cfg.virtual_battery_price_weight * price_dispatch_kw)
                 + soc_recovery_signal_kw
             )
 
         dispatch_kw = _clamp(raw_dispatch_kw, -discharge_soft_limit_kw, charge_soft_limit_kw)
 
-        deadband_kw = max(cfg.virtual_battery_dispatch_deadband_kw, 0.0)
         sign_flip_blocked = False
         if abs(dispatch_kw) < deadband_kw:
             dispatch_kw = 0.0
@@ -1744,6 +1752,7 @@ class IchargingBreakerRuntime:
             "soc_recovery_signal_kw": soc_recovery_signal_kw,
             "community_signal_raw_kw": community_signal_raw_kw,
             "community_signal_limited_kw": community_signal_limited_kw,
+            "community_signal_applied_kw": community_signal_applied_kw,
             "sign_flip_blocked": sign_flip_blocked,
         }
 
