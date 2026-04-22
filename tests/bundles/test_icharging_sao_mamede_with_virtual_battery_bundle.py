@@ -188,7 +188,7 @@ def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
     assert cfg.target_soc_neutral == pytest.approx(0.7, rel=1e-6)
     assert cfg.target_soc_expensive == pytest.approx(0.6, rel=1e-6)
     assert cfg.virtual_battery_soc_recovery_gain == pytest.approx(1.0, rel=1e-6)
-    assert cfg.virtual_battery_sign_flip_extra_kw == pytest.approx(0.3, rel=1e-6)
+    assert cfg.virtual_battery_sign_flip_extra_kw == pytest.approx(0.6, rel=1e-6)
     assert cfg.forecast_support_enabled is True
 
 

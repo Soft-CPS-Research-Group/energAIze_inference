@@ -160,7 +160,20 @@ def test_missing_required_community_fields_returns_400(boavista_with_flex_commun
 
 def test_community_deficit_reduces_local_dispatch(boavista_with_flex_community_client):
     neutral = _base_payload()
-    _connect_many_chargers_for_contention(neutral)
+    mixed = ["AC000001_1", "AC000002_1", "AC000003_1", "AC000004_1", "AC000005_1"]
+    for idx, charger_id in enumerate(mixed):
+        ev_id = f"EV_MIX_{idx}"
+        neutral["observations"]["charging_sessions"][charger_id] = {
+            "power": 0.0,
+            "electric_vehicle": ev_id,
+        }
+        _set_flex(
+            neutral,
+            ev_id=ev_id,
+            soc=0.50,
+            target_soc=0.53,
+            departure_minutes_from_now=45,
+        )
 
     deficit = copy.deepcopy(neutral)
     deficit["community"]["energy_in_total"] = _kwh_for_interval(60.0)
@@ -184,7 +197,36 @@ def test_community_deficit_reduces_local_dispatch(boavista_with_flex_community_c
 
 def test_small_community_kwh_value_changes_dispatch(boavista_with_flex_community_client):
     no_community_gap = _base_payload()
-    _connect_many_chargers_for_contention(no_community_gap)
+    mixed = [
+        "AC000002_1",
+        "AC000005_1",
+        "AC000008_1",
+        "AC000011_1",
+        "AC000014_1",
+        "AC000003_1",
+        "AC000006_1",
+        "AC000009_1",
+        "AC000012_1",
+        "ACEXT004_1",
+        "AC000001_1",
+        "AC000004_1",
+        "AC000007_1",
+        "AC000010_1",
+        "AC000013_1",
+    ]
+    for idx, charger_id in enumerate(mixed):
+        ev_id = f"EV_SMALL_{idx}"
+        no_community_gap["observations"]["charging_sessions"][charger_id] = {
+            "power": 0.0,
+            "electric_vehicle": ev_id,
+        }
+        _set_flex(
+            no_community_gap,
+            ev_id=ev_id,
+            soc=0.50,
+            target_soc=0.53,
+            departure_minutes_from_now=45,
+        )
 
     with_small_gap = copy.deepcopy(no_community_gap)
     with_small_gap["community"]["energy_in_total"] = _kwh_for_interval(1.774152)
@@ -224,6 +266,20 @@ def test_nonflex_is_prioritized_and_flex_respects_floor_under_community_deficit(
         ev_id = f"F_{idx}"
         _connect_charger(payload_neutral, charger_id, ev_id, flexible=True)
         _connect_charger(payload_deficit, charger_id, ev_id, flexible=True)
+        _set_flex(
+            payload_neutral,
+            ev_id=ev_id,
+            soc=0.50,
+            target_soc=0.53,
+            departure_minutes_from_now=45,
+        )
+        _set_flex(
+            payload_deficit,
+            ev_id=ev_id,
+            soc=0.50,
+            target_soc=0.53,
+            departure_minutes_from_now=45,
+        )
 
     payload_deficit["community"]["energy_in_total"] = _kwh_for_interval(30.0)
     payload_deficit["community"]["energy_out_total"] = 0.0
@@ -246,3 +302,45 @@ def test_nonflex_is_prioritized_and_flex_respects_floor_under_community_deficit(
     assert _line_total_kw(payload_deficit, deficit_actions, "L1") <= 18.333 + 1e-3
     assert _line_total_kw(payload_deficit, deficit_actions, "L2") <= 18.333 + 1e-3
     assert _line_total_kw(payload_deficit, deficit_actions, "L3") <= 18.333 + 1e-3
+
+
+def test_community_deficit_does_not_cut_flexible_below_required_when_feasible(
+    boavista_with_flex_community_client,
+):
+    neutral = _base_payload()
+    deficit = _base_payload()
+
+    charger_id = "AC000001_1"
+    ev_id = "F_REQ_0"
+    neutral["observations"]["charging_sessions"][charger_id] = {
+        "power": 0.0,
+        "electric_vehicle": ev_id,
+    }
+    deficit["observations"]["charging_sessions"][charger_id] = {
+        "power": 0.0,
+        "electric_vehicle": ev_id,
+    }
+    _set_flex(
+        neutral,
+        ev_id=ev_id,
+        soc=0.50,
+        target_soc=0.53,
+        departure_minutes_from_now=45,
+    )
+    _set_flex(
+        deficit,
+        ev_id=ev_id,
+        soc=0.50,
+        target_soc=0.53,
+        departure_minutes_from_now=45,
+    )
+    deficit["community"]["energy_in_total"] = _kwh_for_interval(60.0)
+    deficit["community"]["energy_out_total"] = 0.0
+
+    neutral_actions = _run(boavista_with_flex_community_client, neutral)
+    deficit_actions = _run(boavista_with_flex_community_client, deficit)
+
+    neutral_kw = float(neutral_actions[charger_id])
+    deficit_kw = float(deficit_actions[charger_id])
+    assert deficit_kw >= 2.9
+    assert deficit_kw <= neutral_kw + 1e-6

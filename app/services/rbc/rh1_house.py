@@ -1702,7 +1702,8 @@ class Rh1HouseRuntime:
 
         exported_from_battery_penalty = 0.0
         if battery_kw < -1e-9 and net_grid_kw < -1e-9:
-            exported_from_battery_penalty = abs(battery_kw) * dt_hours * max(price_now, 0.0)
+            exported_from_battery_kw = min(abs(battery_kw), exported_kw)
+            exported_from_battery_penalty = exported_from_battery_kw * dt_hours * max(price_now, 0.0)
 
         import_violation = max(net_grid_kw - grid_import_limit_kw, 0.0)
         export_violation = max(-grid_export_limit_kw - net_grid_kw, 0.0)

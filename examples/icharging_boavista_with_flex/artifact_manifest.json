@@ -399,6 +399,13 @@
             "target_soc": "electric_vehicles.{ev_id}.flexibility.estimated_soc_at_departure",
             "departure_time": "electric_vehicles.{ev_id}.flexibility.estimated_time_at_departure"
           },
+          "forecast_support_enabled": false,
+          "forecast_consumption_prefix": "forecasts.ConsumptionForecastService.consumption_total",
+          "forecast_production_prefix": "forecasts.ProductionForecastService.production_total",
+          "forecast_window_hours": 2.0,
+          "forecast_soc_bias_gain": 0.5,
+          "forecast_soc_bias_max": 0.15,
+          "forecast_dispatch_weight": 0.25,
           "non_flex_active_power_kw": 0.05,
           "drop_inactive_non_flex": true,
           "require_observations_envelope": true

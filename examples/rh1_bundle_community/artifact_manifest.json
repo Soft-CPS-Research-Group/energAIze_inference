@@ -108,7 +108,7 @@
           "community_deficit_weight": 1.0,
           "community_surplus_weight": 1.0,
           "community_dispatch_weight": 0.2,
-          "community_dispatch_cap_kw": 2.4,
+          "community_dispatch_cap_kw": 3.6,
           "community_price_signal_key": "community.price_signal",
           "forecast_support_enabled": true,
           "price_quantile_cheap": 0.35,

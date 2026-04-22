@@ -185,10 +185,10 @@
           "virtual_battery_operating_soc_max": 0.85,
           "virtual_battery_soc_hysteresis": 0.02,
           "virtual_battery_dispatch_deadband_kw": 5.0,
-          "virtual_battery_community_weight": 0.5,
-          "virtual_battery_price_weight": 0.35,
+          "virtual_battery_community_weight": 0.6,
+          "virtual_battery_price_weight": 0.4,
           "virtual_battery_soc_recovery_gain": 1.0,
-          "virtual_battery_sign_flip_extra_kw": 0.3
+          "virtual_battery_sign_flip_extra_kw": 0.6
         }
       }
     ]

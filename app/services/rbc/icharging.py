@@ -1241,14 +1241,19 @@ class IchargingBreakerRuntime:
         self._enforce_line_limits(
             cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
         )
-        self._enforce_line_limits(cfg, states, actions, min_levels, flexible_chargers, per_phase_limit)
 
         board_total = sum(
             value for cid, value in actions.items() if states.get(cid) and states[cid].connected
         )
         if board_total - effective_board_limit > 1e-6:
             order = self._ordered_chargers(states, flexible_chargers)
-            _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
+            preferred_min_levels = self._preferred_flex_min_levels(states, min_levels)
+            _reduce_actions(order, board_total - effective_board_limit, actions, preferred_min_levels)
+            board_total = sum(
+                value for cid, value in actions.items() if states.get(cid) and states[cid].connected
+            )
+            if board_total - effective_board_limit > 1e-6:
+                _reduce_actions(order, board_total - effective_board_limit, actions, min_levels)
             self._enforce_line_limits(
                 cfg, states, actions, min_levels, flexible_chargers, per_phase_limit
             )
@@ -1585,9 +1590,15 @@ class IchargingBreakerRuntime:
                         per_phase = action_kw / max(state.n_phases, 1)
                         action_text = f"{action_text} ({fmt_kw(per_phase)}/phase)"
                     if state.flexible:
+                        req_soc_departure = fmt_optional_pct((state.flex_log or {}).get("target_soc"))
+                        departure = fmt_optional_text((state.flex_log or {}).get("departure_time"))
+                        soc_text = fmt_optional_pct((state.flex_log or {}).get("soc"))
                         flex_text = (
                             f"flex=yes req={fmt_kw(state.required_kw)}"
                             f" prio={state.priority:.2f}"
+                            f" soc={soc_text}"
+                            f" req_soc_at_departure={req_soc_departure}"
+                            f" departure={departure}"
                         )
                     else:
                         reason = fmt_optional_text((state.flex_log or {}).get("reason"))
@@ -1603,7 +1614,7 @@ class IchargingBreakerRuntime:
                             (
                                 "    flex_input:"
                                 f" soc={fmt_optional_pct(state.flex_log.get('soc'))}"
-                                f" target={fmt_optional_pct(state.flex_log.get('target_soc'))}"
+                                f" req_soc_at_departure={fmt_optional_pct(state.flex_log.get('target_soc'))}"
                                 f" arrival_soc={fmt_optional_pct(state.flex_log.get('arrival_soc'))}"
                                 f" departure_soc={fmt_optional_pct(state.flex_log.get('departure_soc'))}"
                                 f" arrival={fmt_optional_text(state.flex_log.get('arrival_time'))}"
@@ -2295,20 +2306,15 @@ class IchargingBreakerRuntime:
         )
         flex_floor_total_kw = sum(states[cid].min_kw for cid in flex_ids)
         physical_flex_budget_kw = max(board_limit - nonflex_total_kw, 0.0)
-        flex_budget_kw = _clamp(
-            physical_flex_budget_kw + community_flex_adjust_kw,
-            0.0,
-            physical_flex_budget_kw,
-        )
-        additional_budget_kw = max(flex_budget_kw - flex_floor_total_kw, 0.0)
-        if additional_budget_kw <= 1e-6:
-            return
-
         ordered_flex = sorted(flex_ids, key=lambda cid: states[cid].priority, reverse=True)
-        for target_mode in ("required", "max"):
+
+        def allocate_to_target(*, target_mode: str, budget_kw: float) -> float:
+            remaining_budget = max(budget_kw, 0.0)
+            if remaining_budget <= 1e-6:
+                return 0.0
             for cid in ordered_flex:
-                if additional_budget_kw <= 1e-6:
-                    return
+                if remaining_budget <= 1e-6:
+                    break
                 state = states[cid]
                 current_kw = actions.get(cid, 0.0)
                 target_kw = state.required_kw if target_mode == "required" else state.max_kw
@@ -2325,14 +2331,47 @@ class IchargingBreakerRuntime:
                 )
                 addition_kw = min(
                     target_kw - current_kw,
-                    additional_budget_kw,
+                    remaining_budget,
                     board_remaining_kw,
                     line_remaining_kw,
                 )
                 if addition_kw <= 1e-6:
                     continue
                 actions[cid] = current_kw + addition_kw
-                additional_budget_kw -= addition_kw
+                remaining_budget -= addition_kw
+            return max(budget_kw - remaining_budget, 0.0)
+
+        # Required flexibility should only be curtailed by physical constraints, not by community bias.
+        required_additional_budget_kw = max(physical_flex_budget_kw - flex_floor_total_kw, 0.0)
+        allocate_to_target(target_mode="required", budget_kw=required_additional_budget_kw)
+
+        flex_budget_kw = _clamp(
+            physical_flex_budget_kw + community_flex_adjust_kw,
+            0.0,
+            physical_flex_budget_kw,
+        )
+        current_flex_total_kw = sum(actions.get(cid, 0.0) for cid in flex_ids)
+        if flex_budget_kw <= current_flex_total_kw + 1e-6:
+            return
+        max_additional_budget_kw = max(flex_budget_kw - current_flex_total_kw, 0.0)
+        allocate_to_target(target_mode="max", budget_kw=max_additional_budget_kw)
+
+    def _preferred_flex_min_levels(
+        self,
+        states: Dict[str, ChargerState],
+        min_levels: Dict[str, float],
+    ) -> Dict[str, float]:
+        preferred = dict(min_levels)
+        for cid, state in states.items():
+            if not state.connected or not state.flexible:
+                continue
+            floor_kw = _clamp(
+                state.required_kw,
+                min_levels.get(cid, state.min_kw),
+                state.max_kw,
+            )
+            preferred[cid] = floor_kw
+        return preferred
 
     def _apply_solar_bonus(
         self,
@@ -2370,6 +2409,7 @@ class IchargingBreakerRuntime:
         flexible_chargers: List[str],
         limit_per_line: float,
     ) -> None:
+        preferred_min_levels = self._preferred_flex_min_levels(states, min_levels)
         for line_name, info in cfg.line_limits.items():
             limit = limit_per_line
             chargers = _line_chargers(cfg, line_name)
@@ -2390,9 +2430,24 @@ class IchargingBreakerRuntime:
                     line_name=line_name,
                     amount=overflow,
                     actions=actions,
-                    min_levels=min_levels,
+                    min_levels=preferred_min_levels,
                     states=states,
                 )
+                total = sum(
+                    actions.get(cid, 0.0) / max(states[cid].n_phases, 1)
+                    for cid in chargers
+                    if cid in states and states[cid].connected
+                )
+                overflow = total - limit
+                if overflow > 1e-6:
+                    _reduce_actions_for_line(
+                        order=order,
+                        line_name=line_name,
+                        amount=overflow,
+                        actions=actions,
+                        min_levels=min_levels,
+                        states=states,
+                    )
 
     def _ordered_chargers(
         self,

@@ -276,3 +276,35 @@ def test_triphase_plus_l1_flex_contention_still_respects_phase_limit(boavista_wi
     actions = post_inference(boavista_with_flex_client, payload)
     assert_board_and_phase_limits(actions, payload, board_limit_kw=55.0)
     assert_connected_charger_action_bounds(actions, payload)
+
+
+def test_phase_saturation_prioritizes_higher_required_flex(boavista_with_flex_client):
+    payload = _empty_hq_payload()
+    selected_l1 = ["AC000002_1", "AC000005_1", "AC000008_1", "AC000011_1", "AC000014_1"]
+    ev_map = _connect_chargers(payload, selected_l1)
+
+    low_required_charger = selected_l1[0]
+    _set_flex(
+        payload,
+        ev_id=ev_map[low_required_charger],
+        soc=0.50,
+        target_soc=0.53,
+        departure_minutes_from_now=45,
+    )
+    for charger_id in selected_l1[1:]:
+        _set_flex(
+            payload,
+            ev_id=ev_map[charger_id],
+            soc=0.10,
+            target_soc=0.90,
+            departure_minutes_from_now=30,
+        )
+
+    actions = post_inference(boavista_with_flex_client, payload)
+    assert_board_and_phase_limits(actions, payload, board_limit_kw=55.0)
+    assert_connected_charger_action_bounds(actions, payload)
+
+    low_kw = float(actions[low_required_charger])
+    urgent_kws = [float(actions[cid]) for cid in selected_l1[1:]]
+    assert low_kw <= 3.2
+    assert min(urgent_kws) >= low_kw + 0.5
