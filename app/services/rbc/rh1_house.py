@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import math
 from typing import Any, Dict, List
 
+from .forecasts import ForecastSocGuidance, build_forecast_soc_guidance, read_site_forecasts
 from app.logging import get_logger
 
 
@@ -87,6 +88,26 @@ def _now_from_payload(payload: Dict[str, Any]) -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "null"}:
+        return ""
+    return text
+
+
+def _extract_prefixed_fields(payload: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+    fields: Dict[str, Any] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str) or not key.startswith(prefix):
+            continue
+        suffix = key[len(prefix) :]
+        if suffix:
+            fields[suffix] = value
+    return dict(sorted(fields.items()))
+
+
 def _round_one_decimal_towards_zero(value: float) -> float:
     scaled = value * 10.0
     if scaled >= 0:
@@ -128,6 +149,13 @@ class Rh1HouseConfig:
     community_dispatch_weight: float = 0.2
     community_dispatch_cap_kw: float = 0.0
     community_price_signal_key: str = "community.price_signal"
+    forecast_support_enabled: bool = False
+    forecast_consumption_prefix: str = "forecasts.ConsumptionForecastService.consumption_total"
+    forecast_production_prefix: str = "forecasts.ProductionForecastService.production_total"
+    forecast_window_hours: float = 2.0
+    forecast_soc_bias_gain: float = 0.5
+    forecast_soc_bias_max: float = 0.15
+    forecast_dispatch_weight: float = 0.25
     reserve_soc_cheap: float = 0.35
     reserve_soc_neutral: float = 0.30
     reserve_soc_expensive: float = 0.25
@@ -264,6 +292,38 @@ class Rh1HouseConfig:
                 0.0,
             ),
             community_price_signal_key=community_price_signal_key,
+            forecast_support_enabled=bool(data.pop("forecast_support_enabled", False)),
+            forecast_consumption_prefix=str(
+                data.pop(
+                    "forecast_consumption_prefix",
+                    "forecasts.ConsumptionForecastService.consumption_total",
+                )
+            ).strip()
+            or "forecasts.ConsumptionForecastService.consumption_total",
+            forecast_production_prefix=str(
+                data.pop(
+                    "forecast_production_prefix",
+                    "forecasts.ProductionForecastService.production_total",
+                )
+            ).strip()
+            or "forecasts.ProductionForecastService.production_total",
+            forecast_window_hours=max(
+                _safe_float(data.pop("forecast_window_hours", 2.0), 2.0),
+                0.0,
+            ),
+            forecast_soc_bias_gain=max(
+                _safe_float(data.pop("forecast_soc_bias_gain", 0.5), 0.5),
+                0.0,
+            ),
+            forecast_soc_bias_max=_clamp(
+                _safe_float(data.pop("forecast_soc_bias_max", 0.15), 0.15),
+                0.0,
+                1.0,
+            ),
+            forecast_dispatch_weight=max(
+                _safe_float(data.pop("forecast_dispatch_weight", 0.25), 0.25),
+                0.0,
+            ),
             reserve_soc_cheap=_clamp(
                 _safe_float(data.pop("reserve_soc_cheap", 0.35), 0.35),
                 0.0,
@@ -374,6 +434,7 @@ class EvAggregate:
     connected: bool
     hard_min_kw: float
     max_kw: float
+    details: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -494,6 +555,19 @@ class Rh1HouseRuntime:
 
         ev = self._ev_action_bounds(payload, now, dt_hours)
         battery_bounds = self._battery_power_bounds(battery_soc, dt_hours)
+        forecast_guidance, forecast_issues = self._forecast_guidance(
+            payload=payload,
+            battery_soc=battery_soc,
+            battery_bounds=battery_bounds,
+            reserve_floor_soc=reserve_floor_soc,
+            charge_target_soc=charge_target_soc,
+        )
+        warnings.extend(f"forecast:{issue}" for issue in forecast_issues)
+        forecast_target_kw = None
+        if forecast_guidance is not None:
+            reserve_floor_soc = forecast_guidance.reserve_floor_soc
+            charge_target_soc = forecast_guidance.target_soc
+            forecast_target_kw = forecast_guidance.target_kw
         community_target = self._community_battery_target_kw(
             battery_bounds=battery_bounds,
             soc=battery_soc,
@@ -518,6 +592,7 @@ class Rh1HouseRuntime:
                 grid_export_limit_kw=grid_export_limit_kw,
                 dt_hours=dt_hours,
                 community_target_kw=0.0,
+                forecast_target_kw=forecast_target_kw,
             )
             battery_kw, base_without_battery = self._optimize_battery_dispatch_for_fixed_ev(
                 payload=payload,
@@ -532,6 +607,7 @@ class Rh1HouseRuntime:
                 grid_export_limit_kw=grid_export_limit_kw,
                 dt_hours=dt_hours,
                 community_target_kw=community_target_kw,
+                forecast_target_kw=forecast_target_kw,
             )
         else:
             ev_kw, battery_kw, base_without_battery = self._optimize_joint_dispatch(
@@ -547,6 +623,7 @@ class Rh1HouseRuntime:
                 grid_export_limit_kw=grid_export_limit_kw,
                 dt_hours=dt_hours,
                 community_target_kw=community_target_kw,
+                forecast_target_kw=forecast_target_kw,
             )
 
         ev_floor_kw = ev.hard_min_kw if (ev.connected and cfg.ev_always_on_when_connected) else 0.0
@@ -692,6 +769,7 @@ class Rh1HouseRuntime:
             strategy="rh1_house_rbc_v1",
             actions=output_actions,
             connected={"ev": ev.connected},
+            ev_flex=ev.details,
             phase_totals={"grid": net_grid_kw},
             board_total=max(net_grid_kw, 0.0),
             grid_import_limit_kw=grid_import_limit_kw,
@@ -715,6 +793,16 @@ class Rh1HouseRuntime:
             price_regime=price_regime,
             reserve_floor_soc=reserve_floor_soc,
             charge_target_soc=charge_target_soc,
+            forecast_window_net_energy_kwh=(
+                forecast_guidance.window_net_energy_kwh if forecast_guidance else None
+            ),
+            forecast_window_avg_net_kw=(
+                forecast_guidance.window_avg_net_kw if forecast_guidance else None
+            ),
+            forecast_imbalance_ratio=(
+                forecast_guidance.imbalance_ratio if forecast_guidance else None
+            ),
+            forecast_target_kw=forecast_target_kw,
         )
 
         def fmt_kw(value: float) -> str:
@@ -732,6 +820,25 @@ class Rh1HouseRuntime:
 
         def fmt_price(value: float) -> str:
             return f"{value:.4f}"
+
+        def fmt_optional_pct(value: float | None) -> str:
+            if value is None:
+                return "-"
+            return f"{value * 100.0:.1f}%"
+
+        def fmt_optional_num(value: float | None) -> str:
+            if value is None:
+                return "-"
+            return f"{value:.4f}"
+
+        def fmt_optional_minutes(value: float | None) -> str:
+            if value is None:
+                return "-"
+            return f"{value:.1f}"
+
+        def fmt_optional_text(value: Any) -> str:
+            text = _clean_text(value)
+            return text or "-"
 
         summary_lines = [
             "Strategy: rh1_house_rbc_v1",
@@ -755,6 +862,7 @@ class Rh1HouseRuntime:
                 f"Policy: price_regime={price_regime}"
                 f" reserve_floor_soc={reserve_floor_soc * 100.0:.1f}%"
                 f" charge_target_soc={charge_target_soc * 100.0:.1f}%"
+                f" forecast_target={fmt_optional_kw(forecast_target_kw)} kW"
             ),
             (
                 f"EV: connected={'yes' if ev.connected else 'no'}"
@@ -779,6 +887,29 @@ class Rh1HouseRuntime:
                 " + community_battery_alignment"
             ),
         ]
+        for detail in ev.details:
+            summary_lines.append(
+                (
+                    f"  EV detail: charger={detail.get('charger_id', '-')}"
+                    f" ev={detail.get('ev_id', '-')}"
+                    f" flex_enabled={'yes' if detail.get('flexibility_enabled') else 'no'}"
+                    f" reason={fmt_optional_text(detail.get('reason'))}"
+                    f" req={fmt_optional_kw(detail.get('required_kw'))} kW"
+                    f" prio={fmt_optional_num(detail.get('priority'))}"
+                    f" soc={fmt_optional_pct(detail.get('soc'))}"
+                    f" target={fmt_optional_pct(detail.get('target_soc'))}"
+                    f" arrival_soc={fmt_optional_pct(detail.get('arrival_soc'))}"
+                    f" departure_soc={fmt_optional_pct(detail.get('departure_soc'))}"
+                    f" gap_kwh={fmt_optional_num(detail.get('energy_gap_kwh'))}"
+                    f" capacity_kwh={fmt_optional_num(detail.get('capacity_kwh'))}"
+                    f" arrival={fmt_optional_text(detail.get('arrival_time'))}"
+                    f" departure={fmt_optional_text(detail.get('departure_time'))}"
+                    f" mins_to_departure={fmt_optional_minutes(detail.get('minutes_remaining'))}"
+                    f" mode={fmt_optional_text(detail.get('mode'))}"
+                    f" flex_charger={fmt_optional_text(detail.get('flex_charger'))}"
+                    f" missing={','.join(detail.get('missing_fields') or []) or '-'}"
+                )
+            )
         if community_import_kw is not None and community_export_kw is not None:
             summary_lines.append(
                 (
@@ -1141,12 +1272,183 @@ class Rh1HouseRuntime:
         charge_target_soc = _clamp(charge_target_soc, reserve_floor_soc, cfg.battery_soc_max)
         return reserve_floor_soc, charge_target_soc
 
+    def _forecast_guidance(
+        self,
+        payload: Dict[str, Any],
+        battery_soc: float,
+        battery_bounds: BatteryPowerBounds,
+        reserve_floor_soc: float,
+        charge_target_soc: float,
+    ) -> tuple[ForecastSocGuidance | None, List[str]]:
+        cfg = self.config
+        if not cfg.forecast_support_enabled:
+            return None, []
+
+        read_result = read_site_forecasts(
+            payload,
+            consumption_prefix=cfg.forecast_consumption_prefix,
+            production_prefix=cfg.forecast_production_prefix,
+        )
+        if read_result.snapshot is None:
+            return None, list(read_result.issues)
+
+        guidance = build_forecast_soc_guidance(
+            read_result.snapshot,
+            window_hours=cfg.forecast_window_hours,
+            capacity_kwh=cfg.battery_capacity_kwh,
+            current_soc=battery_soc,
+            base_reserve_soc=reserve_floor_soc,
+            base_target_soc=charge_target_soc,
+            soc_min=cfg.battery_soc_min,
+            soc_max=cfg.battery_soc_max,
+            charge_limit_kw=max(battery_bounds.max_kw, 0.0),
+            discharge_limit_kw=max(-battery_bounds.min_kw, 0.0),
+            soc_bias_gain=cfg.forecast_soc_bias_gain,
+            soc_bias_max=cfg.forecast_soc_bias_max,
+            dispatch_weight=cfg.forecast_dispatch_weight,
+        )
+        return guidance, list(read_result.issues)
+
+    def _build_ev_flex_detail(
+        self,
+        payload: Dict[str, Any],
+        ev_id: str,
+        charger_id: str,
+        charger_min_kw: float,
+        charger_max_kw: float,
+        now: datetime,
+        control_minutes: float,
+        flexibility_enabled: bool,
+    ) -> Dict[str, Any]:
+        cfg = self.config
+        soc_key = cfg.resolve_ev_field("soc", ev_id)
+        target_key = cfg.resolve_ev_field("target_soc", ev_id)
+        departure_key = cfg.resolve_ev_field("departure_time", ev_id)
+        raw_prefix = f"electric_vehicles.{ev_id}.flexibility."
+        raw_flex_fields = _extract_prefixed_fields(payload, raw_prefix)
+
+        soc_raw = _maybe_float(payload.get(soc_key))
+        soc = self._normalize_soc(soc_raw) if soc_raw is not None else None
+
+        target_soc_raw = _maybe_float(payload.get(target_key))
+        if target_soc_raw is not None and target_soc_raw > 0.0:
+            target_soc = self._normalize_soc(target_soc_raw)
+            if soc is not None:
+                target_soc = _clamp(target_soc, soc, 1.0)
+        else:
+            target_soc = None
+
+        arrival_soc_raw = _maybe_float(raw_flex_fields.get("estimated_soc_at_arrival"))
+        arrival_soc = self._normalize_soc(arrival_soc_raw) if arrival_soc_raw is not None else None
+        departure_soc_raw = _maybe_float(raw_flex_fields.get("estimated_soc_at_departure"))
+        departure_soc = (
+            self._normalize_soc(departure_soc_raw) if departure_soc_raw is not None else None
+        )
+
+        arrival_time = _clean_text(raw_flex_fields.get("estimated_time_at_arrival"))
+        departure_time = _clean_text(payload.get(departure_key)) or _clean_text(
+            raw_flex_fields.get("estimated_time_at_departure")
+        )
+        departure_dt = _parse_datetime(payload.get(departure_key)) or _parse_datetime(departure_time)
+        if departure_dt is not None:
+            departure_dt = departure_dt.astimezone(timezone.utc)
+
+        minutes_remaining = None
+        if departure_dt is not None:
+            minutes_remaining = max(
+                (departure_dt - now).total_seconds() / 60.0,
+                control_minutes,
+            )
+
+        capacity_kwh = max(cfg.vehicle_capacities.get(ev_id, cfg.ev_default_capacity_kwh), 1.0)
+        energy_gap_kwh = None
+        if soc is not None and target_soc is not None:
+            energy_gap_kwh = max(target_soc - soc, 0.0) * capacity_kwh
+
+        missing_fields: List[str] = []
+        if soc_raw is None:
+            missing_fields.append("soc")
+        if target_soc_raw is None or target_soc_raw <= 0.0:
+            missing_fields.append("target_soc")
+        if departure_dt is None and not departure_time:
+            missing_fields.append("departure_time")
+
+        return {
+            "charger_id": charger_id,
+            "ev_id": ev_id,
+            "flexibility_enabled": flexibility_enabled,
+            "charger_min_kw": charger_min_kw,
+            "charger_max_kw": charger_max_kw,
+            "soc_raw": soc_raw,
+            "soc": soc,
+            "target_soc_raw": target_soc_raw,
+            "target_soc": target_soc,
+            "arrival_soc_raw": arrival_soc_raw,
+            "arrival_soc": arrival_soc,
+            "departure_soc_raw": departure_soc_raw,
+            "departure_soc": departure_soc,
+            "arrival_time": arrival_time,
+            "departure_time": departure_time,
+            "minutes_remaining": minutes_remaining,
+            "capacity_kwh": capacity_kwh,
+            "energy_gap_kwh": energy_gap_kwh,
+            "mode": _clean_text(raw_flex_fields.get("mode")),
+            "flex_charger": _clean_text(raw_flex_fields.get("charger")),
+            "missing_fields": missing_fields,
+            "raw_flex_fields": raw_flex_fields,
+        }
+
+    def _required_ev_power_from_detail(
+        self,
+        detail: Dict[str, Any],
+        charger_min_kw: float,
+        charger_max_kw: float,
+        control_minutes: float,
+        dt_hours: float,
+    ) -> float:
+        cfg = self.config
+        soc = detail.get("soc")
+        target_soc = detail.get("target_soc")
+        minutes_remaining = detail.get("minutes_remaining")
+        gap_kwh = detail.get("energy_gap_kwh")
+
+        detail.update({"eligible": False, "required_kw": cfg.ev_min_connected_kw, "priority": None})
+
+        if soc is None or target_soc is None:
+            detail["reason"] = "missing_soc_or_target"
+            return cfg.ev_min_connected_kw
+        if target_soc <= soc + 1e-6:
+            detail["reason"] = "target_already_met"
+            return cfg.ev_min_connected_kw
+        if gap_kwh is None or gap_kwh <= 1e-9:
+            detail["reason"] = "no_energy_gap"
+            return cfg.ev_min_connected_kw
+        if minutes_remaining is None:
+            detail["reason"] = "missing_departure_time"
+            return cfg.ev_min_connected_kw
+
+        if minutes_remaining <= control_minutes + 1e-9:
+            required_kw = charger_max_kw
+        else:
+            required_kw = gap_kwh / max(minutes_remaining / 60.0, dt_hours)
+        required_kw = _clamp(required_kw, charger_min_kw, charger_max_kw)
+        detail.update(
+            {
+                "eligible": True,
+                "required_kw": required_kw,
+                "priority": required_kw / charger_max_kw if charger_max_kw > 0 else 1.0,
+                "reason": "schedulable",
+            }
+        )
+        return required_kw
+
     def _ev_action_bounds(self, payload: Dict[str, Any], now: datetime, dt_hours: float) -> EvAggregate:
         cfg = self.config
         control_minutes = max(cfg.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES)
         hard_min_total = 0.0
         max_total = 0.0
         connected_any = False
+        details: List[Dict[str, Any]] = []
 
         for charger_id, meta in cfg.chargers.items():
             ev_raw = payload.get(f"charging_sessions.{charger_id}.electric_vehicle")
@@ -1159,68 +1461,48 @@ class Rh1HouseRuntime:
             charger_max = max(_safe_float(meta.get("max_kw"), 22.0), charger_min)
             max_total += charger_max
 
+            detail = self._build_ev_flex_detail(
+                payload=payload,
+                ev_id=ev_id,
+                charger_id=charger_id,
+                charger_min_kw=charger_min,
+                charger_max_kw=charger_max,
+                now=now,
+                control_minutes=control_minutes,
+                flexibility_enabled=cfg.ev_use_flexibility,
+            )
+
             if cfg.ev_use_flexibility:
-                required_kw = self._required_ev_power(
-                    payload=payload,
-                    ev_id=ev_id,
+                required_kw = self._required_ev_power_from_detail(
+                    detail=detail,
                     charger_min_kw=charger_min,
                     charger_max_kw=charger_max,
-                    now=now,
                     control_minutes=control_minutes,
                     dt_hours=dt_hours,
                 )
             else:
                 required_kw = charger_min
+                detail.update(
+                    {
+                        "eligible": False,
+                        "required_kw": required_kw,
+                        "priority": None,
+                        "reason": "flexibility_disabled",
+                    }
+                )
+            details.append(detail)
             hard_min_total += max(required_kw, charger_min)
 
         if not connected_any:
-            return EvAggregate(connected=False, hard_min_kw=0.0, max_kw=0.0)
+            return EvAggregate(connected=False, hard_min_kw=0.0, max_kw=0.0, details=details)
 
         hard_min_total = _clamp(hard_min_total, 0.0, max_total)
-        return EvAggregate(connected=True, hard_min_kw=hard_min_total, max_kw=max_total)
-
-    def _required_ev_power(
-        self,
-        payload: Dict[str, Any],
-        ev_id: str,
-        charger_min_kw: float,
-        charger_max_kw: float,
-        now: datetime,
-        control_minutes: float,
-        dt_hours: float,
-    ) -> float:
-        cfg = self.config
-        soc_key = cfg.resolve_ev_field("soc", ev_id)
-        target_key = cfg.resolve_ev_field("target_soc", ev_id)
-        departure_key = cfg.resolve_ev_field("departure_time", ev_id)
-
-        soc = _maybe_float(payload.get(soc_key))
-        target_soc = _maybe_float(payload.get(target_key))
-        departure = _parse_datetime(payload.get(departure_key))
-
-        if soc is None or target_soc is None or departure is None or target_soc <= 0.0:
-            return cfg.ev_min_connected_kw
-
-        soc = self._normalize_soc(soc)
-        target_soc = self._normalize_soc(target_soc)
-        target_soc = _clamp(target_soc, soc, 1.0)
-        if target_soc <= soc + 1e-6:
-            return cfg.ev_min_connected_kw
-
-        minutes_remaining = max((departure - now).total_seconds() / 60.0, control_minutes)
-        capacity_kwh = cfg.vehicle_capacities.get(ev_id, cfg.ev_default_capacity_kwh)
-        capacity_kwh = max(capacity_kwh, 1.0)
-        gap_kwh = max(target_soc - soc, 0.0) * capacity_kwh
-
-        if gap_kwh <= 1e-9:
-            return cfg.ev_min_connected_kw
-
-        if minutes_remaining <= control_minutes + 1e-9:
-            required_kw = charger_max_kw
-        else:
-            required_kw = gap_kwh / max(minutes_remaining / 60.0, dt_hours)
-        required_kw = _clamp(required_kw, charger_min_kw, charger_max_kw)
-        return required_kw
+        return EvAggregate(
+            connected=True,
+            hard_min_kw=hard_min_total,
+            max_kw=max_total,
+            details=details,
+        )
 
     def _battery_power_bounds(self, soc: float, dt_hours: float) -> BatteryPowerBounds:
         cfg = self.config
@@ -1399,6 +1681,7 @@ class Rh1HouseRuntime:
         grid_export_limit_kw: float,
         dt_hours: float,
         community_target_kw: float,
+        forecast_target_kw: float | None,
     ) -> float:
         cfg = self.config
         net_grid_kw = base_without_battery + battery_kw
@@ -1429,6 +1712,10 @@ class Rh1HouseRuntime:
             community_target_kw=community_target_kw,
             dt_hours=dt_hours,
         )
+        forecast_penalty = 0.0
+        if forecast_target_kw is not None:
+            forecast_error_kw = battery_kw - forecast_target_kw
+            forecast_penalty = max(cfg.forecast_dispatch_weight, 0.0) * (forecast_error_kw ** 2) * dt_hours
 
         return (
             grid_cost
@@ -1438,6 +1725,7 @@ class Rh1HouseRuntime:
             + exported_from_battery_penalty
             + hard_violation_penalty
             + community_penalty
+            + forecast_penalty
         )
 
     def _optimize_joint_dispatch(
@@ -1454,6 +1742,7 @@ class Rh1HouseRuntime:
         grid_export_limit_kw: float,
         dt_hours: float,
         community_target_kw: float,
+        forecast_target_kw: float | None,
     ) -> tuple[float, float, float]:
         ev_min_kw = _clamp(ev.hard_min_kw, 0.0, ev.max_kw)
         if not ev.connected:
@@ -1486,6 +1775,7 @@ class Rh1HouseRuntime:
                     grid_export_limit_kw=grid_export_limit_kw,
                     dt_hours=dt_hours,
                     community_target_kw=community_target_kw,
+                    forecast_target_kw=forecast_target_kw,
                 )
                 net_grid_kw = base_without_battery + battery_kw
                 candidate = (objective, ev_kw, battery_kw, base_without_battery, net_grid_kw)
@@ -1540,6 +1830,7 @@ class Rh1HouseRuntime:
         grid_export_limit_kw: float,
         dt_hours: float,
         community_target_kw: float,
+        forecast_target_kw: float | None,
     ) -> tuple[float, float]:
         base_without_battery = self._estimate_base_without_battery(
             payload=payload,
@@ -1565,6 +1856,7 @@ class Rh1HouseRuntime:
                 grid_export_limit_kw=grid_export_limit_kw,
                 dt_hours=dt_hours,
                 community_target_kw=community_target_kw,
+                forecast_target_kw=forecast_target_kw,
             )
             net_grid_kw = base_without_battery + battery_kw
             candidate = (objective, battery_kw, net_grid_kw)

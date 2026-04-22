@@ -84,6 +84,34 @@ def test_price_vector_does_not_change_dispatch(boavista_with_flex_client):
     assert actions_a == actions_b
 
 
+def test_forecasts_do_not_change_dispatch_when_bundle_support_disabled(boavista_with_flex_client):
+    record = load_json(MESSAGE_PATH)[0]
+    payload_a = normalize_record(record)
+    payload_b = json.loads(json.dumps(payload_a))
+    payload_b["forecasts"] = {
+        "ConsumptionForecastService": {
+            "consumption_total": {
+                "values": [0.25] * 8,
+                "measurement_unit": "kWh",
+                "frequency_seconds": 900,
+                "horizon_seconds": 7200,
+            }
+        },
+        "ProductionForecastService": {
+            "production_total": {
+                "values": [0.05] * 8,
+                "measurement_unit": "kWh",
+                "frequency_seconds": 900,
+                "horizon_seconds": 7200,
+            }
+        },
+    }
+
+    actions_a = post_inference(boavista_with_flex_client, payload_a)
+    actions_b = post_inference(boavista_with_flex_client, payload_b)
+    assert actions_a == actions_b
+
+
 def _empty_hq_payload() -> dict:
     record = load_json(MESSAGE_PATH)[0]
     payload = normalize_record(record)

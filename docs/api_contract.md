@@ -167,6 +167,39 @@ Community-participation example:
 }
 ```
 
+`features.forecasts` is optional. When present, the service keeps it separate from observations and flattens it under the `forecasts.*` prefix for forecast-enabled runtimes. Missing, empty, partial, or malformed forecasts do not produce `400` responses by themselves; the runtime falls back to the existing bundle logic.
+
+Forecast example:
+
+```json
+{
+  "features": {
+    "timestamp": "2026-04-09T13:20:45Z",
+    "observations": {
+      "solar_generation": 0.0
+    },
+    "forecasts": {
+      "ConsumptionForecastService": {
+        "consumption_total": {
+          "values": [0.25, 0.24, 0.23, 0.22],
+          "measurement_unit": "kWh",
+          "frequency_seconds": 900,
+          "horizon_seconds": 3600
+        }
+      },
+      "ProductionForecastService": {
+        "production_total": {
+          "values": [0.05, 0.06, 0.07, 0.08],
+          "measurement_unit": "kWh",
+          "frequency_seconds": 900,
+          "horizon_seconds": 3600
+        }
+      }
+    }
+  }
+}
+```
+
 ## GET /info
 
 Returns metadata for the currently loaded default pipeline context.

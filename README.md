@@ -92,6 +92,7 @@ Full request/response contracts and error semantics:
 - Nested objects are flattened using dot notation: `a.b.c`.
 - Arrays use indices: `list[0]`, `list[1]`.
 - Aliases can map external field names to internal ones.
+- `features.forecasts` is optional. When present, it is preserved under the `forecasts.*` prefix and made available to forecast-enabled bundles.
 - Alias precedence at load time:
   - explicit `/admin/load.alias_mapping_path` (or `FEATURE_ALIAS_PATH`) takes priority.
   - fallback to `metadata.alias_mapping_path` in `artifact_manifest.json`.
@@ -124,6 +125,37 @@ Community-participation example:
   }
 }
 ```
+
+Forecast example:
+```json
+{
+  "features": {
+    "timestamp": "2026-04-09T13:20:45Z",
+    "observations": {
+      "solar_generation": 0.0
+    },
+    "forecasts": {
+      "ConsumptionForecastService": {
+        "consumption_total": {
+          "values": [0.25, 0.24, 0.23, 0.22],
+          "measurement_unit": "kWh",
+          "frequency_seconds": 900,
+          "horizon_seconds": 3600
+        }
+      },
+      "ProductionForecastService": {
+        "production_total": {
+          "values": [0.05, 0.06, 0.07, 0.08],
+          "measurement_unit": "kWh",
+          "frequency_seconds": 900,
+          "horizon_seconds": 3600
+        }
+      }
+    }
+  }
+}
+```
+Forecast-aware behavior is opt-in per bundle. If a bundle does not enable forecast support, the request is still accepted and `forecasts` is ignored.
 
 ## Running Locally
 ```bash
@@ -211,6 +243,7 @@ Collection: `postman/EnergyFlexibilityInference.postman_collection.json`.
 - Includes sample requests for loading bundles and running inference.
 - Supports `x-request-id` for tracing.
 - ONNX sample requests use the envelope contract: `features.timestamp + features.observations` (with optional `features.forecasts`).
+- Forecast-enabled bundle sections now include explicit `Inference: with forecasts` requests for RH1 and Sao Mamede virtual-battery bundles, both local and community variants.
 
 ## Observability
 - Console logs by default (optionally JSON).

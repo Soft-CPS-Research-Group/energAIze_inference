@@ -29,6 +29,34 @@ def _kwh_for_interval(power_kw: float) -> float:
     return power_kw * DECISION_INTERVAL_HOURS
 
 
+def _set_site_forecasts(
+    payload: dict,
+    *,
+    consumption_values: list[float] | None = None,
+    production_values: list[float] | None = None,
+    frequency_seconds: int = 900,
+) -> None:
+    forecasts = payload.setdefault("forecasts", {})
+    if consumption_values is not None:
+        forecasts["ConsumptionForecastService"] = {
+            "consumption_total": {
+                "values": consumption_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(consumption_values) * frequency_seconds,
+            }
+        }
+    if production_values is not None:
+        forecasts["ProductionForecastService"] = {
+            "production_total": {
+                "values": production_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(production_values) * frequency_seconds,
+            }
+        }
+
+
 @pytest.fixture
 def sao_mamede_with_battery_client():
     if store.is_configured():
@@ -161,6 +189,7 @@ def test_manifest_models_single_pt_limit(sao_mamede_with_battery_client):
     assert cfg.target_soc_expensive == pytest.approx(0.6, rel=1e-6)
     assert cfg.virtual_battery_soc_recovery_gain == pytest.approx(1.0, rel=1e-6)
     assert cfg.virtual_battery_sign_flip_extra_kw == pytest.approx(0.3, rel=1e-6)
+    assert cfg.forecast_support_enabled is True
 
 
 def test_single_controllable_bb_charger_uses_merged_plugs(sao_mamede_with_battery_client):
@@ -211,6 +240,52 @@ def test_virtual_battery_responds_to_energy_tariffs_price_vector(
 
     assert expensive_actions[ACTION_BATTERY] < -1e-6
     assert cheap_actions[ACTION_BATTERY] > 1e-6
+
+
+def test_virtual_battery_forecast_deficit_increases_charge_preparation(
+    sao_mamede_with_battery_client,
+):
+    base = _base_payload()
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.35
+    base["observations"]["solar_generation"] = 0.0
+    base["observations"]["non_shiftable_load"] = 0.0
+    base["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = (
+        [0.20] + ([0.05] * 30) + ([0.20] * 30) + ([0.35] * 35)
+    )
+
+    deficit = copy.deepcopy(base)
+    _set_site_forecasts(
+        deficit,
+        consumption_values=[8.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    base_actions = _run(sao_mamede_with_battery_client, base)
+    deficit_actions = _run(sao_mamede_with_battery_client, deficit)
+
+    assert deficit_actions[ACTION_BATTERY] > base_actions[ACTION_BATTERY] + 0.1
+
+
+def test_virtual_battery_forecast_surplus_reduces_price_driven_charge(
+    sao_mamede_with_battery_client,
+):
+    base = _base_payload()
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.82
+    base["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.05] + [0.30] * 95
+    base["observations"]["solar_generation"] = 0.0
+
+    surplus = copy.deepcopy(base)
+    _set_site_forecasts(
+        surplus,
+        consumption_values=[0.0] * 8,
+        production_values=[8.0] * 8,
+    )
+
+    base_actions = _run(sao_mamede_with_battery_client, base)
+    surplus_actions = _run(sao_mamede_with_battery_client, surplus)
+
+    assert base_actions[ACTION_BATTERY] > 0.1
+    assert surplus_actions[ACTION_BATTERY] < base_actions[ACTION_BATTERY] - 0.1
 
 
 def test_virtual_battery_soc_guards(sao_mamede_with_battery_client):

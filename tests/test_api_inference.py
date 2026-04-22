@@ -155,6 +155,56 @@ def _build_rule_based_alias_bundle(
     return manifest_path, alias_path
 
 
+def _build_forecast_envelope_bundle(tmp_path: Path) -> Path:
+    bundle_dir = tmp_path / "forecast_envelope_bundle"
+    bundle_dir.mkdir()
+
+    policy = {
+        "default_actions": {"hvac": 0.0},
+        "rules": [
+            {
+                "if": {"forecasts.ConsumptionForecastService.consumption_total.values[0]": 0.5},
+                "actions": {"hvac": 1.0},
+            }
+        ],
+    }
+    policy_path = bundle_dir / "policy_agent_0.json"
+    policy_path.write_text(json.dumps(policy), encoding="utf-8")
+
+    manifest = {
+        "manifest_version": 1,
+        "metadata": {},
+        "simulator": {},
+        "training": {},
+        "topology": {"num_agents": 1},
+        "algorithm": {"name": "RuleBasedPolicy", "hyperparameters": {}},
+        "environment": {
+            "observation_names": [["timestamp"]],
+            "encoders": [[{"type": "NoNormalization", "params": {}}]],
+            "action_bounds": [[{"low": [0], "high": [1]}]],
+            "action_names": ["hvac"],
+            "reward_function": {"name": "RewardFunction", "params": {}},
+        },
+        "agent": {
+            "format": "rule_based",
+            "artifacts": [
+                {
+                    "agent_index": 0,
+                    "path": "policy_agent_0.json",
+                    "format": "rule_based",
+                    "config": {
+                        "require_observations_envelope": True,
+                    },
+                }
+            ],
+        },
+    }
+
+    manifest_path = bundle_dir / "artifact_manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    return manifest_path
+
+
 def _build_icharging_subminute_bundle(tmp_path: Path) -> Path:
     bundle_dir = tmp_path / "icharging_subminute"
     bundle_dir.mkdir()
@@ -626,6 +676,77 @@ def test_api_flattens_nested_payload(tmp_path):
         assert response.status_code == 200
         body = response.json()
         assert body["actions"]["0"]["hvac"] == pytest.approx(0.8, rel=1e-6)
+    finally:
+        store.unload()
+
+
+def test_api_flattens_forecasts_inside_required_observations_envelope(tmp_path):
+    manifest_path = _build_forecast_envelope_bundle(tmp_path)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+
+    client = TestClient(app)
+    payload = {
+        "features": {
+            "timestamp": "2026-04-09T13:20:45Z",
+            "observations": {
+                "non_shiftable_load": 0.0,
+            },
+            "forecasts": {
+                "ConsumptionForecastService": {
+                    "consumption_total": {
+                        "values": [0.5, 0.4],
+                        "measurement_unit": "kWh",
+                        "frequency_seconds": 900,
+                        "horizon_seconds": 1800,
+                    }
+                }
+            },
+        }
+    }
+
+    try:
+        response = client.post("/inference", json=payload)
+        assert response.status_code == 200
+        assert response.json()["actions"]["0"]["hvac"] == pytest.approx(1.0, rel=1e-6)
+    finally:
+        store.unload()
+
+
+def test_api_accepts_missing_or_malformed_forecasts_inside_required_observations_envelope(tmp_path):
+    manifest_path = _build_forecast_envelope_bundle(tmp_path)
+    if store.is_configured():
+        store.unload()
+    store.load(manifest_path, None, 0)
+
+    client = TestClient(app)
+    payload_without_forecasts = {
+        "features": {
+            "timestamp": "2026-04-09T13:20:45Z",
+            "observations": {
+                "non_shiftable_load": 0.0,
+            },
+        }
+    }
+    payload_with_malformed_forecasts = {
+        "features": {
+            "timestamp": "2026-04-09T13:20:45Z",
+            "observations": {
+                "non_shiftable_load": 0.0,
+            },
+            "forecasts": "invalid",
+        }
+    }
+
+    try:
+        response_without = client.post("/inference", json=payload_without_forecasts)
+        assert response_without.status_code == 200
+        assert response_without.json()["actions"]["0"]["hvac"] == pytest.approx(0.0, rel=1e-6)
+
+        response_malformed = client.post("/inference", json=payload_with_malformed_forecasts)
+        assert response_malformed.status_code == 200
+        assert response_malformed.json()["actions"]["0"]["hvac"] == pytest.approx(0.0, rel=1e-6)
     finally:
         store.unload()
 

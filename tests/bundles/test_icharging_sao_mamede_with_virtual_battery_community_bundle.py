@@ -24,6 +24,34 @@ def _kwh_for_interval(power_kw: float) -> float:
     return power_kw * DECISION_INTERVAL_HOURS
 
 
+def _set_site_forecasts(
+    payload: dict,
+    *,
+    consumption_values: list[float] | None = None,
+    production_values: list[float] | None = None,
+    frequency_seconds: int = 900,
+) -> None:
+    forecasts = payload.setdefault("forecasts", {})
+    if consumption_values is not None:
+        forecasts["ConsumptionForecastService"] = {
+            "consumption_total": {
+                "values": consumption_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(consumption_values) * frequency_seconds,
+            }
+        }
+    if production_values is not None:
+        forecasts["ProductionForecastService"] = {
+            "production_total": {
+                "values": production_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(production_values) * frequency_seconds,
+            }
+        }
+
+
 @pytest.fixture
 def sao_mamede_with_battery_community_client():
     if store.is_configured():
@@ -79,6 +107,7 @@ def test_bundle_loads_sao_mamede_with_virtual_battery_community(
     pipeline = store.get_pipeline()
     assert pipeline.agent.strategy == "icharging_breaker"
     assert pipeline.agent._icharging_runtime is not None  # noqa: SLF001
+    assert pipeline.agent._icharging_runtime.config.forecast_support_enabled is True  # noqa: SLF001
 
 
 def test_missing_required_community_fields_returns_400(
@@ -160,6 +189,50 @@ def test_low_soc_can_recharge_with_persistent_community_deficit_when_price_favor
 
     actions = _run(sao_mamede_with_battery_community_client, payload)
     assert actions[ACTION_BATTERY] > 0.1
+
+
+def test_forecast_deficit_tempers_virtual_battery_discharge_under_community_deficit(
+    sao_mamede_with_battery_community_client,
+):
+    base = _base_payload()
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.55
+    base["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.20] * 96
+    base["community"]["energy_in_total"] = _kwh_for_interval(40.0)
+    base["community"]["energy_out_total"] = 0.0
+
+    forecasted = copy.deepcopy(base)
+    _set_site_forecasts(
+        forecasted,
+        consumption_values=[8.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    base_actions = _run(sao_mamede_with_battery_community_client, base)
+    forecast_actions = _run(sao_mamede_with_battery_community_client, forecasted)
+
+    assert forecast_actions[ACTION_BATTERY] > base_actions[ACTION_BATTERY] + 0.1
+
+
+def test_community_signal_still_biases_virtual_battery_when_forecast_is_present(
+    sao_mamede_with_battery_community_client,
+):
+    neutral = _base_payload()
+    neutral["observations"]["batteries"]["B01"]["SoC"] = 0.55
+    neutral["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.20] * 96
+    _set_site_forecasts(
+        neutral,
+        consumption_values=[8.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    deficit = copy.deepcopy(neutral)
+    deficit["community"]["energy_in_total"] = _kwh_for_interval(40.0)
+    deficit["community"]["energy_out_total"] = 0.0
+
+    neutral_actions = _run(sao_mamede_with_battery_community_client, neutral)
+    deficit_actions = _run(sao_mamede_with_battery_community_client, deficit)
+
+    assert deficit_actions[ACTION_BATTERY] <= neutral_actions[ACTION_BATTERY]
 
 
 def test_deadband_reduces_near_zero_dispatch_chattering(

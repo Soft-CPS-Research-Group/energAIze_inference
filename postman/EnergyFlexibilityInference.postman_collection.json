@@ -787,6 +787,46 @@
           ]
         },
         {
+          "name": "Inference: with forecasts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-04-09T13:20:45Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 0.0,\n      \"energy_tariffs\": {\n        \"OMIE\": {\n          \"energy_price\": {\n            \"values\": [0.2, 0.05, 0.05, 0.05, 0.2, 0.2, 0.2, 0.35],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 7200\n          }\n        }\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"BB000SMI_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-5_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-5_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-6_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-6_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"}\n      },\n      \"electric_vehicles\": {},\n      \"batteries\": {\n        \"B01\": {\"energy_in\": 0.0, \"energy_out\": 0.0, \"SoC\": 0.55}\n      }\n    },\n    \"forecasts\": {\n      \"ConsumptionForecastService\": {\n        \"consumption_total\": {\n          \"values\": [8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      },\n      \"ProductionForecastService\": {\n        \"production_total\": {\n          \"values\": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede with battery accepts forecasts', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0']).to.have.property('B01');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Admin Unload",
           "request": {
             "method": "POST",
@@ -912,6 +952,46 @@
                   "  const body = pm.response.json();",
                   "  pm.expect(body.actions['0'].ev_charge_kw).to.be.within(0, 4.6);",
                   "  pm.expect(body.actions['0'].battery_kw).to.be.within(-4.8, 4.8);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: with forecasts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-04-09T13:20:45Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 0.0,\n      \"energy_price\": {\n        \"values\": [0.25, 0.05, 0.05, 0.05, 0.2, 0.2, 0.2, 0.35],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 7200\n      },\n      \"batteries\": {\n        \"B01\": {\"energy_in\": 0.0, \"energy_out\": 0.0, \"SoC\": 0.55}\n      },\n      \"charging_sessions\": {\n        \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"\"}\n      },\n      \"electric_vehicles\": {}\n    },\n    \"forecasts\": {\n      \"ConsumptionForecastService\": {\n        \"consumption_total\": {\n          \"values\": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      },\n      \"ProductionForecastService\": {\n        \"production_total\": {\n          \"values\": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      }\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RH1 accepts forecasts', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0']).to.have.property('B01');",
                   "});"
                 ]
               }
@@ -1469,6 +1549,46 @@
           ]
         },
         {
+          "name": "Inference: with forecasts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-04-09T13:20:45Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 0.0,\n      \"energy_price\": {\n        \"values\": [0.25, 0.05, 0.05, 0.05, 0.2, 0.2, 0.2, 0.35],\n        \"measurement_unit\": \"€/kWh\",\n        \"frequency_seconds\": 900,\n        \"horizon_seconds\": 7200\n      },\n      \"batteries\": {\n        \"B01\": {\"energy_in\": 0.0, \"energy_out\": 0.0, \"SoC\": 0.55}\n      },\n      \"charging_sessions\": {\n        \"EVC01\": {\"power\": 0.0, \"electric_vehicle\": \"\"}\n      },\n      \"electric_vehicles\": {}\n    },\n    \"forecasts\": {\n      \"ConsumptionForecastService\": {\n        \"consumption_total\": {\n          \"values\": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      },\n      \"ProductionForecastService\": {\n        \"production_total\": {\n          \"values\": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      }\n    },\n    \"community\": {\n      \"energy_in_total\": 0.0024641,\n      \"energy_out_total\": 0.0\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('RH1 community accepts forecasts', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0']).to.have.property('B01');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Info",
           "request": {
             "method": "GET",
@@ -1697,6 +1817,46 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Tariff vector in energy_tariffs schema is accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.actions['0']).to.have.property('B01');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inference: with forecasts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/inference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "inference"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"features\": {\n    \"timestamp\": \"2026-04-09T13:20:45Z\",\n    \"observations\": {\n      \"non_shiftable_load\": 0.0,\n      \"solar_generation\": 0.0,\n      \"energy_tariffs\": {\n        \"OMIE\": {\n          \"energy_price\": {\n            \"values\": [0.2, 0.05, 0.05, 0.05, 0.2, 0.2, 0.2, 0.35],\n            \"measurement_unit\": \"€/kWh\",\n            \"frequency_seconds\": 900,\n            \"horizon_seconds\": 7200\n          }\n        }\n      },\n      \"charging_sessions\": {\n        \"BB000SMI_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"BB000SMI_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-5_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-5_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-6_1\": {\"power\": 0.0, \"electric_vehicle\": \"\"},\n        \"M1123089-6_2\": {\"power\": 0.0, \"electric_vehicle\": \"\"}\n      },\n      \"electric_vehicles\": {},\n      \"batteries\": {\n        \"B01\": {\"energy_in\": 0.0, \"energy_out\": 0.0, \"SoC\": 0.55}\n      }\n    },\n    \"forecasts\": {\n      \"ConsumptionForecastService\": {\n        \"consumption_total\": {\n          \"values\": [8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0, 8.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      },\n      \"ProductionForecastService\": {\n        \"production_total\": {\n          \"values\": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],\n          \"measurement_unit\": \"kWh\",\n          \"frequency_seconds\": 900,\n          \"horizon_seconds\": 7200\n        }\n      }\n    },\n    \"community\": {\n      \"energy_in_total\": 0.0024641,\n      \"energy_out_total\": 0.0\n    }\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sao Mamede community accepts forecasts', function () {",
                   "  pm.response.to.have.status(200);",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.actions['0']).to.have.property('B01');",

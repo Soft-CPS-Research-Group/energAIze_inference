@@ -37,6 +37,34 @@ def _price_curve(now: float, h1: float, h2: float, h6: float, h12: float, h24: f
     }
 
 
+def _set_site_forecasts(
+    payload: dict,
+    *,
+    consumption_values: list[float] | None = None,
+    production_values: list[float] | None = None,
+    frequency_seconds: int = 900,
+) -> None:
+    forecasts = payload.setdefault("forecasts", {})
+    if consumption_values is not None:
+        forecasts["ConsumptionForecastService"] = {
+            "consumption_total": {
+                "values": consumption_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(consumption_values) * frequency_seconds,
+            }
+        }
+    if production_values is not None:
+        forecasts["ProductionForecastService"] = {
+            "production_total": {
+                "values": production_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(production_values) * frequency_seconds,
+            }
+        }
+
+
 @pytest.fixture
 def rh1_community_client():
     if store.is_configured():
@@ -99,6 +127,7 @@ def test_bundle_loads_rh1_community(rh1_community_client):
     assert cfg.target_soc_cheap == pytest.approx(0.85, rel=1e-6)
     assert cfg.target_soc_neutral == pytest.approx(0.7, rel=1e-6)
     assert cfg.target_soc_expensive == pytest.approx(0.6, rel=1e-6)
+    assert cfg.forecast_support_enabled is True
 
 
 def test_missing_required_community_fields_returns_400(rh1_community_client):
@@ -183,6 +212,51 @@ def test_price_signal_still_trades_off_with_community_target(rh1_community_clien
     expensive_actions = _run(rh1_community_client, expensive_now)
 
     assert expensive_actions[ACTION_BATTERY] < cheap_actions[ACTION_BATTERY]
+
+
+def test_forecast_deficit_tempers_battery_discharge_under_community_deficit(rh1_community_client):
+    base = _base_payload()
+    base["observations"]["batteries"]["B01"]["SoC"] = 0.55
+    base["observations"]["energy_price"] = {
+        "values": [0.25] + ([0.05] * 30) + ([0.20] * 30) + ([0.35] * 35),
+        "measurement_unit": "€/kWh",
+        "frequency_seconds": 900,
+        "horizon_seconds": 86400,
+    }
+    base["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    base["community"]["energy_out_total"] = 0.0
+
+    forecasted = copy.deepcopy(base)
+    _set_site_forecasts(
+        forecasted,
+        consumption_values=[1.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    base_actions = _run(rh1_community_client, base)
+    forecast_actions = _run(rh1_community_client, forecasted)
+
+    assert forecast_actions[ACTION_BATTERY] > base_actions[ACTION_BATTERY] + 0.1
+
+
+def test_community_bias_still_applies_when_local_forecast_is_present(rh1_community_client):
+    neutral = _base_payload()
+    neutral["observations"]["batteries"]["B01"]["SoC"] = 0.55
+    neutral["observations"]["energy_price"] = _price_curve(0.20, 0.20, 0.20, 0.20, 0.20, 0.20)
+    _set_site_forecasts(
+        neutral,
+        consumption_values=[1.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    deficit = copy.deepcopy(neutral)
+    deficit["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    deficit["community"]["energy_out_total"] = 0.0
+
+    neutral_actions = _run(rh1_community_client, neutral)
+    deficit_actions = _run(rh1_community_client, deficit)
+
+    assert deficit_actions[ACTION_BATTERY] <= neutral_actions[ACTION_BATTERY]
 
 
 def test_cheap_price_and_low_soc_prefers_charging_before_community_discharge(rh1_community_client):

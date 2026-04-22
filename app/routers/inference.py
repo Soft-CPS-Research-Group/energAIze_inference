@@ -34,6 +34,9 @@ def _normalize_agent_input(selected_features: Dict[str, Any], pipeline) -> Dict[
         raise KeyError("Missing required object 'observations' for this bundle")
 
     normalized = dict(observations)
+    top_forecasts = selected_features.get("forecasts")
+    if isinstance(top_forecasts, dict) and "forecasts" not in normalized:
+        normalized["forecasts"] = dict(top_forecasts)
     top_community = selected_features.get("community")
     if isinstance(top_community, dict) and "community" not in normalized:
         normalized["community"] = dict(top_community)

@@ -62,6 +62,34 @@ def _set_tariff_curve(
     )
 
 
+def _set_site_forecasts(
+    payload: dict,
+    *,
+    consumption_values: list[float] | None = None,
+    production_values: list[float] | None = None,
+    frequency_seconds: int = 900,
+) -> None:
+    forecasts = payload.setdefault("forecasts", {})
+    if consumption_values is not None:
+        forecasts["ConsumptionForecastService"] = {
+            "consumption_total": {
+                "values": consumption_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(consumption_values) * frequency_seconds,
+            }
+        }
+    if production_values is not None:
+        forecasts["ProductionForecastService"] = {
+            "production_total": {
+                "values": production_values,
+                "measurement_unit": "kWh",
+                "frequency_seconds": frequency_seconds,
+                "horizon_seconds": len(production_values) * frequency_seconds,
+            }
+        }
+
+
 def _run(client: TestClient, payload: dict) -> dict[str, float]:
     response = client.post("/inference", json={"features": payload})
     assert response.status_code == 200
@@ -148,6 +176,7 @@ def test_rh1_bundle_loads_and_strategy_selected(rh1_client):
 def test_rh1_manifest_soc_key_matches_real_payload_schema(rh1_client):
     cfg = store.get_pipeline().agent._rh1_runtime.config  # noqa: SLF001
     assert cfg.battery_soc_keys[0] == "batteries.B01.SoC"
+    assert cfg.forecast_support_enabled is True
 
 
 def test_rh1_actions_contract_ev_battery_only(rh1_client):
@@ -241,6 +270,59 @@ def test_rh1_tariff_vector_from_energy_tariffs_affects_dispatch(rh1_client):
 
     assert cheap_actions[ACTION_BATTERY] > 0.0
     assert expensive_actions[ACTION_BATTERY] < 0.0
+
+
+def test_rh1_forecast_deficit_increases_battery_charge_bias(rh1_client):
+    base = {
+        "timestamp": "2026-03-01T12:00:00Z",
+        "observations": {
+            "non_shiftable_load": 0.0,
+            "solar_generation": 0.0,
+            "energy_price": _price_curve(0.20, 0.20, 0.20, 0.20, 0.20, 0.20),
+            "batteries": {"B01": {"SoC": 0.30}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        "forecasts": {},
+    }
+    deficit = copy.deepcopy(base)
+    _set_site_forecasts(
+        deficit,
+        consumption_values=[1.0] * 8,
+        production_values=[0.0] * 8,
+    )
+
+    base_actions = _run(rh1_client, base)
+    deficit_actions = _run(rh1_client, deficit)
+
+    assert deficit_actions[ACTION_BATTERY] > base_actions[ACTION_BATTERY] + 0.1
+
+
+def test_rh1_forecast_surplus_reduces_price_driven_charging(rh1_client):
+    base = {
+        "timestamp": "2026-03-01T12:00:00Z",
+        "observations": {
+            "non_shiftable_load": 0.0,
+            "solar_generation": 0.0,
+            "energy_price": _price_curve(0.05, 0.25, 0.24, 0.23, 0.22, 0.21),
+            "batteries": {"B01": {"SoC": 0.85}},
+            "charging_sessions": {"EVC01": {"power": 0.0, "electric_vehicle": ""}},
+            "electric_vehicles": {},
+        },
+        "forecasts": {},
+    }
+    surplus = copy.deepcopy(base)
+    _set_site_forecasts(
+        surplus,
+        consumption_values=[0.0] * 8,
+        production_values=[1.0] * 8,
+    )
+
+    base_actions = _run(rh1_client, base)
+    surplus_actions = _run(rh1_client, surplus)
+
+    assert base_actions[ACTION_BATTERY] > 0.0
+    assert surplus_actions[ACTION_BATTERY] < base_actions[ACTION_BATTERY] - 0.1
 
 
 def test_rh1_grid_meter_is_used_as_primary_site_balance_signal(rh1_client):

@@ -170,6 +170,7 @@
           "virtual_battery_community_current_import_key": "community.current_net_import_kw",
           "virtual_battery_community_price_prefix": "community.price_signal",
           "virtual_battery_local_price_prefix": "energy_tariffs.OMIE.energy_price",
+          "forecast_support_enabled": true,
           "price_quantile_cheap": 0.35,
           "price_quantile_expensive": 0.7,
           "reserve_soc_cheap": 0.35,

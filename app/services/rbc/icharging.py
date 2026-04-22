@@ -5,6 +5,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
 
+from .forecasts import ForecastSocGuidance, build_forecast_soc_guidance, read_site_forecasts
 from app.logging import get_logger
 
 
@@ -106,6 +107,131 @@ def _current_timestamp(payload: Dict[str, Any]) -> datetime:
         if parsed:
             return parsed.astimezone(timezone.utc)
     return datetime.now(timezone.utc)
+
+
+def _clean_text(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text or text.lower() in {"nan", "none", "null"}:
+        return ""
+    return text
+
+
+def _extract_prefixed_fields(payload: Dict[str, Any], prefix: str) -> Dict[str, Any]:
+    fields: Dict[str, Any] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str) or not key.startswith(prefix):
+            continue
+        suffix = key[len(prefix) :]
+        if suffix:
+            fields[suffix] = value
+    return dict(sorted(fields.items()))
+
+
+def _build_ev_flex_snapshot(
+    payload: Dict[str, Any],
+    ev_id: str,
+    *,
+    soc_key: str,
+    target_key: str,
+    departure_key: str,
+    capacity_kwh: Optional[float],
+    now: Optional[datetime] = None,
+    min_minutes: float = 0.0,
+    allow_departure_fallback: bool = False,
+    default_departure_buffer_minutes: float = 0.0,
+    soc_unit_mode: str = "auto",
+) -> Dict[str, Any]:
+    if not ev_id:
+        return {}
+
+    flex_prefix = f"electric_vehicles.{ev_id}.flexibility."
+    raw_flex_fields = _extract_prefixed_fields(payload, flex_prefix)
+
+    soc_raw = _maybe_float(payload.get(soc_key))
+    soc = _normalize_soc_value(soc_raw, soc_unit_mode) if soc_raw is not None else None
+
+    target_soc_raw = _maybe_float(payload.get(target_key))
+    if target_soc_raw is not None and target_soc_raw > 0.0:
+        target_soc = _normalize_soc_value(target_soc_raw, soc_unit_mode)
+        if soc is not None:
+            target_soc = _clamp(target_soc, soc, 1.0)
+    else:
+        target_soc = None
+
+    arrival_soc_raw = _maybe_float(raw_flex_fields.get("estimated_soc_at_arrival"))
+    arrival_soc = (
+        _normalize_soc_value(arrival_soc_raw, soc_unit_mode) if arrival_soc_raw is not None else None
+    )
+    departure_soc_raw = _maybe_float(raw_flex_fields.get("estimated_soc_at_departure"))
+    departure_soc = (
+        _normalize_soc_value(departure_soc_raw, soc_unit_mode)
+        if departure_soc_raw is not None
+        else None
+    )
+
+    arrival_time = _clean_text(raw_flex_fields.get("estimated_time_at_arrival"))
+    departure_raw = _clean_text(payload.get(departure_key)) or _clean_text(
+        raw_flex_fields.get("estimated_time_at_departure")
+    )
+    departure_dt = _parse_datetime(payload.get(departure_key)) or _parse_datetime(departure_raw)
+
+    departure_fallback_used = False
+    effective_departure_dt = departure_dt.astimezone(timezone.utc) if departure_dt else None
+    if (
+        effective_departure_dt is None
+        and now is not None
+        and allow_departure_fallback
+    ):
+        buffer_minutes = max(default_departure_buffer_minutes, min_minutes, 0.0)
+        effective_departure_dt = now + timedelta(minutes=buffer_minutes)
+        departure_fallback_used = True
+
+    minutes_remaining = None
+    if effective_departure_dt is not None and now is not None:
+        minutes_remaining = max(
+            (effective_departure_dt - now).total_seconds() / 60.0,
+            max(min_minutes, 0.0),
+        )
+
+    capacity_norm = max(capacity_kwh, 0.0) if capacity_kwh is not None else None
+    energy_gap_kwh = None
+    if soc is not None and target_soc is not None and capacity_norm is not None and capacity_norm > 0.0:
+        energy_gap_kwh = max(target_soc - soc, 0.0) * capacity_norm
+
+    missing_fields: List[str] = []
+    if soc_raw is None:
+        missing_fields.append("soc")
+    if target_soc_raw is None or target_soc_raw <= 0.0:
+        missing_fields.append("target_soc")
+    if departure_dt is None and not departure_raw:
+        missing_fields.append("departure_time")
+
+    return {
+        "ev": ev_id,
+        "soc_raw": soc_raw,
+        "soc": soc,
+        "target_soc_raw": target_soc_raw,
+        "target_soc": target_soc,
+        "arrival_soc_raw": arrival_soc_raw,
+        "arrival_soc": arrival_soc,
+        "departure_soc_raw": departure_soc_raw,
+        "departure_soc": departure_soc,
+        "arrival_time": arrival_time,
+        "departure_time": departure_raw,
+        "effective_departure_time": (
+            effective_departure_dt.isoformat() if effective_departure_dt is not None else ""
+        ),
+        "minutes_remaining": minutes_remaining,
+        "capacity_kwh": capacity_norm,
+        "energy_gap_kwh": energy_gap_kwh,
+        "mode": _clean_text(raw_flex_fields.get("mode")),
+        "flex_charger": _clean_text(raw_flex_fields.get("charger")),
+        "departure_fallback_used": departure_fallback_used,
+        "missing_fields": missing_fields,
+        "raw_flex_fields": raw_flex_fields,
+    }
 
 
 def _round_down_one_decimal(value: float) -> float:
@@ -250,6 +376,13 @@ class IchargingRuntimeConfig:
     virtual_battery_community_current_import_key: str = "community.current_net_import_kw"
     virtual_battery_community_price_prefix: str = "community.price_signal"
     virtual_battery_local_price_prefix: str = "energy_price"
+    forecast_support_enabled: bool = False
+    forecast_consumption_prefix: str = "forecasts.ConsumptionForecastService.consumption_total"
+    forecast_production_prefix: str = "forecasts.ProductionForecastService.production_total"
+    forecast_window_hours: float = 2.0
+    forecast_soc_bias_gain: float = 0.5
+    forecast_soc_bias_max: float = 0.15
+    forecast_dispatch_weight: float = 0.25
     price_quantile_cheap: float = 0.35
     price_quantile_expensive: float = 0.70
     reserve_soc_cheap: float = 0.35
@@ -466,6 +599,38 @@ class IchargingRuntimeConfig:
             virtual_battery_local_price_prefix=str(
                 data.pop("virtual_battery_local_price_prefix", "energy_price")
             ),
+            forecast_support_enabled=bool(data.pop("forecast_support_enabled", False)),
+            forecast_consumption_prefix=str(
+                data.pop(
+                    "forecast_consumption_prefix",
+                    "forecasts.ConsumptionForecastService.consumption_total",
+                )
+            ).strip()
+            or "forecasts.ConsumptionForecastService.consumption_total",
+            forecast_production_prefix=str(
+                data.pop(
+                    "forecast_production_prefix",
+                    "forecasts.ProductionForecastService.production_total",
+                )
+            ).strip()
+            or "forecasts.ProductionForecastService.production_total",
+            forecast_window_hours=max(
+                _safe_float(data.pop("forecast_window_hours", 2.0), 2.0),
+                0.0,
+            ),
+            forecast_soc_bias_gain=max(
+                _safe_float(data.pop("forecast_soc_bias_gain", 0.5), 0.5),
+                0.0,
+            ),
+            forecast_soc_bias_max=_clamp(
+                _safe_float(data.pop("forecast_soc_bias_max", 0.15), 0.15),
+                0.0,
+                1.0,
+            ),
+            forecast_dispatch_weight=max(
+                _safe_float(data.pop("forecast_dispatch_weight", 0.25), 0.25),
+                0.0,
+            ),
             price_quantile_cheap=_clamp(
                 _safe_float(data.pop("price_quantile_cheap", 0.35), 0.35),
                 0.0,
@@ -644,6 +809,7 @@ class ChargerState:
     required_kw: float = 0.0
     priority: float = 0.0
     is_active_nonflex: bool = False
+    flex_log: Dict[str, Any] = field(default_factory=dict)
 
 
 class IchargingBreakerRuntime:
@@ -653,6 +819,42 @@ class IchargingBreakerRuntime:
 
     def _decision_interval_hours(self) -> float:
         return max(self.config.control_interval_minutes, MIN_CONTROL_INTERVAL_MINUTES) / 60.0
+
+    def _capture_ev_flex_log(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+        state: ChargerState,
+        now: datetime,
+        min_minutes: float,
+    ) -> None:
+        if not state.connected or not state.ev_id:
+            state.flex_log = {}
+            return
+
+        capacity_kwh = cfg.vehicle_capacities.get(state.ev_id, cfg.default_capacity_kwh)
+        state.flex_log = _build_ev_flex_snapshot(
+            payload,
+            state.ev_id,
+            soc_key=cfg.resolve_field("soc", state.ev_id),
+            target_key=cfg.resolve_field("target_soc", state.ev_id),
+            departure_key=cfg.resolve_field("departure_time", state.ev_id),
+            capacity_kwh=capacity_kwh,
+            now=now,
+            min_minutes=min_minutes,
+            allow_departure_fallback=cfg.allow_departure_fallback and state.allow_flex,
+            default_departure_buffer_minutes=cfg.default_departure_buffer_minutes,
+        )
+        state.flex_log.update(
+            {
+                "charger_id": state.id,
+                "connected": state.connected,
+                "allow_flex": state.allow_flex,
+                "min_kw": state.min_kw,
+                "max_kw": state.max_kw,
+                "session_power_kw": state.session_power,
+            }
+        )
 
     def _site_meter_component_kwh(
         self,
@@ -858,6 +1060,7 @@ class IchargingBreakerRuntime:
                 st.required_kw = 0.0
                 st.priority = 0.0
                 st.is_active_nonflex = False
+                st.flex_log = {}
 
             log.warning(
                 "rbc.exclusive_group_conflict",
@@ -992,6 +1195,8 @@ class IchargingBreakerRuntime:
             if not state.connected:
                 continue
 
+            self._capture_ev_flex_log(cfg, payload, state, now, min_minutes)
+
             if state.allow_flex:
                 if self._populate_flexible_state(
                     cfg,
@@ -1107,10 +1312,36 @@ class IchargingBreakerRuntime:
             flex_summary = {
                 cid: {
                     "ev": states[cid].ev_id,
-                    "required_kw": _round_down_one_decimal(states[cid].required_kw),
-                    "priority": round(states[cid].priority, 3),
+                    "flexible": states[cid].flexible,
+                    "required_kw": (
+                        _round_down_one_decimal(states[cid].required_kw)
+                        if states[cid].flexible
+                        else None
+                    ),
+                    "priority": round(states[cid].priority, 3) if states[cid].flexible else None,
+                    "reason": states[cid].flex_log.get("reason"),
+                    "soc": states[cid].flex_log.get("soc"),
+                    "target_soc": states[cid].flex_log.get("target_soc"),
+                    "arrival_time": states[cid].flex_log.get("arrival_time"),
+                    "departure_time": states[cid].flex_log.get("departure_time"),
+                    "effective_departure_time": states[cid].flex_log.get(
+                        "effective_departure_time"
+                    ),
+                    "minutes_remaining": states[cid].flex_log.get("minutes_remaining"),
+                    "energy_gap_kwh": states[cid].flex_log.get("energy_gap_kwh"),
+                    "capacity_kwh": states[cid].flex_log.get("capacity_kwh"),
+                    "arrival_soc": states[cid].flex_log.get("arrival_soc"),
+                    "departure_soc": states[cid].flex_log.get("departure_soc"),
+                    "mode": states[cid].flex_log.get("mode"),
+                    "flex_charger": states[cid].flex_log.get("flex_charger"),
+                    "departure_fallback_used": states[cid].flex_log.get(
+                        "departure_fallback_used", False
+                    ),
+                    "missing_fields": states[cid].flex_log.get("missing_fields") or [],
+                    "raw_flex_fields": states[cid].flex_log.get("raw_flex_fields") or {},
                 }
-                for cid in flexible_chargers
+                for cid, state in states.items()
+                if state.connected
             }
             site_import_kwh = self._site_meter_component_kwh(
                 payload, cfg.site_meter_import_key, "energy_in"
@@ -1178,6 +1409,21 @@ class IchargingBreakerRuntime:
             virtual_battery_community_signal_applied_kw = _maybe_float(
                 virtual_battery_diagnostics.get("community_signal_applied_kw")
             )
+            virtual_battery_forecast_signal_kw = _maybe_float(
+                virtual_battery_diagnostics.get("forecast_signal_kw")
+            )
+            virtual_battery_forecast_window_net_energy_kwh = _maybe_float(
+                virtual_battery_diagnostics.get("forecast_window_net_energy_kwh")
+            )
+            virtual_battery_forecast_window_avg_net_kw = _maybe_float(
+                virtual_battery_diagnostics.get("forecast_window_avg_net_kw")
+            )
+            virtual_battery_forecast_imbalance_ratio = _maybe_float(
+                virtual_battery_diagnostics.get("forecast_imbalance_ratio")
+            )
+            virtual_battery_forecast_issues = list(
+                virtual_battery_diagnostics.get("forecast_issues") or []
+            )
             virtual_battery_sign_flip_blocked = bool(
                 virtual_battery_diagnostics.get("sign_flip_blocked", False)
             )
@@ -1228,6 +1474,11 @@ class IchargingBreakerRuntime:
                 virtual_battery_soc_recovery_signal_kw=virtual_battery_soc_recovery_signal_kw,
                 virtual_battery_community_signal_raw_kw=virtual_battery_community_signal_raw_kw,
                 virtual_battery_community_signal_limited_kw=virtual_battery_community_signal_limited_kw,
+                virtual_battery_forecast_signal_kw=virtual_battery_forecast_signal_kw,
+                virtual_battery_forecast_window_net_energy_kwh=virtual_battery_forecast_window_net_energy_kwh,
+                virtual_battery_forecast_window_avg_net_kw=virtual_battery_forecast_window_avg_net_kw,
+                virtual_battery_forecast_imbalance_ratio=virtual_battery_forecast_imbalance_ratio,
+                virtual_battery_forecast_issues=virtual_battery_forecast_issues,
                 virtual_battery_sign_flip_blocked=virtual_battery_sign_flip_blocked,
             )
 
@@ -1251,6 +1502,15 @@ class IchargingBreakerRuntime:
                 if value is None:
                     return "-"
                 return f"{value:.4f}"
+
+            def fmt_optional_minutes(value: Optional[float]) -> str:
+                if value is None:
+                    return "-"
+                return f"{value:.1f}"
+
+            def fmt_optional_text(value: Any) -> str:
+                text = _clean_text(value)
+                return text or "-"
 
             line_chargers: Dict[str, List[str]] = {}
             for cid in cfg.chargers:
@@ -1330,13 +1590,34 @@ class IchargingBreakerRuntime:
                             f" prio={state.priority:.2f}"
                         )
                     else:
-                        flex_text = "flex=no"
+                        reason = fmt_optional_text((state.flex_log or {}).get("reason"))
+                        flex_text = f"flex=no reason={reason}"
                     summary_lines.append(
                         (
                             f"  {cid} - ev={ev} connected={connected_flag}"
                             f" action={action_text} min={fmt_kw(state.min_kw)} max={fmt_kw(state.max_kw)} {flex_text}"
                         )
                     )
+                    if state.flex_log:
+                        summary_lines.append(
+                            (
+                                "    flex_input:"
+                                f" soc={fmt_optional_pct(state.flex_log.get('soc'))}"
+                                f" target={fmt_optional_pct(state.flex_log.get('target_soc'))}"
+                                f" arrival_soc={fmt_optional_pct(state.flex_log.get('arrival_soc'))}"
+                                f" departure_soc={fmt_optional_pct(state.flex_log.get('departure_soc'))}"
+                                f" arrival={fmt_optional_text(state.flex_log.get('arrival_time'))}"
+                                f" departure={fmt_optional_text(state.flex_log.get('departure_time'))}"
+                                f" effective_departure={fmt_optional_text(state.flex_log.get('effective_departure_time'))}"
+                                f" mins_to_departure={fmt_optional_minutes(state.flex_log.get('minutes_remaining'))}"
+                                f" energy_gap_kwh={fmt_optional_num(state.flex_log.get('energy_gap_kwh'))}"
+                                f" capacity_kwh={fmt_optional_num(state.flex_log.get('capacity_kwh'))}"
+                                f" mode={fmt_optional_text(state.flex_log.get('mode'))}"
+                                f" flex_charger={fmt_optional_text(state.flex_log.get('flex_charger'))}"
+                                f" missing={','.join(state.flex_log.get('missing_fields') or []) or '-'}"
+                                f" departure_fallback={'yes' if state.flex_log.get('departure_fallback_used') else 'no'}"
+                            )
+                        )
 
             if cfg.virtual_battery_action_name:
                 summary_lines.append(
@@ -1361,9 +1642,17 @@ class IchargingBreakerRuntime:
                         f" community_signal_raw_kw={fmt_optional_kw(virtual_battery_community_signal_raw_kw)}"
                         f" community_signal_limited_kw={fmt_optional_kw(virtual_battery_community_signal_limited_kw)}"
                         f" community_signal_applied_kw={fmt_optional_kw(virtual_battery_community_signal_applied_kw)}"
+                        f" forecast_signal_kw={fmt_optional_kw(virtual_battery_forecast_signal_kw)}"
+                        f" forecast_window_net_kwh={fmt_optional_num(virtual_battery_forecast_window_net_energy_kwh)}"
+                        f" forecast_window_avg_kw={fmt_optional_kw(virtual_battery_forecast_window_avg_net_kw)}"
+                        f" forecast_imbalance_ratio={fmt_optional_num(virtual_battery_forecast_imbalance_ratio)}"
                         f" sign_flip_blocked={'yes' if virtual_battery_sign_flip_blocked else 'no'}"
                     )
                 )
+                if virtual_battery_forecast_issues:
+                    summary_lines.append(
+                        f"{cfg.virtual_battery_log_label} forecast issues: {', '.join(virtual_battery_forecast_issues)}"
+                    )
 
             if cfg.emit_session_source_actions and cfg.session_merge_map:
                 summary_lines.append("Session source actions:")
@@ -1485,6 +1774,46 @@ class IchargingBreakerRuntime:
         )
         soc_target = _clamp(soc_target, reserve_floor_soc, cfg.virtual_battery_soc_max)
         return reserve_floor_soc, soc_target
+
+    def _virtual_battery_forecast_guidance(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+        *,
+        soc: float,
+        capacity_kwh: float,
+        charge_limit_kw: float,
+        discharge_limit_kw: float,
+        reserve_floor_soc: float,
+        soc_target: float,
+    ) -> tuple[ForecastSocGuidance | None, List[str]]:
+        if not cfg.forecast_support_enabled:
+            return None, []
+
+        read_result = read_site_forecasts(
+            payload,
+            consumption_prefix=cfg.forecast_consumption_prefix,
+            production_prefix=cfg.forecast_production_prefix,
+        )
+        if read_result.snapshot is None:
+            return None, list(read_result.issues)
+
+        guidance = build_forecast_soc_guidance(
+            read_result.snapshot,
+            window_hours=cfg.forecast_window_hours,
+            capacity_kwh=capacity_kwh,
+            current_soc=soc,
+            base_reserve_soc=reserve_floor_soc,
+            base_target_soc=soc_target,
+            soc_min=cfg.virtual_battery_soc_min,
+            soc_max=cfg.virtual_battery_soc_max,
+            charge_limit_kw=charge_limit_kw,
+            discharge_limit_kw=discharge_limit_kw,
+            soc_bias_gain=cfg.forecast_soc_bias_gain,
+            soc_bias_max=cfg.forecast_soc_bias_max,
+            dispatch_weight=cfg.forecast_dispatch_weight,
+        )
+        return guidance, list(read_result.issues)
 
     def _price_based_virtual_battery_dispatch(
         self,
@@ -1612,12 +1941,28 @@ class IchargingBreakerRuntime:
 
         price_regime = self._virtual_battery_price_regime(cfg, payload)
         reserve_floor_soc, soc_target = self._virtual_battery_soc_profile(cfg, price_regime)
+        forecast_guidance, forecast_issues = self._virtual_battery_forecast_guidance(
+            cfg,
+            payload,
+            soc=soc,
+            capacity_kwh=capacity_kwh,
+            charge_limit_kw=charge_limit_kw,
+            discharge_limit_kw=discharge_limit_kw,
+            reserve_floor_soc=reserve_floor_soc,
+            soc_target=soc_target,
+        )
+        forecast_signal_kw = 0.0
+        if forecast_guidance is not None:
+            reserve_floor_soc = forecast_guidance.reserve_floor_soc
+            soc_target = forecast_guidance.target_soc
+            forecast_signal_kw = forecast_guidance.target_kw
 
         # Blended policy:
         # 1) local balancing (site import/export relief),
         # 2) community support,
         # 3) price signal,
-        # 4) SOC target recovery.
+        # 4) forecast bias,
+        # 5) SOC target recovery.
         surplus_kw = max((-net for net in candidate_nets_kw if net < -1e-6), default=0.0)
         import_kw = max((net for net in candidate_nets_kw if net > 1e-6), default=0.0)
         if surplus_kw > 1e-6:
@@ -1718,6 +2063,7 @@ class IchargingBreakerRuntime:
                 local_signal_kw
                 + community_signal_applied_kw
                 + (cfg.virtual_battery_price_weight * price_dispatch_kw)
+                + forecast_signal_kw
                 + soc_recovery_signal_kw
             )
 
@@ -1753,6 +2099,17 @@ class IchargingBreakerRuntime:
             "community_signal_raw_kw": community_signal_raw_kw,
             "community_signal_limited_kw": community_signal_limited_kw,
             "community_signal_applied_kw": community_signal_applied_kw,
+            "forecast_signal_kw": forecast_signal_kw,
+            "forecast_window_net_energy_kwh": (
+                forecast_guidance.window_net_energy_kwh if forecast_guidance else None
+            ),
+            "forecast_window_avg_net_kw": (
+                forecast_guidance.window_avg_net_kw if forecast_guidance else None
+            ),
+            "forecast_imbalance_ratio": (
+                forecast_guidance.imbalance_ratio if forecast_guidance else None
+            ),
+            "forecast_issues": forecast_issues,
             "sign_flip_blocked": sign_flip_blocked,
         }
 
@@ -1768,9 +2125,16 @@ class IchargingBreakerRuntime:
         min_minutes: float,
         whitelist: Optional[Set[str]],
     ) -> bool:
+        flex_log = state.flex_log if state.flex_log is not None else {}
+        if flex_log:
+            flex_log.update({"eligible": False, "required_kw": None, "priority": None})
         if not state.allow_flex or not state.connected:
+            if flex_log:
+                flex_log["reason"] = "disabled_or_disconnected"
             return False
         if whitelist is not None and state.ev_id not in whitelist:
+            if flex_log:
+                flex_log["reason"] = "not_in_whitelist"
             return False
 
         soc_key = cfg.resolve_field("soc", state.ev_id)
@@ -1779,20 +2143,28 @@ class IchargingBreakerRuntime:
         soc = _maybe_float(payload.get(soc_key))
         target_soc = _maybe_float(payload.get(target_key))
         if soc is None or target_soc is None or target_soc <= 0:
+            if flex_log:
+                flex_log["reason"] = "missing_soc_or_target"
             return False
         soc = _clamp(soc, 0.0, 1.0)
         target_soc = _clamp(target_soc, soc, 1.0)
         if target_soc <= soc + 1e-6:
+            if flex_log:
+                flex_log["reason"] = "target_already_met"
             return False
 
         capacity = cfg.vehicle_capacities.get(state.ev_id, cfg.default_capacity_kwh)
         energy_gap = max(target_soc - soc, 0.0) * capacity
         if energy_gap <= 1e-6:
+            if flex_log:
+                flex_log["reason"] = "no_energy_gap"
             return False
 
         departure_time = _parse_datetime(payload.get(departure_key))
         if not departure_time:
             if not cfg.allow_departure_fallback:
+                if flex_log:
+                    flex_log["reason"] = "missing_departure_time"
                 return False
             departure_time = now + timedelta(minutes=cfg.default_departure_buffer_minutes)
         else:
@@ -1808,6 +2180,15 @@ class IchargingBreakerRuntime:
         state.flexible = True
         state.required_kw = required_kw
         state.priority = required_kw / state.max_kw if state.max_kw > 0 else 1.0
+        if flex_log:
+            flex_log.update(
+                {
+                    "eligible": True,
+                    "required_kw": required_kw,
+                    "priority": state.priority,
+                    "reason": "schedulable",
+                }
+            )
         return True
 
     def _distribute_nonflex(
@@ -2070,6 +2451,7 @@ class BreakerOnlyRuntime:
 
     def allocate(self, payload: Dict[str, Any]) -> Dict[str, float]:
         cfg = self.config
+        now = _current_timestamp(payload)
         solar_kw = max(0.0, _safe_float(payload.get(cfg.solar_generation_key), 0.0))
         effective_board_limit = cfg.max_board_kw + solar_kw
         per_phase_limit = (
@@ -2116,6 +2498,29 @@ class BreakerOnlyRuntime:
                 allow_flex=False,
                 session_power=session_power,
             )
+            if connected:
+                state.flex_log = _build_ev_flex_snapshot(
+                    payload,
+                    ev_id,
+                    soc_key=DEFAULT_FLEX_FIELDS["soc"].replace("{ev_id}", ev_id),
+                    target_key=DEFAULT_FLEX_FIELDS["target_soc"].replace("{ev_id}", ev_id),
+                    departure_key=DEFAULT_FLEX_FIELDS["departure_time"].replace("{ev_id}", ev_id),
+                    capacity_kwh=None,
+                    now=now,
+                    min_minutes=0.0,
+                    allow_departure_fallback=False,
+                )
+                state.flex_log.update(
+                    {
+                        "charger_id": charger_id,
+                        "connected": connected,
+                        "allow_flex": False,
+                        "min_kw": min_kw,
+                        "max_kw": max_kw,
+                        "session_power_kw": session_power,
+                        "reason": "breaker_only_no_flex_dispatch",
+                    }
+                )
             states[charger_id] = state
             min_levels[charger_id] = min_kw
             max_levels[charger_id] = max_kw
@@ -2163,6 +2568,11 @@ class BreakerOnlyRuntime:
                 strategy="breaker_only",
                 actions=quantized,
                 connected=connected,
+                ev_flex={
+                    cid: state.flex_log
+                    for cid, state in states.items()
+                    if state.connected and state.flex_log
+                },
                 phase_totals=line_totals,
                 board_total=board_total,
             )
