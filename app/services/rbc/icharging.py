@@ -1590,6 +1590,12 @@ class IchargingBreakerRuntime:
                         per_phase = action_kw / max(state.n_phases, 1)
                         action_text = f"{action_text} ({fmt_kw(per_phase)}/phase)"
                     if state.flexible:
+                        arrival_soc = fmt_optional_pct((state.flex_log or {}).get("arrival_soc"))
+                        mins_to_departure = fmt_optional_minutes(
+                            (state.flex_log or {}).get("minutes_remaining")
+                        )
+                        energy_gap_kwh = fmt_optional_num((state.flex_log or {}).get("energy_gap_kwh"))
+                        capacity_kwh = fmt_optional_num((state.flex_log or {}).get("capacity_kwh"))
                         req_soc_departure = fmt_optional_pct((state.flex_log or {}).get("target_soc"))
                         departure = fmt_optional_text((state.flex_log or {}).get("departure_time"))
                         soc_text = fmt_optional_pct((state.flex_log or {}).get("soc"))
@@ -1599,36 +1605,19 @@ class IchargingBreakerRuntime:
                             f" soc={soc_text}"
                             f" req_soc_at_departure={req_soc_departure}"
                             f" departure={departure}"
+                            f" arrival_soc={arrival_soc}"
+                            f" mins_to_departure={mins_to_departure}"
+                            f" energy_gap_kwh={energy_gap_kwh}"
+                            f" capacity_kwh={capacity_kwh}"
                         )
                     else:
-                        reason = fmt_optional_text((state.flex_log or {}).get("reason"))
-                        flex_text = f"flex=no reason={reason}"
+                        flex_text = "flex=no"
                     summary_lines.append(
                         (
                             f"  {cid} - ev={ev} connected={connected_flag}"
                             f" action={action_text} min={fmt_kw(state.min_kw)} max={fmt_kw(state.max_kw)} {flex_text}"
                         )
                     )
-                    if state.flex_log:
-                        summary_lines.append(
-                            (
-                                "    flex_input:"
-                                f" soc={fmt_optional_pct(state.flex_log.get('soc'))}"
-                                f" req_soc_at_departure={fmt_optional_pct(state.flex_log.get('target_soc'))}"
-                                f" arrival_soc={fmt_optional_pct(state.flex_log.get('arrival_soc'))}"
-                                f" departure_soc={fmt_optional_pct(state.flex_log.get('departure_soc'))}"
-                                f" arrival={fmt_optional_text(state.flex_log.get('arrival_time'))}"
-                                f" departure={fmt_optional_text(state.flex_log.get('departure_time'))}"
-                                f" effective_departure={fmt_optional_text(state.flex_log.get('effective_departure_time'))}"
-                                f" mins_to_departure={fmt_optional_minutes(state.flex_log.get('minutes_remaining'))}"
-                                f" energy_gap_kwh={fmt_optional_num(state.flex_log.get('energy_gap_kwh'))}"
-                                f" capacity_kwh={fmt_optional_num(state.flex_log.get('capacity_kwh'))}"
-                                f" mode={fmt_optional_text(state.flex_log.get('mode'))}"
-                                f" flex_charger={fmt_optional_text(state.flex_log.get('flex_charger'))}"
-                                f" missing={','.join(state.flex_log.get('missing_fields') or []) or '-'}"
-                                f" departure_fallback={'yes' if state.flex_log.get('departure_fallback_used') else 'no'}"
-                            )
-                        )
 
             if cfg.virtual_battery_action_name:
                 summary_lines.append(
