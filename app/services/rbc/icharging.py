@@ -401,6 +401,12 @@ class IchargingRuntimeConfig:
     virtual_battery_price_weight: float = 0.35
     virtual_battery_soc_recovery_gain: float = 1.0
     virtual_battery_sign_flip_extra_kw: float = 0.3
+    virtual_battery_block_community_discharge_when_price_unfavorable: bool = True
+    virtual_battery_export_price_factor: float = 0.8
+    virtual_battery_degradation_penalty_eur_per_kwh: float = 0.01
+    emit_unmanaged_group_summary: bool = True
+    virtual_battery_emit_policy_summary: bool = True
+    virtual_battery_summary_before_chargers: bool = False
     session_merge_map: Dict[str, List[str]] = field(default_factory=dict)
     emit_session_source_actions: bool = False
     session_merge_power_key: str = "power"
@@ -714,6 +720,31 @@ class IchargingRuntimeConfig:
             virtual_battery_sign_flip_extra_kw=max(
                 _safe_float(data.pop("virtual_battery_sign_flip_extra_kw", 0.3), 0.3),
                 0.0,
+            ),
+            virtual_battery_block_community_discharge_when_price_unfavorable=bool(
+                data.pop(
+                    "virtual_battery_block_community_discharge_when_price_unfavorable",
+                    True,
+                )
+            ),
+            virtual_battery_export_price_factor=_clamp(
+                _safe_float(data.pop("virtual_battery_export_price_factor", 0.8), 0.8),
+                0.0,
+                1.0,
+            ),
+            virtual_battery_degradation_penalty_eur_per_kwh=max(
+                _safe_float(
+                    data.pop("virtual_battery_degradation_penalty_eur_per_kwh", 0.01),
+                    0.01,
+                ),
+                0.0,
+            ),
+            emit_unmanaged_group_summary=bool(data.pop("emit_unmanaged_group_summary", True)),
+            virtual_battery_emit_policy_summary=bool(
+                data.pop("virtual_battery_emit_policy_summary", True)
+            ),
+            virtual_battery_summary_before_chargers=bool(
+                data.pop("virtual_battery_summary_before_chargers", False)
             ),
             session_merge_map=session_merge_map,
             emit_session_source_actions=bool(data.pop("emit_session_source_actions", False)),
@@ -1414,6 +1445,15 @@ class IchargingBreakerRuntime:
             virtual_battery_community_signal_applied_kw = _maybe_float(
                 virtual_battery_diagnostics.get("community_signal_applied_kw")
             )
+            virtual_battery_community_discharge_blocked_by_price = bool(
+                virtual_battery_diagnostics.get("community_discharge_blocked_by_price", False)
+            )
+            virtual_battery_price_now_eur_kwh = _maybe_float(
+                virtual_battery_diagnostics.get("price_now_eur_kwh")
+            )
+            virtual_battery_future_avg_price_eur_kwh = _maybe_float(
+                virtual_battery_diagnostics.get("future_avg_price_eur_kwh")
+            )
             virtual_battery_forecast_signal_kw = _maybe_float(
                 virtual_battery_diagnostics.get("forecast_signal_kw")
             )
@@ -1474,11 +1514,16 @@ class IchargingBreakerRuntime:
                 virtual_battery_soc_norm=virtual_battery_soc,
                 virtual_battery_soc_key=virtual_battery_soc_key_used,
                 virtual_battery_price_regime=virtual_battery_price_regime,
+                virtual_battery_price_now_eur_kwh=virtual_battery_price_now_eur_kwh,
+                virtual_battery_future_avg_price_eur_kwh=virtual_battery_future_avg_price_eur_kwh,
                 virtual_battery_soc_target=virtual_battery_soc_target,
                 virtual_battery_soc_reserve_floor=virtual_battery_soc_reserve_floor,
                 virtual_battery_soc_recovery_signal_kw=virtual_battery_soc_recovery_signal_kw,
                 virtual_battery_community_signal_raw_kw=virtual_battery_community_signal_raw_kw,
                 virtual_battery_community_signal_limited_kw=virtual_battery_community_signal_limited_kw,
+                virtual_battery_community_discharge_blocked_by_price=(
+                    virtual_battery_community_discharge_blocked_by_price
+                ),
                 virtual_battery_forecast_signal_kw=virtual_battery_forecast_signal_kw,
                 virtual_battery_forecast_window_net_energy_kwh=virtual_battery_forecast_window_net_energy_kwh,
                 virtual_battery_forecast_window_avg_net_kw=virtual_battery_forecast_window_avg_net_kw,
@@ -1563,10 +1608,58 @@ class IchargingBreakerRuntime:
                     f" commanded_total={fmt_kw(commanded_board_total)} kW"
                 ),
             ]
-            if cfg.unmanaged_session_groups:
+            if (
+                cfg.emit_unmanaged_group_summary
+                and cfg.unmanaged_session_groups
+            ):
                 summary_lines.append(
                     f"Unmanaged groups: count={len(cfg.unmanaged_session_groups)} measured_peak_sum={fmt_kw(unmanaged_load_kw)} kW"
                 )
+
+            def append_virtual_battery_summary() -> None:
+                if not cfg.virtual_battery_action_name:
+                    return
+                summary_lines.append(
+                    (
+                        f"{cfg.virtual_battery_log_label} ({cfg.virtual_battery_action_name}):"
+                        f" action={fmt_optional_kw(virtual_battery_kw)} kW"
+                        f" soc_raw={fmt_optional_num(virtual_battery_soc_raw)}"
+                        f" soc_key={virtual_battery_soc_key_used or '-'}"
+                        f" soc={fmt_optional_pct(virtual_battery_soc)}"
+                        f" soc_unit_mode={cfg.virtual_battery_soc_unit_mode}"
+                        f" charge_cap={fmt_kw(cfg.virtual_battery_charge_power_max_kw)} kW"
+                        f" discharge_cap={fmt_kw(cfg.virtual_battery_discharge_power_max_kw)} kW"
+                    )
+                )
+                if not cfg.virtual_battery_emit_policy_summary:
+                    return
+                summary_lines.append(
+                    (
+                        f"{cfg.virtual_battery_log_label} policy:"
+                        f" price_regime={virtual_battery_price_regime}"
+                        f" price_now={fmt_optional_num(virtual_battery_price_now_eur_kwh)}"
+                        f" avg_24h={fmt_optional_num(virtual_battery_future_avg_price_eur_kwh)}"
+                        f" reserve_floor_soc={fmt_optional_pct(virtual_battery_soc_reserve_floor)}"
+                        f" soc_target={fmt_optional_pct(virtual_battery_soc_target)}"
+                        f" soc_recovery_signal_kw={fmt_optional_kw(virtual_battery_soc_recovery_signal_kw)}"
+                        f" community_signal_raw_kw={fmt_optional_kw(virtual_battery_community_signal_raw_kw)}"
+                        f" community_signal_limited_kw={fmt_optional_kw(virtual_battery_community_signal_limited_kw)}"
+                        f" community_signal_applied_kw={fmt_optional_kw(virtual_battery_community_signal_applied_kw)}"
+                        f" community_discharge_blocked_by_price={'yes' if virtual_battery_community_discharge_blocked_by_price else 'no'}"
+                        f" forecast_signal_kw={fmt_optional_kw(virtual_battery_forecast_signal_kw)}"
+                        f" forecast_window_net_kwh={fmt_optional_num(virtual_battery_forecast_window_net_energy_kwh)}"
+                        f" forecast_window_avg_kw={fmt_optional_kw(virtual_battery_forecast_window_avg_net_kw)}"
+                        f" forecast_imbalance_ratio={fmt_optional_num(virtual_battery_forecast_imbalance_ratio)}"
+                        f" sign_flip_blocked={'yes' if virtual_battery_sign_flip_blocked else 'no'}"
+                    )
+                )
+                if virtual_battery_forecast_issues:
+                    summary_lines.append(
+                        f"{cfg.virtual_battery_log_label} forecast issues: {', '.join(virtual_battery_forecast_issues)}"
+                    )
+
+            if cfg.virtual_battery_summary_before_chargers:
+                append_virtual_battery_summary()
 
             for phase in ordered_lines:
                 if phase not in line_chargers:
@@ -1619,40 +1712,8 @@ class IchargingBreakerRuntime:
                         )
                     )
 
-            if cfg.virtual_battery_action_name:
-                summary_lines.append(
-                    (
-                        f"{cfg.virtual_battery_log_label} ({cfg.virtual_battery_action_name}):"
-                        f" action={fmt_optional_kw(virtual_battery_kw)} kW"
-                        f" soc_raw={fmt_optional_num(virtual_battery_soc_raw)}"
-                        f" soc_key={virtual_battery_soc_key_used or '-'}"
-                        f" soc={fmt_optional_pct(virtual_battery_soc)}"
-                        f" soc_unit_mode={cfg.virtual_battery_soc_unit_mode}"
-                        f" charge_cap={fmt_kw(cfg.virtual_battery_charge_power_max_kw)} kW"
-                        f" discharge_cap={fmt_kw(cfg.virtual_battery_discharge_power_max_kw)} kW"
-                    )
-                )
-                summary_lines.append(
-                    (
-                        f"{cfg.virtual_battery_log_label} policy:"
-                        f" price_regime={virtual_battery_price_regime}"
-                        f" reserve_floor_soc={fmt_optional_pct(virtual_battery_soc_reserve_floor)}"
-                        f" soc_target={fmt_optional_pct(virtual_battery_soc_target)}"
-                        f" soc_recovery_signal_kw={fmt_optional_kw(virtual_battery_soc_recovery_signal_kw)}"
-                        f" community_signal_raw_kw={fmt_optional_kw(virtual_battery_community_signal_raw_kw)}"
-                        f" community_signal_limited_kw={fmt_optional_kw(virtual_battery_community_signal_limited_kw)}"
-                        f" community_signal_applied_kw={fmt_optional_kw(virtual_battery_community_signal_applied_kw)}"
-                        f" forecast_signal_kw={fmt_optional_kw(virtual_battery_forecast_signal_kw)}"
-                        f" forecast_window_net_kwh={fmt_optional_num(virtual_battery_forecast_window_net_energy_kwh)}"
-                        f" forecast_window_avg_kw={fmt_optional_kw(virtual_battery_forecast_window_avg_net_kw)}"
-                        f" forecast_imbalance_ratio={fmt_optional_num(virtual_battery_forecast_imbalance_ratio)}"
-                        f" sign_flip_blocked={'yes' if virtual_battery_sign_flip_blocked else 'no'}"
-                    )
-                )
-                if virtual_battery_forecast_issues:
-                    summary_lines.append(
-                        f"{cfg.virtual_battery_log_label} forecast issues: {', '.join(virtual_battery_forecast_issues)}"
-                    )
+            if not cfg.virtual_battery_summary_before_chargers:
+                append_virtual_battery_summary()
 
             if cfg.emit_session_source_actions and cfg.session_merge_map:
                 summary_lines.append("Session source actions:")
@@ -1825,20 +1886,11 @@ class IchargingBreakerRuntime:
         if charge_limit_kw <= 1e-6 and discharge_limit_kw <= 1e-6:
             return 0.0
 
-        series: List[float] = []
-        if cfg.virtual_battery_use_community_signals:
-            series = self._extract_price_series(payload, cfg.virtual_battery_community_price_prefix)
-        if not series:
-            series = self._extract_price_series(payload, cfg.virtual_battery_local_price_prefix)
-        if not series:
+        price_snapshot = self._virtual_battery_price_snapshot(cfg, payload)
+        if price_snapshot is None:
             return 0.0
 
-        current = series[0]
-        if len(series) > 1:
-            horizon = series[1 : min(len(series), 25)]
-            future_avg = sum(horizon) / max(len(horizon), 1)
-        else:
-            future_avg = current
+        current, future_avg = price_snapshot
         delta = future_avg - current
         threshold = max(abs(current) * 0.05, 0.01)
         if delta > threshold:
@@ -1846,6 +1898,27 @@ class IchargingBreakerRuntime:
         if delta < -threshold:
             return -discharge_limit_kw
         return 0.0
+
+    def _virtual_battery_price_snapshot(
+        self,
+        cfg: IchargingRuntimeConfig,
+        payload: Dict[str, Any],
+    ) -> tuple[float, float] | None:
+        series: List[float] = []
+        if cfg.virtual_battery_use_community_signals:
+            series = self._extract_price_series(payload, cfg.virtual_battery_community_price_prefix)
+        if not series:
+            series = self._extract_price_series(payload, cfg.virtual_battery_local_price_prefix)
+        if not series:
+            return None
+
+        current = series[0]
+        if len(series) > 1:
+            horizon = series[1 : min(len(series), 25)]
+            future_avg = sum(horizon) / max(len(horizon), 1)
+        else:
+            future_avg = current
+        return float(current), float(future_avg)
 
     def _virtual_battery_dispatch(
         self,
@@ -1932,6 +2005,9 @@ class IchargingBreakerRuntime:
             charge_limit_kw,
             discharge_limit_kw,
         )
+        price_snapshot = self._virtual_battery_price_snapshot(cfg, payload)
+        current_price = price_snapshot[0] if price_snapshot is not None else None
+        future_avg_price = price_snapshot[1] if price_snapshot is not None else None
 
         setpoint_dispatch_kw: Optional[float] = None
         if cfg.virtual_battery_use_setpoint:
@@ -1984,6 +2060,7 @@ class IchargingBreakerRuntime:
 
         community_signal_raw_kw = 0.0
         community_signal_limited_kw = 0.0
+        community_discharge_blocked_by_price = False
         if cfg.community_participation_enabled:
             if target_dispatch_kw is not None:
                 community_signal_raw_kw = target_dispatch_kw
@@ -2031,6 +2108,21 @@ class IchargingBreakerRuntime:
             community_signal_limited_kw = 0.0
         elif community_signal_limited_kw > 0.0 and soc > operating_soc_max:
             community_signal_limited_kw = 0.0
+        if (
+            community_signal_limited_kw < -1e-9
+            and cfg.virtual_battery_block_community_discharge_when_price_unfavorable
+            and current_price is not None
+            and future_avg_price is not None
+        ):
+            discharge_value_now = current_price
+            if import_kw <= 1e-9:
+                discharge_value_now = current_price * cfg.virtual_battery_export_price_factor
+            if (
+                discharge_value_now - future_avg_price
+                <= cfg.virtual_battery_degradation_penalty_eur_per_kwh + 1e-9
+            ):
+                community_signal_limited_kw = 0.0
+                community_discharge_blocked_by_price = True
 
         deadband_kw = max(cfg.virtual_battery_dispatch_deadband_kw, 0.0)
         community_signal_applied_kw = cfg.virtual_battery_community_weight * community_signal_limited_kw
@@ -2099,6 +2191,9 @@ class IchargingBreakerRuntime:
             "community_signal_raw_kw": community_signal_raw_kw,
             "community_signal_limited_kw": community_signal_limited_kw,
             "community_signal_applied_kw": community_signal_applied_kw,
+            "community_discharge_blocked_by_price": community_discharge_blocked_by_price,
+            "price_now_eur_kwh": current_price,
+            "future_avg_price_eur_kwh": future_avg_price,
             "forecast_signal_kw": forecast_signal_kw,
             "forecast_window_net_energy_kwh": (
                 forecast_guidance.window_net_energy_kwh if forecast_guidance else None

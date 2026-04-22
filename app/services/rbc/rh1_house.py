@@ -149,6 +149,7 @@ class Rh1HouseConfig:
     community_dispatch_weight: float = 0.2
     community_dispatch_cap_kw: float = 0.0
     community_price_signal_key: str = "community.price_signal"
+    community_block_discharge_when_price_unfavorable: bool = True
     forecast_support_enabled: bool = False
     forecast_consumption_prefix: str = "forecasts.ConsumptionForecastService.consumption_total"
     forecast_production_prefix: str = "forecasts.ProductionForecastService.production_total"
@@ -292,6 +293,9 @@ class Rh1HouseConfig:
                 0.0,
             ),
             community_price_signal_key=community_price_signal_key,
+            community_block_discharge_when_price_unfavorable=bool(
+                data.pop("community_block_discharge_when_price_unfavorable", True)
+            ),
             forecast_support_enabled=bool(data.pop("forecast_support_enabled", False)),
             forecast_consumption_prefix=str(
                 data.pop(
@@ -443,6 +447,7 @@ class CommunityTargetDecision:
     effective_target_kw: float
     reserve_limited: bool
     soc_recovery_target_kw: float
+    discharge_blocked_by_price: bool = False
 
 
 class Rh1HouseRuntime:
@@ -576,6 +581,8 @@ class Rh1HouseRuntime:
             reserve_floor_soc=reserve_floor_soc,
             charge_target_soc=charge_target_soc,
             price_regime=price_regime,
+            price_now=price_now,
+            future_avg_price=future_avg_price,
         )
         community_target_kw = community_target.effective_target_kw
         if cfg.community_participation_enabled:
@@ -788,6 +795,7 @@ class Rh1HouseRuntime:
             community_target_raw_kw=community_target.raw_target_kw,
             effective_community_target_kw=community_target.effective_target_kw,
             community_reserve_limited=community_target.reserve_limited,
+            community_discharge_blocked_by_price=community_target.discharge_blocked_by_price,
             soc_recovery_target_kw=community_target.soc_recovery_target_kw,
             community_alignment_penalty=community_alignment_penalty,
             price_regime=price_regime,
@@ -921,6 +929,7 @@ class Rh1HouseRuntime:
                     f" soc_recovery_target_kw={fmt_kw(community_target.soc_recovery_target_kw)} kW"
                     f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
                     f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
+                    f" price_blocked={'yes' if community_target.discharge_blocked_by_price else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
                 )
             )
@@ -931,6 +940,7 @@ class Rh1HouseRuntime:
                     f" soc_recovery_target_kw={fmt_kw(community_target.soc_recovery_target_kw)} kW"
                     f" effective_community_target_kw={fmt_kw(community_target.effective_target_kw)} kW"
                     f" reserve_limited={'yes' if community_target.reserve_limited else 'no'}"
+                    f" price_blocked={'yes' if community_target.discharge_blocked_by_price else 'no'}"
                     f" alignment_penalty={community_alignment_penalty:.6f}"
                 )
             )
@@ -1575,6 +1585,8 @@ class Rh1HouseRuntime:
         reserve_floor_soc: float,
         charge_target_soc: float,
         price_regime: str,
+        price_now: float,
+        future_avg_price: float,
     ) -> CommunityTargetDecision:
         cfg = self.config
         if not cfg.community_participation_enabled or community_net_kw is None:
@@ -1587,12 +1599,21 @@ class Rh1HouseRuntime:
 
         deadband_kw = max(cfg.community_energy_deadband_kw, 0.0)
         raw_target_kw = 0.0
+        discharge_blocked_by_price = False
         if community_net_kw > deadband_kw + 1e-9:
             community_deficit_kw = community_net_kw - deadband_kw
             raw_target_kw = -community_deficit_kw * max(cfg.community_deficit_weight, 0.0)
         elif community_net_kw < -(deadband_kw + 1e-9):
             community_surplus_kw = (-community_net_kw) - deadband_kw
             raw_target_kw = community_surplus_kw * max(cfg.community_surplus_weight, 0.0)
+
+        if (
+            raw_target_kw < -1e-9
+            and cfg.community_block_discharge_when_price_unfavorable
+            and not self._is_community_discharge_price_favorable(price_now, future_avg_price)
+        ):
+            raw_target_kw = 0.0
+            discharge_blocked_by_price = True
 
         cap_kw = max(cfg.community_dispatch_cap_kw, 0.0)
         if cap_kw > 1e-9:
@@ -1653,6 +1674,19 @@ class Rh1HouseRuntime:
             effective_target_kw=effective_target_kw,
             reserve_limited=reserve_limited,
             soc_recovery_target_kw=soc_recovery_target_kw,
+            discharge_blocked_by_price=discharge_blocked_by_price,
+        )
+
+    def _is_community_discharge_price_favorable(
+        self,
+        price_now: float,
+        future_avg_price: float,
+    ) -> bool:
+        cfg = self.config
+        discharge_value_now = max(price_now, 0.0) * cfg.export_price_factor
+        return (
+            discharge_value_now - future_avg_price
+            > cfg.battery_degradation_penalty_eur_per_kwh + 1e-9
         )
 
     def _community_alignment_penalty(

@@ -128,15 +128,28 @@ def test_missing_required_community_fields_returns_400(
     assert response.status_code == 400
 
 
-def test_community_deficit_forces_virtual_battery_discharge(
+def test_community_deficit_forces_virtual_battery_discharge_when_price_is_favorable(
     sao_mamede_with_battery_community_client,
 ):
     payload = _base_payload()
     payload["community"]["energy_in_total"] = _kwh_for_interval(40.0)
     payload["community"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.35] + [0.05] * 95
 
     actions = _run(sao_mamede_with_battery_community_client, payload)
     assert actions[ACTION_BATTERY] < -0.1
+
+
+def test_community_deficit_does_not_force_discharge_when_price_is_zero(
+    sao_mamede_with_battery_community_client,
+):
+    payload = _base_payload()
+    payload["community"]["energy_in_total"] = _kwh_for_interval(40.0)
+    payload["community"]["energy_out_total"] = 0.0
+    payload["observations"]["energy_tariffs"]["OMIE"]["energy_price"]["values"] = [0.0] * 96
+
+    actions = _run(sao_mamede_with_battery_community_client, payload)
+    assert actions[ACTION_BATTERY] >= -0.1
 
 
 def test_community_surplus_forces_virtual_battery_charge(

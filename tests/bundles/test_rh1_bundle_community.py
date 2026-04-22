@@ -185,15 +185,28 @@ def test_small_community_energy_interval_converts_to_kw(rh1_community_client):
     assert deficit_small_actions[ACTION_BATTERY] < neutral_actions[ACTION_BATTERY]
 
 
-def test_high_soc_and_community_deficit_no_longer_freezes_battery_at_zero(rh1_community_client):
+def test_high_soc_and_community_deficit_can_still_discharge_when_price_is_favorable(
+    rh1_community_client,
+):
     payload = _base_payload()
     payload["observations"]["batteries"]["B01"]["SoC"] = 0.9
-    payload["observations"]["energy_price"] = _price_curve(0.20, 0.20, 0.20, 0.20, 0.20, 0.20)
+    payload["observations"]["energy_price"] = _price_curve(0.35, 0.08, 0.07, 0.06, 0.05, 0.05)
     payload["community"]["energy_in_total"] = _kwh_for_interval(30.0)
     payload["community"]["energy_out_total"] = 0.0
 
     actions = _run(rh1_community_client, payload)
     assert actions[ACTION_BATTERY] < -0.1
+
+
+def test_community_deficit_does_not_force_discharge_when_price_is_zero(rh1_community_client):
+    payload = _base_payload()
+    payload["observations"]["batteries"]["B01"]["SoC"] = 0.9
+    payload["observations"]["energy_price"] = _price_curve(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+    payload["community"]["energy_in_total"] = _kwh_for_interval(30.0)
+    payload["community"]["energy_out_total"] = 0.0
+
+    actions = _run(rh1_community_client, payload)
+    assert actions[ACTION_BATTERY] >= -0.1
 
 
 def test_price_signal_still_trades_off_with_community_target(rh1_community_client):
