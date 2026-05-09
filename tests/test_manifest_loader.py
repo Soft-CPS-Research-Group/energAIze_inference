@@ -17,9 +17,15 @@ def make_dummy_manifest(tmp_path: Path) -> Path:
         "algorithm": {"name": "MADDPG", "hyperparameters": {}},
         "environment": {
             "observation_names": [["feat1"]],
+            "raw_observation_names": [["raw_feat1"]],
+            "encoded_observation_names": [["feat1"]],
             "encoders": [[{"type": "Normalize", "params": {"x_min": 0, "x_max": 1}}]],
             "action_bounds": [[{"low": [0], "high": [1]}]],
             "action_names": ["action"],
+            "interface": "entity",
+            "topology_mode": "static",
+            "seconds_per_time_step": 15,
+            "entity_encoding": {"profile": "maddpg_v1", "serving_observation_names": "encoded"},
             "reward_function": {"name": "RewardFunction", "params": {}},
         },
         "agent": {
@@ -62,6 +68,12 @@ def make_dummy_manifest(tmp_path: Path) -> Path:
 def test_pipeline_infers(tmp_path):
     manifest_path = make_dummy_manifest(tmp_path)
     manifest = Manifest.parse_file(manifest_path)
+    assert manifest.get_observation_names(0) == ["feat1"]
+    assert manifest.get_raw_observation_names(0) == ["raw_feat1"]
+    assert manifest.get_encoded_observation_names(0) == ["feat1"]
+    assert manifest.environment.entity_encoding["profile"] == "maddpg_v1"
+    assert manifest.environment.seconds_per_time_step == 15
+
     pipeline = InferencePipeline(manifest=manifest, artifacts_root=manifest_path.parent, agent_index=0)
     payload = {"feat1": 0.5}
     result = pipeline.inference(payload)

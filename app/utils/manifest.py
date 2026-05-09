@@ -32,10 +32,17 @@ class RewardMetadata(BaseModel):
 
 class EnvironmentMetadata(BaseModel):
     observation_names: List[List[str]]
+    raw_observation_names: Optional[List[List[str]]] = None
+    encoded_observation_names: Optional[List[List[str]]] = None
     encoders: List[List[EncoderSpec]]
     action_bounds: List[Any] = Field(default_factory=list)
     action_names: Optional[List[str]] = None
     action_names_by_agent: Optional[Dict[str, List[str]] | List[List[str]]] = None
+    building_names: Optional[List[str]] = None
+    interface: Optional[str] = None
+    topology_mode: Optional[str] = None
+    seconds_per_time_step: Optional[float] = None
+    entity_encoding: Dict[str, Any] = Field(default_factory=dict)
     reward_function: RewardMetadata
 
 
@@ -66,6 +73,20 @@ class Manifest(BaseModel):
         values = self._resolve_agent_value(self.environment.observation_names, agent_index, "observation_names")
         if not isinstance(values, list):
             raise ValueError("observation_names entry must be a list of feature names")
+        return [str(item) for item in values]
+
+    def get_raw_observation_names(self, agent_index: int) -> List[str]:
+        source = self.environment.raw_observation_names or self.environment.observation_names
+        values = self._resolve_agent_value(source, agent_index, "raw_observation_names")
+        if not isinstance(values, list):
+            raise ValueError("raw_observation_names entry must be a list of feature names")
+        return [str(item) for item in values]
+
+    def get_encoded_observation_names(self, agent_index: int) -> List[str]:
+        source = self.environment.encoded_observation_names or self.environment.observation_names
+        values = self._resolve_agent_value(source, agent_index, "encoded_observation_names")
+        if not isinstance(values, list):
+            raise ValueError("encoded_observation_names entry must be a list of feature names")
         return [str(item) for item in values]
 
     def get_encoder_specs(self, agent_index: int) -> List[EncoderSpec]:
