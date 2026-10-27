@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from functools import lru_cache
+from typing import Callable
 
-import onnxruntime as ort
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Request
 
+from app.adapters.hardware import _cuda_available
+from app.application.service import InferenceService
+from app.bootstrap import build_service
+from app.dependencies import get_service
 from app.routers import admin, inference, info
 from app.logging import RequestContextMiddleware, get_logger, init_logging
-from app.settings import settings
+from app.settings import Settings, settings
 from app.state import store
 from app.version import __version__
 
@@ -19,8 +22,10 @@ init_logging()
 async def lifespan(app: FastAPI):
     """Manage startup and shutdown behaviour for the inference service."""
 
+    settings = app.state.settings
+    service = app.state.inference_service
     if settings.manifest_path is not None:
-        store.load(
+        service.load(
             settings.manifest_path,
             settings.artifacts_dir,
             settings.agent_index,
@@ -32,52 +37,14 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        if store.is_configured():
+        if service.store.is_configured():
             get_logger().info("Lifespan shutdown unloading pipeline")
-            store.unload()
+            service.unload()
 
 
-app = FastAPI(title="Energy Flexibility Inference API", version=__version__, lifespan=lifespan)
-app.add_middleware(RequestContextMiddleware)
-
-app.include_router(info.router)
-app.include_router(inference.router)
-app.include_router(admin.router)
-
-
-@lru_cache(maxsize=1)
-def _cuda_available() -> bool:
-    if "CUDAExecutionProvider" not in ort.get_available_providers():
-        return False
-    try:
-        import onnx
-        from onnx import TensorProto, helper
-    except Exception:
-        get_logger().warning("onnx.unavailable_for_gpu_check")
-        return False
-
-    node = helper.make_node("Identity", ["x"], ["y"])
-    graph = helper.make_graph(
-        [node],
-        "gpu_check",
-        [helper.make_tensor_value_info("x", TensorProto.FLOAT, [1])],
-        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1])],
-    )
-    model = helper.make_model(graph, producer_name="gpu_check")
-    try:
-        session = ort.InferenceSession(
-            model.SerializeToString(),
-            providers=["CUDAExecutionProvider"],
-        )
-        return "CUDAExecutionProvider" in session.get_providers()
-    except Exception:
-        return False
-
-
-@app.get("/health", tags=["info"])
-async def health_check():
-    record = store.get_record()
-    gpu_available = _cuda_available()
+async def health_check(request: Request, service: InferenceService = Depends(get_service)):
+    record = service.store.get_record()
+    gpu_available = request.app.state.gpu_probe()
     providers = []
     manifest_path = None
     alias_path = None
@@ -96,3 +63,29 @@ async def health_check():
         "alias_mapping_path": alias_path,
         "gpu_available": gpu_available,
     }
+
+
+def create_app(
+    *,
+    config: Settings | None = None,
+    service: InferenceService | None = None,
+    gpu_probe: Callable[[], bool] | None = None,
+) -> FastAPI:
+    """Create an isolated API instance with explicitly replaceable dependencies."""
+    config = config if config is not None else Settings()
+    application = FastAPI(
+        title="Energy Flexibility Inference API", version=__version__, lifespan=lifespan
+    )
+    application.state.settings = config
+    application.state.inference_service = service if service is not None else build_service(config)
+    application.state.gpu_probe = gpu_probe if gpu_probe is not None else _cuda_available
+    application.add_middleware(RequestContextMiddleware)
+    application.include_router(info.router)
+    application.include_router(inference.router)
+    application.include_router(admin.router)
+    application.get("/health", tags=["info"])(health_check)
+    return application
+
+
+# Preserve the ASGI entrypoint and legacy scripts that use app.state.store.
+app = create_app(config=settings, service=build_service(settings, store))

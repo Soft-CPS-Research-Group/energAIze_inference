@@ -1,157 +1,21 @@
-"""Inference pipeline that reconstructs preprocessing and runtime execution."""
+"""Pipeline facade: delegate execution to an injected runtime factory."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, Optional, Protocol, TYPE_CHECKING
 
-import numpy as np
-import onnxruntime as ort
+from app.core.contracts import Actions, AgentRuntime, Features
 
-from app.services.preprocessor import AgentPreprocessor, build_encoder
-from app.services.rbc import (
-    BreakerOnlyConfig,
-    BreakerOnlyRuntime,
-    IchargingBreakerRuntime,
-    IchargingRuntimeConfig,
-    Rh1HouseConfig,
-    Rh1HouseRuntime,
-)
-from app.settings import settings
-from app.utils.manifest import Manifest
-from app.logging import get_logger
+if TYPE_CHECKING:
+    from app.utils.manifest import Manifest
 
 
-def _round_down_one_decimal(value: float) -> float:
-    import math
-
-    return math.floor(value * 10.0) / 10.0
-
-
-def _apply_aliases(payload: Dict[str, float], aliases: Dict[str, str]) -> Dict[str, float]:
-    """Apply feature alias mapping to the incoming payload."""
-    if not aliases:
-        return payload
-    transformed = dict(payload)
-    for alias, target in aliases.items():
-        if alias in transformed and target not in transformed:
-            transformed[target] = transformed.pop(alias)
-    return transformed
-
-
-class OnnxAgentRuntime:
-    """Runtime wrapper around an ONNX model for a single agent."""
-
-    def __init__(
-        self,
-        index: int,
-        session: ort.InferenceSession,
-        preprocessor: AgentPreprocessor,
-        action_names: List[str],
-        feature_aliases: Dict[str, str] | None = None,
-        action_bounds: Dict[str, List[float]] | None = None,
-    ):
-        self.index = index
-        self.session = session
-        self.preprocessor = preprocessor
-        self.action_names = action_names
-        self.feature_aliases = feature_aliases or {}
-        self.providers = session.get_providers()
-        self._low = action_bounds.get("low") if action_bounds else None
-        self._high = action_bounds.get("high") if action_bounds else None
-
-    def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
-        payload = _apply_aliases(payload, self.feature_aliases)
-        features = self.preprocessor.transform(payload)
-        log = get_logger()
-        try:
-            log.debug("Running ONNX inference", agent_index=self.index)
-            outputs = self.session.run(None, {self.session.get_inputs()[0].name: features.reshape(1, -1)})
-            actions = outputs[0].squeeze(0)
-            mapping: Dict[str, float] = {}
-            for i, value in enumerate(actions.tolist()):
-                key = self.action_names[i] if i < len(self.action_names) else f"action_{i}"
-                mapping[key] = self._postprocess_value(value, i)
-            return mapping
-        except Exception:
-            log.exception("onnx.inference_failed", agent_index=self.index)
-            return {name: 0.0 for name in self.action_names}
-
-    def _postprocess_value(self, value: float, idx: int) -> float:
-        # clamp to bounds if provided
-        if self._low and idx < len(self._low):
-            value = max(value, float(self._low[idx]))
-        if self._high and idx < len(self._high):
-            value = min(value, float(self._high[idx]))
-        # round down to one decimal place
-        value = _round_down_one_decimal(value)
-        return float(value)
-
-
-class RuleBasedRuntime:
-    """Runtime for simple rule-based policies described in JSON."""
-
-    def __init__(
-        self,
-        index: int,
-        config: Dict[str, Any],
-        action_names: List[str],
-        preprocessor: Optional[AgentPreprocessor] = None,
-        feature_aliases: Dict[str, str] | None = None,
-    ):
-        self.index = index
-        self.config = config
-        self.action_names = action_names
-        self.preprocessor = preprocessor if config.get("use_preprocessor") else None
-        self.feature_aliases = feature_aliases or {}
-        self.rules = config.get("rules", [])
-        default_actions = config.get("default_actions", {})
-        if not default_actions and action_names:
-            default_actions = {name: 0.0 for name in action_names}
-        self.default_actions = default_actions
-        self.providers = ["rule_based"]
-        self.strategy = config.get("strategy")
-        self._icharging_runtime: IchargingBreakerRuntime | None = None
-        self._breaker_runtime: BreakerOnlyRuntime | None = None
-        self._rh1_runtime: Rh1HouseRuntime | None = None
-        if self.strategy in {"breaker_allocation", "icharging_breaker"}:
-            icharging_cfg = IchargingRuntimeConfig.from_dict(dict(config))
-            self._icharging_runtime = IchargingBreakerRuntime(icharging_cfg)
-        elif self.strategy in {"breaker_only", "icharging_breaker_v0"}:
-            breaker_cfg = BreakerOnlyConfig.from_dict(dict(config))
-            self._breaker_runtime = BreakerOnlyRuntime(breaker_cfg)
-        elif self.strategy == "rh1_house_rbc_v1":
-            rh1_cfg = Rh1HouseConfig.from_dict(dict(config))
-            self._rh1_runtime = Rh1HouseRuntime(rh1_cfg)
-
-    def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
-        payload = _apply_aliases(payload, self.feature_aliases)
-        raw_payload = payload
-        if self.preprocessor:
-            features = self.preprocessor.transform(payload)
-            raw_payload = {f"f{i}": v for i, v in enumerate(features.tolist())}
-
-        if self._icharging_runtime:
-            return self._icharging_runtime.allocate(payload)
-        if self._breaker_runtime:
-            return self._breaker_runtime.allocate(payload)
-        if self._rh1_runtime:
-            return self._rh1_runtime.allocate(payload)
-
-        for rule in self.rules:
-            conditions = rule.get("if", {})
-            if all(raw_payload.get(k) == v for k, v in conditions.items()):
-                actions = rule.get("actions", {})
-                get_logger().debug(
-                    "Rule matched", agent_index=self.index, conditions=conditions
-                )
-                return {k: float(v) for k, v in actions.items()}
-
-        get_logger().debug("No rule matched", agent_index=self.index)
-        return {k: float(v) for k, v in self.default_actions.items()}
-
-
-
+class RuntimeFactory(Protocol):
+    def build(
+        self, manifest: Manifest, artifacts_root: Path, agent_index: int,
+        alias_overrides: Dict[str, str],
+    ) -> AgentRuntime: ...
 
 
 class InferencePipeline:
@@ -163,78 +27,39 @@ class InferencePipeline:
         artifacts_root: Path,
         agent_index: int,
         alias_overrides: Optional[Dict[str, str]] = None,
+        *,
+        runtime_factory: RuntimeFactory | None = None,
     ):
         self.manifest = manifest
         self.artifacts_root = artifacts_root
         self.agent_index = agent_index
         self.alias_overrides = alias_overrides or {}
-        self._agent = self._build_agent()
+        if runtime_factory is None:
+            # Default retained for existing scripts; production composition injects it.
+            from app.adapters.runtime_factory import ArtifactRuntimeFactory
+            from app.settings import settings
 
-    def _build_agent(self):
-        action_names = self.manifest.get_action_names(self.agent_index)
-        artifact = self.manifest.get_artifact(self.agent_index)
-
-        get_logger().info(
-            "Loading agent",
-            agent_index=artifact.agent_index,
-            format=artifact.format or "onnx",
-            providers=settings.onnx_execution_providers,
+            runtime_factory = ArtifactRuntimeFactory(settings.onnx_execution_providers)
+        self._agent = runtime_factory.build(
+            manifest, artifacts_root, agent_index, self.alias_overrides
         )
 
-        encoder_specs = self.manifest.get_encoder_specs(artifact.agent_index)
-        observation_names = self.manifest.get_observation_names(artifact.agent_index)
-        encoders = [build_encoder(spec) for spec in encoder_specs]
-        preprocessor = AgentPreprocessor(observation_names, encoders)
-
-        artifact_path = self.manifest.resolve_artifact_path(self.artifacts_root, artifact)
-        if not artifact_path.exists():
-            raise FileNotFoundError(f"Artifact not found: {artifact_path}")
-
-        artifact_config = dict(artifact.config or {})
-        feature_aliases = dict(self.alias_overrides)
-
-        if artifact.format in (None, "onnx"):
-            session = ort.InferenceSession(
-                path_or_bytes=artifact_path.as_posix(),
-                providers=settings.onnx_execution_providers,
-            )
-            bounds = self.manifest.get_action_bounds(artifact.agent_index)
-            return OnnxAgentRuntime(
-                index=artifact.agent_index,
-                session=session,
-                preprocessor=preprocessor,
-                action_names=action_names,
-                feature_aliases=feature_aliases,
-                action_bounds=bounds,
-            )
-
-        if artifact.format == "rule_based":
-            import json
-
-            config = dict(artifact_config)
-            if "config_path" in config:
-                config_path = self.artifacts_root / config["config_path"]
-                with config_path.open("r", encoding="utf-8") as handle:
-                    config.update(json.load(handle))
-            with artifact_path.open("r", encoding="utf-8") as handle:
-                policy_data = json.load(handle)
-            config.setdefault("default_actions", policy_data.get("default_actions", {}))
-            config.setdefault("rules", policy_data.get("rules", []))
-            return RuleBasedRuntime(
-                index=artifact.agent_index,
-                config=config,
-                action_names=action_names,
-                preprocessor=preprocessor,
-                feature_aliases=feature_aliases,
-            )
-
-        raise NotImplementedError(f"Unsupported artifact format '{artifact.format}'")
-
-    def inference(self, payload: Dict[str, float]) -> Dict[str, Dict[str, float]]:
+    def inference(self, payload: Features) -> Actions:
         """Run inference and map outputs back to named actions."""
         actions = self._agent.infer(payload)
         return {str(self._agent.index): actions}
 
     @property
-    def agent(self):
+    def agent(self) -> AgentRuntime:
         return self._agent
+
+
+def __getattr__(name: str):
+    """Preserve legacy runtime imports without eagerly importing execution engines."""
+    if name == "OnnxAgentRuntime":
+        from app.services.runtimes.onnx import OnnxAgentRuntime
+        return OnnxAgentRuntime
+    if name == "RuleBasedRuntime":
+        from app.services.runtimes.rule_based import RuleBasedRuntime
+        return RuleBasedRuntime
+    raise AttributeError(name)

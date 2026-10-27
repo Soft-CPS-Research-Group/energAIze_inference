@@ -5,14 +5,16 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.models.responses import InfoResponse
-from app.state import store
+from app.application.service import InferenceService
+from app.dependencies import get_service
 from app.version import __version__
 from app.logging import get_logger
 
 router = APIRouter(prefix="/info", tags=["info"])
-def get_record():
-    record = store.get_record()
-    ## Check if model is configured
+
+
+def get_record(service: InferenceService = Depends(get_service)):
+    record = service.store.get_record()
     if not record:
         get_logger().warning("Info requested before model configuration")
         raise HTTPException(status_code=503, detail="Model not configured")
@@ -20,10 +22,12 @@ def get_record():
 
 
 @router.get("", response_model=InfoResponse)
-async def get_info(record = Depends(get_record)):
+async def get_info(
+    record = Depends(get_record), service: InferenceService = Depends(get_service),
+):
     """Return metadata about the currently loaded pipeline."""
     manifest = record.pipeline.manifest
-    uptime_seconds = (datetime.utcnow() - store.get_startup_time()).total_seconds()
+    uptime_seconds = (datetime.utcnow() - service.store.get_startup_time()).total_seconds()
     return InfoResponse(
         algorithm=manifest.algorithm.get("name", "unknown"),
         manifest_version=manifest.manifest_version,

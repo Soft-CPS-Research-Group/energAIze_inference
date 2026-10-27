@@ -1,186 +1,44 @@
-"""Runtime state management for loaded inference pipelines."""
+"""Compatibility facade for scripts using the original process-wide store.
 
-from dataclasses import dataclass, field
-from datetime import datetime
+New application instances receive their own store through create_app().
+"""
+
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
-from app.services.pipeline import InferencePipeline
-from app.utils.manifest import load_manifest
-from app.logging import get_logger
+from app.core.contracts import PipelineRecord
+from app.core.state import InMemoryPipelineStore
 
 
-@dataclass
-class PipelineRecord:
-    """Metadata describing the currently loaded pipeline."""
-
-    pipelines: Dict[int, InferencePipeline]
-    manifest_path: Path
-    artifacts_dir: Path
-    agent_index: int
-    loaded_agent_indices: List[int]
-    alias_mapping_path: Path | None
-    loaded_at: datetime = field(default_factory=datetime.utcnow)
-
-    @property
-    def pipeline(self) -> InferencePipeline:
-        return self.pipelines[self.agent_index]
-
-    @property
-    def default_agent_index(self) -> int:
-        return self.agent_index
-
-
-class PipelineStore:
-    """Container for the active inference pipeline and associated metadata."""
-
-    def __init__(self) -> None:
-        self._record: Optional[PipelineRecord] = None
-        self._startup_time = datetime.utcnow()
-
-    def is_configured(self) -> bool:
-        return self._record is not None
-
-    def get_pipeline(self, agent_index: int | None = None) -> InferencePipeline:
-        if not self._record:
-            raise RuntimeError("Model pipeline not configured")
-        target = self._record.agent_index if agent_index is None else int(agent_index)
-        pipeline = self._record.pipelines.get(target)
-        if pipeline is None:
-            raise RuntimeError(f"Agent index {target} not configured")
-        return pipeline
-
-    def get_record(self) -> Optional[PipelineRecord]:
-        return self._record
-
+class PipelineStore(InMemoryPipelineStore):
     def load(
         self,
         manifest_path: Path,
-        artifacts_dir: Optional[Path],
+        artifacts_dir: Path | None,
         agent_index: int | None = None,
-        alias_mapping_path: Optional[Path] = None,
+        alias_mapping_path: Path | None = None,
     ) -> PipelineRecord:
-        manifest_path = manifest_path.expanduser().resolve()
-        root = artifacts_dir.expanduser().resolve() if artifacts_dir else manifest_path.parent
-        manifest = load_manifest(manifest_path)
-        effective_alias_mapping_path = _resolve_alias_mapping_path(
-            alias_mapping_path=alias_mapping_path,
-            manifest_metadata=manifest.metadata,
-            artifacts_root=root,
+        # Keep legacy callers working without coupling the core store to files.
+        from app.adapters.bundles import FilesystemBundleLoader
+        from app.services.pipeline import InferencePipeline
+
+        candidate = FilesystemBundleLoader(InferencePipeline).load(
+            manifest_path, artifacts_dir, agent_index, alias_mapping_path
         )
-
-        loaded_agent_indices = sorted({int(artifact.agent_index) for artifact in manifest.agent.artifacts})
-        if not loaded_agent_indices:
-            raise ValueError("Manifest has no agent artifacts")
-
-        default_agent_index = (
-            int(agent_index) if agent_index is not None else loaded_agent_indices[0]
-        )
-        if default_agent_index not in loaded_agent_indices:
-            raise ValueError(
-                f"Default agent_index={default_agent_index} not found in manifest artifacts "
-                f"{loaded_agent_indices}"
-            )
-
-        get_logger().info(
-            "Loading pipeline",
-            manifest_path=str(manifest_path),
-            artifacts_dir=str(root),
-            agent_index=default_agent_index,
-            loaded_agent_indices=loaded_agent_indices,
-        )
-
-        alias_overrides = _load_alias_overrides(effective_alias_mapping_path, default_agent_index)
-        pipelines: Dict[int, InferencePipeline] = {}
-        for current_agent_index in loaded_agent_indices:
-            pipelines[current_agent_index] = InferencePipeline(
-                manifest=manifest,
-                artifacts_root=root,
-                agent_index=current_agent_index,
-                alias_overrides=dict(alias_overrides),
-            )
-
-        self._record = PipelineRecord(
-            pipelines=pipelines,
-            manifest_path=manifest_path,
-            artifacts_dir=root,
-            agent_index=default_agent_index,
-            loaded_agent_indices=loaded_agent_indices,
-            alias_mapping_path=effective_alias_mapping_path,
-        )
-        return self._record
+        self.activate(candidate)
+        return candidate
 
     def unload(self) -> None:
-        if self._record:
+        from app.logging import get_logger
+
+        record = self.get_record()
+        if record:
             get_logger().info(
                 "Unloading pipeline",
-                manifest_path=str(self._record.manifest_path),
-                agent_index=self._record.agent_index,
-                loaded_agent_indices=self._record.loaded_agent_indices,
+                manifest_path=str(record.manifest_path),
+                agent_index=record.agent_index,
+                loaded_agent_indices=record.loaded_agent_indices,
             )
-        self._record = None
-
-    def get_startup_time(self) -> datetime:
-        return self._startup_time
+        super().unload()
 
 
 store = PipelineStore()
-
-
-def _resolve_alias_mapping_path(
-    alias_mapping_path: Optional[Path],
-    manifest_metadata: Dict[str, Any],
-    artifacts_root: Path,
-) -> Path | None:
-    if alias_mapping_path is not None:
-        return alias_mapping_path.expanduser().resolve()
-
-    metadata_alias_path = manifest_metadata.get("alias_mapping_path")
-    if metadata_alias_path in (None, ""):
-        return None
-    if not isinstance(metadata_alias_path, str):
-        raise ValueError("metadata.alias_mapping_path must be a string when provided")
-
-    candidate = Path(metadata_alias_path).expanduser()
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (artifacts_root / candidate).resolve()
-
-
-def _load_alias_overrides(path: Optional[Path], agent_index: int) -> Dict[str, str]:
-    """Load flat feature alias overrides from JSON sidecar files.
-
-    The file must contain a single dictionary mapping alias keys to canonical
-    feature names. Keys prefixed with an underscore are ignored so files can
-    hold short comments (e.g. `_comment`).
-    """
-
-    if path is None:
-        return {}
-    path = path.expanduser().resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"Alias mapping file not found: {path}")
-
-    import json
-
-    with path.open("r", encoding="utf-8") as handle:
-        raw = json.load(handle)
-
-    if not isinstance(raw, dict):
-        raise ValueError("Alias mapping must be a JSON object mapping aliases to features")
-
-    aliases: Dict[str, str] = {}
-    for key, value in raw.items():
-        if isinstance(key, str) and key.startswith("_"):
-            continue
-        if not isinstance(value, (str, int, float, bool)):
-            raise ValueError(f"Alias mapping value for {key!r} must be scalar")
-        aliases[str(key)] = str(value)
-
-    get_logger().debug(
-        "Loaded alias overrides",
-        alias_count=len(aliases),
-        alias_path=str(path),
-        agent_index=agent_index,
-    )
-    return aliases

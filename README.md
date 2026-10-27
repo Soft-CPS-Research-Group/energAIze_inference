@@ -12,13 +12,15 @@ Serve inference decisions for any algorithm (rule-based policies, ONNX models, o
 - Safe outputs: actions are clamped and rounded as configured by the bundle.
 
 ## Architecture
-- HTTP API (FastAPI)
-- Payload flattening and optional alias mapping
-- Inference pipeline
-  - Preprocessor (encoders)
-  - Runtime (e.g., `onnx` or `rule_based` artifacts)
-  - Post-processing (clamps/rounding)
-- Response mapping (actions per agent)
+- HTTP routes translate requests and errors; dependencies belong to each app instance.
+- Application service coordinates loading and inference through replaceable interfaces.
+- Core holds the active pipeline record and internal contracts, without HTTP or engine dependencies.
+- Adapters read bundles, prepare legacy Percepta messages and emit action diagnostics.
+- Runtime adapters execute ONNX or the existing RBC strategies and preserve current post-processing.
+- `create_app()` and `app/bootstrap.py` compose these parts. `app.main:app` remains the ASGI entrypoint.
+
+See [architecture and iteration 1](docs/architecture.md) for dependency boundaries,
+extension points, regression evidence and known limitations.
 
 ## Bundle Format
 A bundle is a directory with three groups of files:

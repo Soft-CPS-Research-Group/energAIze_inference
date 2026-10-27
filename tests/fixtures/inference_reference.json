@@ -1,0 +1,624 @@
+{
+  "baseline_commit": "8b1b2acfce33c71d480ffe05f6e8b05807c87656",
+  "absolute_tolerance": 1e-06,
+  "cases": [
+    {
+      "manifest": "examples/icharging_boavista_with_flex/artifact_manifest.json",
+      "messages": "examples/icharging_boavista_with_flex/exemplos_mensagem_i-charging_headquarters_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 4.6,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.6,
+                "AC000007_1": 4.6,
+                "AC000008_1": 4.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 4.6,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 4.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 1.6,
+                "AC000004_1": 1.6,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.6,
+                "AC000007_1": 4.6,
+                "AC000008_1": 4.6,
+                "AC000009_1": 4.6,
+                "AC000010_1": 1.6,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 4.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 4.6,
+                "ACEXT004_1": 4.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 4.6,
+                "AC000005_1": 4.5,
+                "AC000006_1": 1.6,
+                "AC000007_1": 1.6,
+                "AC000008_1": 1.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 1.6,
+                "AC000011_1": 4.5,
+                "AC000012_1": 4.6,
+                "AC000013_1": 1.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 4.5,
+                "ACEXT002_1": 4.5,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_boavista_with_flex_community/artifact_manifest.json",
+      "messages": "examples/icharging_boavista_with_flex_community/exemplos_mensagem_i-charging_headquarters_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 5,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 9,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_boavista_without_flex/artifact_manifest.json",
+      "messages": "examples/icharging_boavista_without_flex/exemplos_mensagem_i-charging_headquarters_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 3.1,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.6,
+                "AC000007_1": 3.1,
+                "AC000008_1": 4.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 3.1,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 3.1,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 1.6,
+                "AC000004_1": 1.6,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.5,
+                "AC000007_1": 4.6,
+                "AC000008_1": 4.6,
+                "AC000009_1": 4.5,
+                "AC000010_1": 1.6,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 4.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 4.6,
+                "ACEXT004_1": 4.5,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 4.6,
+                "AC000005_1": 2.9,
+                "AC000006_1": 1.6,
+                "AC000007_1": 1.6,
+                "AC000008_1": 1.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 1.6,
+                "AC000011_1": 2.9,
+                "AC000012_1": 4.6,
+                "AC000013_1": 1.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 2.9,
+                "ACEXT002_1": 2.9,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_sao_mamede_with_virtual_battery/artifact_manifest.json",
+      "messages": "examples/icharging_sao_mamede_with_virtual_battery/exemplos_mensagem_SaoMamede_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -10.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 50.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -50.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -50.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 0.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_sao_mamede_with_virtual_battery_community/artifact_manifest.json",
+      "messages": "examples/icharging_sao_mamede_with_virtual_battery_community/exemplos_mensagem_SaoMamede_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 5,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 9,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_sao_mamede_without_virtual_battery/artifact_manifest.json",
+      "messages": "examples/icharging_sao_mamede_without_virtual_battery/exemplos_mensagem_SaoMamede_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 50.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 0.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/rh1_bundle/artifact_manifest.json",
+      "messages": "examples/rh1_bundle/exemplos_mensagem_R-H-01_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 4.8
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 4.8
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 10,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 0.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/rh1_bundle_community/artifact_manifest.json",
+      "messages": "examples/rh1_bundle_community/exemplos_mensagem_R-H-01_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 5,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        },
+        {
+          "index": 10,
+          "status": 400,
+          "body": {
+            "detail": "\"Missing required community field(s): 'community.energy_in_total', 'community.energy_out_total'\""
+          }
+        }
+      ]
+    },
+    {
+      "manifest": "examples/icharging_boavista_with_flex_community/artifact_manifest.json",
+      "messages": "examples/icharging_boavista_with_flex_community/exemplos_mensagem_i-charging_headquarters_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 4.6,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.6,
+                "AC000007_1": 4.6,
+                "AC000008_1": 4.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 4.6,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 4.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 1.6,
+                "AC000004_1": 1.6,
+                "AC000005_1": 1.6,
+                "AC000006_1": 4.6,
+                "AC000007_1": 4.6,
+                "AC000008_1": 4.6,
+                "AC000009_1": 4.6,
+                "AC000010_1": 1.6,
+                "AC000011_1": 1.6,
+                "AC000012_1": 1.6,
+                "AC000013_1": 4.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 1.6,
+                "ACEXT002_1": 1.6,
+                "ACEXT003_1": 4.6,
+                "ACEXT004_1": 4.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "AC000001_1": 1.6,
+                "AC000002_1": 1.6,
+                "AC000003_1": 4.6,
+                "AC000004_1": 4.6,
+                "AC000005_1": 4.5,
+                "AC000006_1": 1.6,
+                "AC000007_1": 1.6,
+                "AC000008_1": 1.6,
+                "AC000009_1": 1.6,
+                "AC000010_1": 1.6,
+                "AC000011_1": 4.5,
+                "AC000012_1": 4.6,
+                "AC000013_1": 1.6,
+                "AC000014_1": 1.6,
+                "ACEXT001_1": 4.5,
+                "ACEXT002_1": 4.5,
+                "ACEXT003_1": 1.6,
+                "ACEXT004_1": 1.6,
+                "BB000018_1": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ],
+      "features_patch": {
+        "community": {
+          "energy_in_total": 0.2,
+          "energy_out_total": 0.1
+        }
+      }
+    },
+    {
+      "manifest": "examples/icharging_sao_mamede_with_virtual_battery_community/artifact_manifest.json",
+      "messages": "examples/icharging_sao_mamede_with_virtual_battery_community/exemplos_mensagem_SaoMamede_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -10.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 50.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -50.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 8.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 9,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "B01": -50.0,
+                "BB000SMI_1": 8.0,
+                "BB000SMI_2": 0.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ],
+      "features_patch": {
+        "community": {
+          "energy_in_total": 0.2,
+          "energy_out_total": 0.1
+        }
+      }
+    },
+    {
+      "manifest": "examples/rh1_bundle_community/artifact_manifest.json",
+      "messages": "examples/rh1_bundle_community/exemplos_mensagem_R-H-01_2303.json",
+      "sequence": [
+        {
+          "index": 0,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 4.8
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 5,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 4.8
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        },
+        {
+          "index": 10,
+          "status": 200,
+          "body": {
+            "actions": {
+              "0": {
+                "EVC01": 0.0,
+                "B01": 0.0
+              }
+            },
+            "request_id": "iteration1-reference"
+          }
+        }
+      ],
+      "features_patch": {
+        "community": {
+          "energy_in_total": 0.2,
+          "energy_out_total": 0.1
+        }
+      }
+    }
+  ]
+}

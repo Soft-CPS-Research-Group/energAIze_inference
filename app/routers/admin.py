@@ -2,16 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Body, HTTPException
-from app.state import store
+from fastapi import APIRouter, Body, Depends, HTTPException
+from app.application.service import InferenceService
+from app.dependencies import get_service, get_settings
 from app.logging import get_logger
-from app.settings import settings
+from app.settings import Settings
 
 router = APIRouter(prefix="/admin", tags=["admin"], responses={401: {"description": "Unauthorized"}})
 
 
-def _validate_path_within_allowed_root(path: Path, *, field_name: str) -> None:
-    root = settings.allowed_bundle_root
+def _validate_path_within_allowed_root(path: Path, *, field_name: str, config: Settings) -> None:
+    root = config.allowed_bundle_root
     if root is None:
         return
 
@@ -36,14 +37,16 @@ async def admin_load(
     agent_index: int | None = Body(default=None, embed=True, ge=0),
     artifacts_dir: Path | None = Body(default=None, embed=True),
     alias_mapping_path: Path | None = Body(default=None, embed=True),
+    service: InferenceService = Depends(get_service),
+    config: Settings = Depends(get_settings),
 ):
     """Load a model pipeline from disk, replacing any currently active pipeline."""
-    _validate_path_within_allowed_root(manifest_path, field_name="manifest_path")
+    _validate_path_within_allowed_root(manifest_path, field_name="manifest_path", config=config)
     if artifacts_dir is not None:
-        _validate_path_within_allowed_root(artifacts_dir, field_name="artifacts_dir")
+        _validate_path_within_allowed_root(artifacts_dir, field_name="artifacts_dir", config=config)
 
     try:
-        record = store.load(manifest_path, artifacts_dir, agent_index, alias_mapping_path)
+        record = service.load(manifest_path, artifacts_dir, agent_index, alias_mapping_path)
     except FileNotFoundError as exc:
         get_logger().warning("Failed to load pipeline", error=str(exc))
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -62,10 +65,10 @@ async def admin_load(
 
 
 @router.post("/unload")
-async def admin_unload():
+async def admin_unload(service: InferenceService = Depends(get_service)):
     """Unload the active pipeline, returning the service to an unconfigured state."""
-    if not store.is_configured():
+    if not service.store.is_configured():
         raise HTTPException(status_code=409, detail="No model configured")
-    store.unload()
+    service.unload()
     get_logger().info("Pipeline successfully unloaded")
     return {"status": "unloaded"}
