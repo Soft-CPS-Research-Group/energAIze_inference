@@ -1,0 +1,306 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DecisionResult",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "decision.v1-draft"
+      ],
+      "type": "string"
+    },
+    "request_id": {
+      "title": "Request Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "activation": {
+      "$ref": "#/definitions/ActivationReference"
+    },
+    "proposed_actions": {
+      "title": "Proposed Actions",
+      "type": "object",
+      "patternProperties": {
+        "^\\S(?:[\\s\\S]*\\S)?$": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    },
+    "actions": {
+      "title": "Actions",
+      "type": "object",
+      "patternProperties": {
+        "^\\S(?:[\\s\\S]*\\S)?$": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "integer"
+          }
+        ]
+      }
+    },
+    "safety": {
+      "$ref": "#/definitions/SafetyReport"
+    }
+  },
+  "required": [
+    "schema_version",
+    "request_id",
+    "activation",
+    "proposed_actions",
+    "actions",
+    "safety"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ActivationReference": {
+      "title": "ActivationReference",
+      "type": "object",
+      "properties": {
+        "activation_id": {
+          "title": "Activation Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "site_id": {
+          "title": "Site Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "configuration_revision": {
+          "title": "Configuration Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "installation_revision": {
+          "title": "Installation Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bindings_revision": {
+          "title": "Bindings Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_id": {
+          "title": "Bundle Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_revision": {
+          "title": "Bundle Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "title": "Manifest Sha256",
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "agent_index": {
+          "title": "Agent Index",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message_profile": {
+          "title": "Message Profile",
+          "enum": [
+            "percepta.mongo-message.v0"
+          ],
+          "type": "string"
+        },
+        "adapter_revision": {
+          "title": "Adapter Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "safety_policy_revision": {
+          "title": "Safety Policy Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "service_version": {
+          "title": "Service Version",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "activation_id",
+        "site_id",
+        "configuration_revision",
+        "installation_revision",
+        "bindings_revision",
+        "bundle_id",
+        "bundle_revision",
+        "manifest_sha256",
+        "agent_index",
+        "message_profile",
+        "adapter_revision",
+        "safety_policy_revision",
+        "service_version"
+      ],
+      "additionalProperties": false
+    },
+    "SafetyChange": {
+      "title": "SafetyChange",
+      "type": "object",
+      "properties": {
+        "action_name": {
+          "title": "Action Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "proposed_value": {
+          "title": "Proposed Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "corrected_value": {
+          "title": "Corrected Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "applied": {
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "rule_ids": {
+          "title": "Rule Ids",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          }
+        },
+        "reason": {
+          "title": "Reason",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_name",
+        "channel_id",
+        "equipment_id",
+        "unit",
+        "proposed_value",
+        "corrected_value",
+        "applied",
+        "rule_ids",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "SafetyReport": {
+      "title": "SafetyReport",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "title": "Mode",
+          "enum": [
+            "off",
+            "observe",
+            "intervene"
+          ],
+          "type": "string"
+        },
+        "changes": {
+          "title": "Changes",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SafetyChange"
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "changes"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

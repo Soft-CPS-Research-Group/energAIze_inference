@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OperationReceipt",
+  "type": "object",
+  "properties": {
+    "operation_id": {
+      "title": "Operation Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "enum": [
+        "pending",
+        "running",
+        "succeeded",
+        "failed",
+        "uncertain"
+      ],
+      "type": "string"
+    },
+    "resource_id": {
+      "anyOf": [
+        {
+          "title": "Resource Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ContractError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "operation_id",
+    "status"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ContractError": {
+      "title": "ContractError",
+      "type": "object",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "detail"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": "bundle-interface.v1-draft",
+  "bundle_id": "example-fixed-policy",
+  "revision": "bundle-1",
+  "target_site_id": "example-house",
+  "agent_index": 0,
+  "runtime": "rule_based",
+  "topology_support": "fixed",
+  "inputs": [
+    {
+      "name": "site_load",
+      "meaning": {
+        "quantity": "active_power",
+        "unit": "kW",
+        "value_type": "number",
+        "value_semantics": "instantaneous",
+        "positive_direction": "consumption"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "EVC01",
+      "meaning": {
+        "quantity": "active_power_setpoint",
+        "unit": "kW",
+        "value_type": "number",
+        "value_semantics": "command",
+        "positive_direction": "consumption"
+      }
+    }
+  ]
+}

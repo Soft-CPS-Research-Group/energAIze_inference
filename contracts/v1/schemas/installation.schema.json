@@ -1,0 +1,459 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstallationContext",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "installation.v1-draft"
+      ],
+      "type": "string"
+    },
+    "site_id": {
+      "title": "Site Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "revision": {
+      "title": "Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "timezone": {
+      "title": "Timezone",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "sources": {
+      "title": "Sources",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/SourceReference"
+      }
+    },
+    "equipment": {
+      "title": "Equipment",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Equipment"
+      }
+    },
+    "channels": {
+      "title": "Channels",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Channel"
+      }
+    },
+    "aggregate_limits": {
+      "title": "Aggregate Limits",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/AggregateLimit"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "site_id",
+    "revision",
+    "timezone",
+    "sources",
+    "equipment",
+    "channels"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "SourceReference": {
+      "title": "SourceReference",
+      "type": "object",
+      "properties": {
+        "system": {
+          "title": "System",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "reference": {
+          "title": "Reference",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "reference",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "TechnicalValue": {
+      "title": "TechnicalValue",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "unit"
+      ],
+      "additionalProperties": false
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "type": "object",
+      "properties": {
+        "equipment_id": {
+          "title": "Equipment Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "title": "Label",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phases": {
+          "title": "Phases",
+          "type": "array",
+          "items": {
+            "enum": [
+              "L1",
+              "L2",
+              "L3"
+            ],
+            "type": "string"
+          }
+        },
+        "technical_values": {
+          "title": "Technical Values",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TechnicalValue"
+          }
+        }
+      },
+      "required": [
+        "equipment_id",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SignalMeaning": {
+      "title": "SignalMeaning",
+      "type": "object",
+      "properties": {
+        "quantity": {
+          "title": "Quantity",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value_type": {
+          "title": "Value Type",
+          "enum": [
+            "number",
+            "string",
+            "boolean",
+            "number_vector"
+          ],
+          "type": "string"
+        },
+        "value_semantics": {
+          "title": "Value Semantics",
+          "enum": [
+            "instantaneous",
+            "state",
+            "interval",
+            "cumulative",
+            "forecast",
+            "command",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "positive_direction": {
+          "title": "Positive Direction",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "interval_seconds": {
+          "anyOf": [
+            {
+              "title": "Interval Seconds",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "quantity",
+        "unit",
+        "value_type",
+        "value_semantics",
+        "positive_direction"
+      ],
+      "additionalProperties": false
+    },
+    "Bounds": {
+      "title": "Bounds",
+      "type": "object",
+      "properties": {
+        "lower": {
+          "anyOf": [
+            {
+              "title": "Lower",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "upper": {
+          "anyOf": [
+            {
+              "title": "Upper",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Channel": {
+      "title": "Channel",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "title": "Role",
+          "enum": [
+            "observation",
+            "forecast",
+            "action"
+          ],
+          "type": "string"
+        },
+        "meaning": {
+          "$ref": "#/definitions/SignalMeaning"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "access": {
+          "title": "Access",
+          "enum": [
+            "read",
+            "write",
+            "read_write",
+            "unavailable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "message_path": {
+          "anyOf": [
+            {
+              "title": "Message Path",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "physical_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "channel_id",
+        "role",
+        "meaning",
+        "enabled",
+        "access"
+      ],
+      "additionalProperties": false
+    },
+    "ConstraintTerm": {
+      "title": "ConstraintTerm",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "coefficient": {
+          "title": "Coefficient",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "channel_id",
+        "coefficient"
+      ],
+      "additionalProperties": false
+    },
+    "AggregateLimit": {
+      "title": "AggregateLimit",
+      "type": "object",
+      "properties": {
+        "constraint_id": {
+          "title": "Constraint Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "terms": {
+          "title": "Terms",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConstraintTerm"
+          }
+        },
+        "bounds": {
+          "$ref": "#/definitions/Bounds"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "unit",
+        "terms",
+        "bounds"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

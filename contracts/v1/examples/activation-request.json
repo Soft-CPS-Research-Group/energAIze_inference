@@ -1,0 +1,5 @@
+{
+  "schema_version": "activation.v1-draft",
+  "candidate_id": "example-candidate-2",
+  "expected_activation_id": "example-activation-1"
+}

@@ -1,0 +1,756 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConfigurationDraft",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "configuration.v1-draft"
+      ],
+      "type": "string"
+    },
+    "revision": {
+      "title": "Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "installation": {
+      "$ref": "#/definitions/InstallationContext"
+    },
+    "bundle": {
+      "$ref": "#/definitions/BundleInterface"
+    },
+    "bindings": {
+      "$ref": "#/definitions/Bindings"
+    },
+    "message": {
+      "$ref": "#/definitions/MessageProfile"
+    },
+    "safety": {
+      "$ref": "#/definitions/SafetyPolicy"
+    }
+  },
+  "required": [
+    "schema_version",
+    "revision",
+    "installation",
+    "bundle",
+    "bindings",
+    "message",
+    "safety"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "SourceReference": {
+      "title": "SourceReference",
+      "type": "object",
+      "properties": {
+        "system": {
+          "title": "System",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "reference": {
+          "title": "Reference",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "reference",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "TechnicalValue": {
+      "title": "TechnicalValue",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value",
+        "unit"
+      ],
+      "additionalProperties": false
+    },
+    "Equipment": {
+      "title": "Equipment",
+      "type": "object",
+      "properties": {
+        "equipment_id": {
+          "title": "Equipment Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "kind": {
+          "title": "Kind",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "title": "Label",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phases": {
+          "title": "Phases",
+          "type": "array",
+          "items": {
+            "enum": [
+              "L1",
+              "L2",
+              "L3"
+            ],
+            "type": "string"
+          }
+        },
+        "technical_values": {
+          "title": "Technical Values",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TechnicalValue"
+          }
+        }
+      },
+      "required": [
+        "equipment_id",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SignalMeaning": {
+      "title": "SignalMeaning",
+      "type": "object",
+      "properties": {
+        "quantity": {
+          "title": "Quantity",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value_type": {
+          "title": "Value Type",
+          "enum": [
+            "number",
+            "string",
+            "boolean",
+            "number_vector"
+          ],
+          "type": "string"
+        },
+        "value_semantics": {
+          "title": "Value Semantics",
+          "enum": [
+            "instantaneous",
+            "state",
+            "interval",
+            "cumulative",
+            "forecast",
+            "command",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "positive_direction": {
+          "title": "Positive Direction",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "interval_seconds": {
+          "anyOf": [
+            {
+              "title": "Interval Seconds",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "quantity",
+        "unit",
+        "value_type",
+        "value_semantics",
+        "positive_direction"
+      ],
+      "additionalProperties": false
+    },
+    "Bounds": {
+      "title": "Bounds",
+      "type": "object",
+      "properties": {
+        "lower": {
+          "anyOf": [
+            {
+              "title": "Lower",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "upper": {
+          "anyOf": [
+            {
+              "title": "Upper",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Channel": {
+      "title": "Channel",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "role": {
+          "title": "Role",
+          "enum": [
+            "observation",
+            "forecast",
+            "action"
+          ],
+          "type": "string"
+        },
+        "meaning": {
+          "$ref": "#/definitions/SignalMeaning"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "access": {
+          "title": "Access",
+          "enum": [
+            "read",
+            "write",
+            "read_write",
+            "unavailable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "message_path": {
+          "anyOf": [
+            {
+              "title": "Message Path",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "physical_bounds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "channel_id",
+        "role",
+        "meaning",
+        "enabled",
+        "access"
+      ],
+      "additionalProperties": false
+    },
+    "ConstraintTerm": {
+      "title": "ConstraintTerm",
+      "type": "object",
+      "properties": {
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "coefficient": {
+          "title": "Coefficient",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "channel_id",
+        "coefficient"
+      ],
+      "additionalProperties": false
+    },
+    "AggregateLimit": {
+      "title": "AggregateLimit",
+      "type": "object",
+      "properties": {
+        "constraint_id": {
+          "title": "Constraint Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "terms": {
+          "title": "Terms",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConstraintTerm"
+          }
+        },
+        "bounds": {
+          "$ref": "#/definitions/Bounds"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "unit",
+        "terms",
+        "bounds"
+      ],
+      "additionalProperties": false
+    },
+    "InstallationContext": {
+      "title": "InstallationContext",
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "enum": [
+            "installation.v1-draft"
+          ],
+          "type": "string"
+        },
+        "site_id": {
+          "title": "Site Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "timezone": {
+          "title": "Timezone",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "sources": {
+          "title": "Sources",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SourceReference"
+          }
+        },
+        "equipment": {
+          "title": "Equipment",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Equipment"
+          }
+        },
+        "channels": {
+          "title": "Channels",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Channel"
+          }
+        },
+        "aggregate_limits": {
+          "title": "Aggregate Limits",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AggregateLimit"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "site_id",
+        "revision",
+        "timezone",
+        "sources",
+        "equipment",
+        "channels"
+      ],
+      "additionalProperties": false
+    },
+    "SignalRequirement": {
+      "title": "SignalRequirement",
+      "type": "object",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "meaning": {
+          "$ref": "#/definitions/SignalMeaning"
+        }
+      },
+      "required": [
+        "name",
+        "meaning"
+      ],
+      "additionalProperties": false
+    },
+    "BundleInterface": {
+      "title": "BundleInterface",
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "enum": [
+            "bundle-interface.v1-draft"
+          ],
+          "type": "string"
+        },
+        "bundle_id": {
+          "title": "Bundle Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "anyOf": [
+            {
+              "title": "Manifest Sha256",
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_site_id": {
+          "title": "Target Site Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "agent_index": {
+          "title": "Agent Index",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "runtime": {
+          "title": "Runtime",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "topology_support": {
+          "title": "Topology Support",
+          "enum": [
+            "fixed",
+            "dynamic",
+            "unspecified"
+          ],
+          "type": "string"
+        },
+        "inputs": {
+          "title": "Inputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignalRequirement"
+          }
+        },
+        "outputs": {
+          "title": "Outputs",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignalRequirement"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "bundle_id",
+        "revision",
+        "target_site_id",
+        "agent_index",
+        "runtime",
+        "topology_support",
+        "inputs",
+        "outputs"
+      ],
+      "additionalProperties": false
+    },
+    "Binding": {
+      "title": "Binding",
+      "type": "object",
+      "properties": {
+        "signal_name": {
+          "title": "Signal Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "signal_name",
+        "channel_id"
+      ],
+      "additionalProperties": false
+    },
+    "Bindings": {
+      "title": "Bindings",
+      "type": "object",
+      "properties": {
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "inputs": {
+          "title": "Inputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Binding"
+          }
+        },
+        "outputs": {
+          "title": "Outputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Binding"
+          }
+        }
+      },
+      "required": [
+        "revision",
+        "inputs",
+        "outputs"
+      ],
+      "additionalProperties": false
+    },
+    "MessageProfile": {
+      "title": "MessageProfile",
+      "type": "object",
+      "properties": {
+        "profile_id": {
+          "title": "Profile Id",
+          "enum": [
+            "percepta.mongo-message.v0"
+          ],
+          "type": "string"
+        },
+        "adapter_revision": {
+          "title": "Adapter Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "producer_revision": {
+          "anyOf": [
+            {
+              "title": "Producer Revision",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "profile_id",
+        "adapter_revision"
+      ],
+      "additionalProperties": false
+    },
+    "SafetyPolicy": {
+      "title": "SafetyPolicy",
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "title": "Schema Version",
+          "enum": [
+            "safety-policy.v1-draft"
+          ],
+          "type": "string"
+        },
+        "revision": {
+          "title": "Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "mode": {
+          "title": "Mode",
+          "enum": [
+            "off",
+            "observe",
+            "intervene"
+          ],
+          "type": "string"
+        },
+        "profile_id": {
+          "title": "Profile Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "rule_ids": {
+          "title": "Rule Ids",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "revision",
+        "mode",
+        "profile_id",
+        "rule_ids"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

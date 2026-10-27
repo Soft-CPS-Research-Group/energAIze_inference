@@ -1,0 +1,10 @@
+{
+  "schema_version": "safety-policy.v1-draft",
+  "revision": "safety-1",
+  "mode": "intervene",
+  "profile_id": "example-power-limits",
+  "rule_ids": [
+    "channel-bounds",
+    "site-import"
+  ]
+}

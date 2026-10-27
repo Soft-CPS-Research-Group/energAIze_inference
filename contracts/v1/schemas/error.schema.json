@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ContractError",
+  "type": "object",
+  "properties": {
+    "code": {
+      "title": "Code",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "path": {
+      "title": "Path",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "detail": {
+      "title": "Detail",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "path",
+    "detail"
+  ],
+  "additionalProperties": false
+}

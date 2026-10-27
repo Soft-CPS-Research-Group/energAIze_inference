@@ -1,0 +1,106 @@
+{
+  "schema_version": "installation.v1-draft",
+  "site_id": "example-house",
+  "revision": "installation-1",
+  "timezone": "Europe/Lisbon",
+  "sources": [
+    {
+      "system": "example-community-catalogue",
+      "reference": "synthetic-house-snapshot",
+      "revision": "source-1"
+    }
+  ],
+  "equipment": [
+    {
+      "equipment_id": "charger-1",
+      "kind": "ev_charger",
+      "label": "Example charger 1",
+      "phases": [
+        "L1"
+      ],
+      "technical_values": [
+        {
+          "name": "rated_power",
+          "value": 7.4,
+          "unit": "kW"
+        }
+      ]
+    }
+  ],
+  "channels": [
+    {
+      "channel_id": "base-load",
+      "role": "observation",
+      "meaning": {
+        "quantity": "active_power",
+        "unit": "kW",
+        "value_type": "number",
+        "value_semantics": "instantaneous",
+        "positive_direction": "consumption"
+      },
+      "enabled": true,
+      "access": "read",
+      "message_path": [
+        "observations",
+        "non_shiftable_load"
+      ]
+    },
+    {
+      "channel_id": "charger-1-power",
+      "equipment_id": "charger-1",
+      "role": "observation",
+      "meaning": {
+        "quantity": "active_power",
+        "unit": "kW",
+        "value_type": "number",
+        "value_semantics": "instantaneous",
+        "positive_direction": "consumption"
+      },
+      "enabled": true,
+      "access": "read",
+      "message_path": [
+        "observations",
+        "charging_sessions",
+        "EVC01",
+        "power"
+      ]
+    },
+    {
+      "channel_id": "charger-1-setpoint",
+      "equipment_id": "charger-1",
+      "role": "action",
+      "meaning": {
+        "quantity": "active_power_setpoint",
+        "unit": "kW",
+        "value_type": "number",
+        "value_semantics": "command",
+        "positive_direction": "consumption"
+      },
+      "enabled": true,
+      "access": "write",
+      "physical_bounds": {
+        "lower": 0,
+        "upper": 7.4
+      }
+    }
+  ],
+  "aggregate_limits": [
+    {
+      "constraint_id": "site-import",
+      "unit": "kW",
+      "terms": [
+        {
+          "channel_id": "base-load",
+          "coefficient": 1
+        },
+        {
+          "channel_id": "charger-1-setpoint",
+          "coefficient": 1
+        }
+      ],
+      "bounds": {
+        "upper": 11
+      }
+    }
+  ]
+}

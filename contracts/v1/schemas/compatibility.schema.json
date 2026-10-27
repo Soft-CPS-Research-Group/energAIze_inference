@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CompatibilityReport",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "compatibility.v1-draft"
+      ],
+      "type": "string"
+    },
+    "configuration_revision": {
+      "title": "Configuration Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "baseline_activation_id": {
+      "anyOf": [
+        {
+          "title": "Baseline Activation Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "title": "Status",
+      "enum": [
+        "compatible",
+        "incompatible",
+        "insufficient_information"
+      ],
+      "type": "string"
+    },
+    "checks_performed": {
+      "title": "Checks Performed",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      }
+    },
+    "issues": {
+      "title": "Issues",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CompatibilityIssue"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "configuration_revision",
+    "status",
+    "checks_performed",
+    "issues"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "CompatibilityIssue": {
+      "title": "CompatibilityIssue",
+      "type": "object",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "required_change": {
+          "title": "Required Change",
+          "enum": [
+            "configuration",
+            "bundle",
+            "adapter",
+            "service",
+            "source_data"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "path",
+        "explanation",
+        "required_change"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "compatibility.v1-draft",
+  "configuration_revision": "configuration-2",
+  "baseline_activation_id": "example-activation-1",
+  "status": "incompatible",
+  "checks_performed": [
+    "controlled-channel-coverage"
+  ],
+  "issues": [
+    {
+      "code": "new_controlled_channel_unmapped",
+      "path": "/installation/channels/4",
+      "explanation": "The second charger has no output in the fixed bundle. A new bundle and explicit binding are required.",
+      "required_change": "bundle"
+    }
+  ]
+}

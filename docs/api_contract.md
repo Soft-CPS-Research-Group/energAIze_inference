@@ -2,6 +2,9 @@
 
 This document is the source of truth for runtime HTTP contracts and payload routing behavior.
 
+The [iteration 2 draft contracts](../contracts/v1/README.md) describe the planned
+versioned configuration and safety audit boundary. They do not change these routes.
+
 ## API Surface
 
 - `POST /admin/load`
@@ -258,9 +261,8 @@ Example:
 
 - `400`:
   - missing required community fields when `community_participation_enabled=true`;
-  - unknown `agent_index` requested;
   - other runtime `RuntimeError` cases not related to configuration state.
-- `503`: pipeline not configured.
+- `503`: pipeline not configured or requested `agent_index` not loaded.
 - `500`: unexpected execution failure.
 
 `POST /inference` missing-community example (`400`):

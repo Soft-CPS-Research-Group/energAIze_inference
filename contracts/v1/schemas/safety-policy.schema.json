@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SafetyPolicy",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "safety-policy.v1-draft"
+      ],
+      "type": "string"
+    },
+    "revision": {
+      "title": "Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "mode": {
+      "title": "Mode",
+      "enum": [
+        "off",
+        "observe",
+        "intervene"
+      ],
+      "type": "string"
+    },
+    "profile_id": {
+      "title": "Profile Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "rule_ids": {
+      "title": "Rule Ids",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "revision",
+    "mode",
+    "profile_id",
+    "rule_ids"
+  ],
+  "additionalProperties": false
+}

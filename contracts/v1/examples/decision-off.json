@@ -1,0 +1,29 @@
+{
+  "schema_version": "decision.v1-draft",
+  "request_id": "example-request-1",
+  "activation": {
+    "activation_id": "example-activation-off",
+    "site_id": "example-house",
+    "configuration_revision": "configuration-off",
+    "installation_revision": "installation-1",
+    "bindings_revision": "bindings-1",
+    "bundle_id": "example-fixed-policy",
+    "bundle_revision": "bundle-1",
+    "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "agent_index": 0,
+    "message_profile": "percepta.mongo-message.v0",
+    "adapter_revision": "legacy-1",
+    "safety_policy_revision": "safety-off",
+    "service_version": "example-service"
+  },
+  "proposed_actions": {
+    "EVC01": 9
+  },
+  "actions": {
+    "EVC01": 9
+  },
+  "safety": {
+    "mode": "off",
+    "changes": []
+  }
+}

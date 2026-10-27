@@ -1,0 +1,43 @@
+{
+  "schema_version": "decision.v1-draft",
+  "request_id": "example-request-1",
+  "activation": {
+    "activation_id": "example-activation-1",
+    "site_id": "example-house",
+    "configuration_revision": "configuration-1",
+    "installation_revision": "installation-1",
+    "bindings_revision": "bindings-1",
+    "bundle_id": "example-fixed-policy",
+    "bundle_revision": "bundle-1",
+    "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "agent_index": 0,
+    "message_profile": "percepta.mongo-message.v0",
+    "adapter_revision": "legacy-1",
+    "safety_policy_revision": "safety-1",
+    "service_version": "example-service"
+  },
+  "proposed_actions": {
+    "EVC01": 9
+  },
+  "actions": {
+    "EVC01": 7.4
+  },
+  "safety": {
+    "mode": "intervene",
+    "changes": [
+      {
+        "action_name": "EVC01",
+        "channel_id": "charger-1-setpoint",
+        "equipment_id": "charger-1",
+        "unit": "kW",
+        "proposed_value": 9,
+        "corrected_value": 7.4,
+        "applied": true,
+        "rule_ids": [
+          "channel-bounds"
+        ],
+        "reason": "Proposal exceeds the example charger upper bound"
+      }
+    ]
+  }
+}

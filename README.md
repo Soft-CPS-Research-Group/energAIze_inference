@@ -22,6 +22,10 @@ Serve inference decisions for any algorithm (rule-based policies, ONNX models, o
 See [architecture and iteration 1](docs/architecture.md) for dependency boundaries,
 extension points, regression evidence and known limitations.
 
+[Iteration 2 draft contracts](contracts/v1/README.md) define installation context,
+explicit algorithm/channel bindings and safety audit records, with schemas,
+examples and validation tools. They are separate from the currently served API.
+
 ## Bundle Format
 A bundle is a directory with three groups of files:
 
