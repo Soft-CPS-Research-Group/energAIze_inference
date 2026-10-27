@@ -1,0 +1,11 @@
+{
+  "schema_version": "preparation.v2-draft",
+  "configuration_revision": "configuration-1",
+  "bundle": {
+    "directory": "bundle",
+    "file_hashes": {
+      "artifact_manifest.json": "25c56f608c9173bba5f3988a2106d65007f6258475a9b85b2b1eb0428d3bf6f2",
+      "policy.json": "8b2f1ccd288d777e276bda5e2f0a72c258ecbd72f79496d8a5afb910d643b052"
+    }
+  }
+}

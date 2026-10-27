@@ -6,21 +6,16 @@ from app.models.responses import InferenceResponse
 from app.logging import get_logger
 from app.application.service import InferenceService
 from app.dependencies import get_service
+from app.core.errors import ExecutionError, InputError
+from app.core.state import PipelineNotConfigured
 
 router = APIRouter(prefix="/inference", tags=["inference"])
-
-
-def _ensure_configured(service: InferenceService = Depends(get_service)):
-    if not service.store.is_configured():
-        get_logger().warning("Inference requested before model configuration")
-        raise HTTPException(status_code=503, detail="Model not configured")
 
 
 @router.post("", response_model=InferenceResponse)
 async def run_inference(
     payload: InferenceRequest,
     request: Request,
-    _ = Depends(_ensure_configured),
     service: InferenceService = Depends(get_service),
 ):
     """Run inference for the configured agent using the supplied feature dict."""
@@ -30,6 +25,13 @@ async def run_inference(
         request_id = getattr(request.state, "request_id", None) or request.headers.get("x-request-id")
     try:
         actions = service.infer(payload.features, payload.agent_index)
+    except PipelineNotConfigured as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except InputError as exc:
+        raise HTTPException(status_code=400, detail=exc.document()) from exc
+    except ExecutionError as exc:
+        log.exception("Inference runtime failed", code=exc.code)
+        raise HTTPException(status_code=500, detail=exc.document()) from exc
     except KeyError as exc:
         log.warning("Inference payload missing data", missing=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc

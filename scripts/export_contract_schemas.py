@@ -11,6 +11,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.contracts.v1.decision import DecisionResult
+from app.contracts.v1.evaluation import EvaluationRequest, EvaluationResult
 from app.contracts.v1.execution import BundleInterface, CompatibilityReport, ConfigurationDraft, SafetyPolicy
 from app.contracts.v1.installation import InstallationContext
 from app.contracts.v1.lifecycle import ActivationRequest, ContractError, OperationReceipt, PreparationRequest
@@ -27,6 +28,8 @@ MODELS = {
     "activation": ActivationRequest,
     "operation": OperationReceipt,
     "error": ContractError,
+    "evaluation-request": EvaluationRequest,
+    "evaluation": EvaluationResult,
 }
 
 

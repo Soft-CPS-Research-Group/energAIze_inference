@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluationRequest",
+  "type": "object",
+  "properties": {
+    "features": {
+      "title": "Features",
+      "type": "object"
+    }
+  },
+  "required": [
+    "features"
+  ],
+  "additionalProperties": false
+}

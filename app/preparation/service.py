@@ -3,6 +3,7 @@
 import fcntl
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from pydantic import ValidationError
 
@@ -12,7 +13,7 @@ from app.core.contracts import PipelineRecord
 from app.logging import get_logger
 from app.preparation.assessment import check_manifest, context_issues, impact, issue
 from app.preparation.bundle import BundleSnapshot, read_json
-from app.preparation.models import PrepareCandidate
+from app.preparation.models import LocalBundle, PrepareCandidate
 from app.preparation.storage import LocalStore, PreparationError
 from app.services.pipeline import InferencePipeline
 
@@ -123,7 +124,7 @@ class PreparationService:
         alias_path = snapshot.destination / snapshot.alias if snapshot.alias else None
         from app.adapters.bundles import _load_alias_overrides
         pipeline = InferencePipeline(manifest, snapshot.destination, artifact.agent_index,
-                                     _load_alias_overrides(alias_path, artifact.agent_index),
+                                     _load_alias_overrides(alias_path, artifact.agent_index) if config.message.adapter_revision == "legacy-1" else {},
                                      runtime_factory=ArtifactRuntimeFactory(self.settings.onnx_execution_providers))
         if (artifact.format or "onnx") == "onnx":
             session = pipeline.agent.session
@@ -138,6 +139,44 @@ class PreparationService:
         # Release native sessions after validation; activation must revalidate/reload.
         return PipelineRecord({artifact.agent_index: pipeline}, snapshot.destination / snapshot.reference.manifest_file,
                               snapshot.destination, artifact.agent_index, [artifact.agent_index], alias_path)
+
+    def evaluate(self, candidate_id, features):
+        """Revalidate a captured candidate and evaluate a proposal without activation."""
+        from app.adapters.channel_message import ChannelMessageAdapter
+        from app.adapters.execution_context import compile_context
+        from app.application.evaluation import CandidateExecution
+        from app.core.errors import ExecutionError
+
+        candidate = self.candidate(candidate_id)
+        if candidate["state"] != "ready":
+            raise PreparationError("candidate_not_ready", "Only ready candidates can be evaluated", "/candidate_id", 409)
+        config = self.configuration(candidate["configuration_revision"])
+        if config.message.adapter_revision != "channels-1":
+            raise PreparationError("evaluation_adapter_unsupported", "Evaluation requires an explicit channels-1 configuration", "/message/adapter_revision", 409)
+        request = PrepareCandidate.parse_raw(self.store.operation(candidate_id)["request"])
+        reference = LocalBundle(directory=f"candidates/{candidate_id}/files",
+                                manifest_file=request.bundle.manifest_file, alias_file=request.bundle.alias_file,
+                                file_hashes=candidate["file_hashes"])
+        # Recopy from the private snapshot, not the mutable delivery directory.
+        # This validates persisted bytes before any native engine is constructed.
+        with TemporaryDirectory(prefix="evaluation-", dir=self.store.root) as temp:
+            snapshot = BundleSnapshot(self.store.root, reference, Path(temp) / "files", self.settings.max_candidate_bytes)
+            manifest = snapshot.collect(config.bundle.manifest_sha256)
+            problems = context_issues(config)
+            if problems:
+                raise PreparationError("candidate_incompatible", "Candidate no longer meets current capabilities", "/candidate_id", 409)
+            artifact, width, names = check_manifest(config, manifest, snapshot)
+            try:
+                record = self._construct(config, manifest, artifact, width, names, snapshot)
+            except PreparationError:
+                raise
+            except Exception as exc:
+                raise ExecutionError("runtime_construction_failed", "Candidate runtime could not be constructed", "/runtime") from exc
+            context = compile_context(config, manifest, candidate_id)
+            execution = CandidateExecution(context, ChannelMessageAdapter(context), record.pipeline.agent)
+            result = execution.evaluate(features)
+            result["providers"] = list(record.pipeline.agent.providers)
+            return result
 
     def initialize_files(self):
         if self.settings.configuration_file:

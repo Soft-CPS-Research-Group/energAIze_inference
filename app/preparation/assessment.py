@@ -41,8 +41,8 @@ def context_issues(config):
         issues.append(issue("manifest_hash_unknown", "/bundle/manifest_sha256", "Supply the expected manifest hash", "source_data"))
     if config.bundle.topology_support != "fixed":
         issues.append(issue("topology_unsupported", "/bundle/topology_support", "Current preparation supports fixed interfaces only", "service"))
-    if config.message.adapter_revision != "legacy-1":
-        issues.append(issue("adapter_unsupported", "/message/adapter_revision", "Supported adapter revision is legacy-1", "adapter"))
+    if config.message.adapter_revision not in ("legacy-1", "channels-1"):
+        issues.append(issue("adapter_unsupported", "/message/adapter_revision", "Supported adapter revisions are legacy-1 and channels-1", "adapter"))
     if config.safety.mode != "off" or config.safety.profile_id != "off.v1" or config.safety.rule_ids:
         issues.append(issue("safety_profile_unsupported", "/safety", "Only explicit off.v1 without rules is implemented; observation/intervention require iteration 5", "service"))
     return issues
@@ -124,7 +124,11 @@ def check_manifest(config, manifest, snapshot):
         size = 1
         if encoder.type == "OnehotEncoding":
             classes = p.get("classes", [])
-            require(bool(classes) and len({str(x) for x in classes}) == len(classes), "encoder_classes_invalid", path, "One-hot classes must be nonempty and unique")
+            require(isinstance(classes, list) and bool(classes) and all(type(x) in (str, int, float, bool) for x in classes)
+                    and len(set(classes)) == len(classes), "encoder_classes_invalid", path, "One-hot classes must be a nonempty list of unique scalar categories")
+            valid_type = {"number": lambda x: type(x) in (int, float) and math.isfinite(x),
+                          "string": lambda x: type(x) is str, "boolean": lambda x: type(x) is bool}.get(requirement.meaning.value_type)
+            require(valid_type is not None and all(valid_type(x) for x in classes), "encoder_classes_type", path, "Encoder categories must match the declared input type")
             size = len(classes)
         elif encoder.type == "PeriodicNormalization":
             size = 2
@@ -132,6 +136,8 @@ def check_manifest(config, manifest, snapshot):
             size = 0
         if runtime == "onnx":
             require(requirement.meaning.value_type in ("number", "boolean") or encoder.type in ("OnehotEncoding", "RemoveFeature"), "input_type_unsupported", path, "ONNX numeric encoding is required")
+        else:
+            require(encoder.type == "NoNormalization", "rule_encoder_unsupported", path, "Simple equality rules consume unencoded inputs")
         width += size
     if manifest.environment.encoded_observation_names:
         require(len(manifest.get_encoded_observation_names(artifact.agent_index)) == width, "encoded_names_mismatch", "/manifest/environment/encoded_observation_names", "Encoded names do not match encoder width")
@@ -147,7 +153,9 @@ def check_manifest(config, manifest, snapshot):
         aliases = read_json((snapshot.destination / snapshot.alias).read_bytes(), "/bundle/aliases")
         aliases = {str(k): str(v) for k, v in aliases.items() if not k.startswith("_")}
     channels = {c.channel_id: c for c in config.installation.channels}
-    for binding in config.bindings.inputs:
+    if config.message.adapter_revision == "channels-1":
+        require(not aliases, "alias_binding_conflict", "/bundle/aliases", "channels-1 uses explicit JSON bindings; migrate alias paths to bindings and remove alias overrides")
+    for binding in config.bindings.inputs if config.message.adapter_revision == "legacy-1" else []:
         path = list(channels[binding.channel_id].message_path or [])
         require(all("." not in key for key in path), "literal_key_unsupported", "/bindings/inputs", "Legacy flattening cannot distinguish dots inside keys")
         if cfg.get("require_observations_envelope"):
@@ -156,7 +164,7 @@ def check_manifest(config, manifest, snapshot):
             path = path[1:]
         name = ".".join(path)
         require(aliases.get(name, name) == binding.signal_name, "input_mapping_unsupported", "/bindings/inputs", "Configured binding is not implemented by legacy-1 flattening/aliases")
-    for binding in config.bindings.outputs:
+    for binding in config.bindings.outputs if config.message.adapter_revision == "legacy-1" else []:
         require(channels[binding.channel_id].equipment_id == binding.signal_name, "output_mapping_unsupported", "/bindings/outputs", "Current direct-action profile requires action names equal to equipment IDs; other routing needs iteration 4")
     physical = {b.signal_name: channels[b.channel_id].physical_bounds for b in config.bindings.outputs}
 
@@ -186,6 +194,5 @@ def check_manifest(config, manifest, snapshot):
         require(bool(bounds) and all(len(bounds.get(key, [])) == len(actions) for key in ("low", "high")), "bounds_invalid", "/manifest/environment/action_bounds", "ONNX needs complete output bounds")
         for low, high in zip(bounds["low"], bounds["high"]):
             require(all(type(v) in (int, float) and math.isfinite(v) for v in (low, high)) and low <= high, "bounds_invalid", "/manifest/environment/action_bounds", "Bounds must be finite and ordered")
-            require(all(math.isclose(v * 10, round(v * 10), abs_tol=1e-8) for v in (low, high)), "rounding_contract_unsupported", "/manifest/environment/action_bounds", "Non-decimal bounds require the post-processing fix in iteration 4")
         require(all(within_physical(name, low, high) for name, low, high in zip(actions, bounds["low"], bounds["high"])), "physical_output_mismatch", "/manifest/environment/action_bounds", "ONNX output bounds exceed the installation bounds")
     return artifact, width, actions

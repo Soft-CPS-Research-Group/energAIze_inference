@@ -1,0 +1,141 @@
+{
+  "schema_version": "configuration.v1-draft",
+  "revision": "configuration-1",
+  "installation": {
+    "schema_version": "installation.v1-draft",
+    "site_id": "example-house",
+    "revision": "installation-1",
+    "timezone": "Europe/Lisbon",
+    "sources": [
+      {
+        "system": "example-community-catalogue",
+        "reference": "synthetic-house-snapshot",
+        "revision": "source-1"
+      }
+    ],
+    "equipment": [
+      {
+        "equipment_id": "EVC01",
+        "kind": "ev_charger",
+        "label": "Example charger 1",
+        "phases": [
+          "L1"
+        ],
+        "technical_values": [
+          {
+            "name": "rated_power",
+            "value": 7.4,
+            "unit": "kW"
+          }
+        ]
+      },
+      {
+        "equipment_id": "B01",
+        "kind": "battery",
+        "label": "Synthetic context for repository message"
+      }
+    ],
+    "channels": [
+      {
+        "channel_id": "battery-soc",
+        "role": "observation",
+        "meaning": {
+          "quantity": "state_of_charge",
+          "unit": "1",
+          "value_type": "number",
+          "value_semantics": "state",
+          "positive_direction": "stored_charge"
+        },
+        "enabled": true,
+        "access": "read",
+        "message_path": [
+          "observations",
+          "batteries",
+          "B01",
+          "SoC"
+        ],
+        "equipment_id": "B01"
+      },
+      {
+        "channel_id": "charger-1-setpoint",
+        "equipment_id": "EVC01",
+        "role": "action",
+        "meaning": {
+          "quantity": "active_power_setpoint",
+          "unit": "kW",
+          "value_type": "number",
+          "value_semantics": "command",
+          "positive_direction": "consumption"
+        },
+        "enabled": true,
+        "access": "write",
+        "physical_bounds": {
+          "lower": 0,
+          "upper": 7.4
+        }
+      }
+    ],
+    "aggregate_limits": []
+  },
+  "bundle": {
+    "schema_version": "bundle-interface.v1-draft",
+    "bundle_id": "example-fixed-policy",
+    "revision": "bundle-1",
+    "target_site_id": "example-house",
+    "agent_index": 0,
+    "runtime": "rule_based",
+    "topology_support": "fixed",
+    "inputs": [
+      {
+        "name": "battery_soc",
+        "meaning": {
+          "quantity": "state_of_charge",
+          "unit": "1",
+          "value_type": "number",
+          "value_semantics": "state",
+          "positive_direction": "stored_charge"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "name": "charger_dispatch",
+        "meaning": {
+          "quantity": "active_power_setpoint",
+          "unit": "kW",
+          "value_type": "number",
+          "value_semantics": "command",
+          "positive_direction": "consumption"
+        }
+      }
+    ],
+    "manifest_sha256": "25c56f608c9173bba5f3988a2106d65007f6258475a9b85b2b1eb0428d3bf6f2"
+  },
+  "bindings": {
+    "revision": "bindings-1",
+    "inputs": [
+      {
+        "signal_name": "battery_soc",
+        "channel_id": "battery-soc"
+      }
+    ],
+    "outputs": [
+      {
+        "signal_name": "charger_dispatch",
+        "channel_id": "charger-1-setpoint"
+      }
+    ]
+  },
+  "message": {
+    "profile_id": "percepta.mongo-message.v0",
+    "adapter_revision": "channels-1",
+    "producer_revision": null
+  },
+  "safety": {
+    "schema_version": "safety-policy.v1-draft",
+    "revision": "off-1",
+    "mode": "off",
+    "profile_id": "off.v1",
+    "rule_ids": []
+  }
+}

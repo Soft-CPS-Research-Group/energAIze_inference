@@ -1,0 +1,15 @@
+{
+  "default_actions": {
+    "charger_dispatch": 1.6
+  },
+  "rules": [
+    {
+      "if": {
+        "battery_soc": 0.25
+      },
+      "actions": {
+        "charger_dispatch": 2.5
+      }
+    }
+  ]
+}

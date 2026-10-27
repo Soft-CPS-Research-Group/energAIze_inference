@@ -31,6 +31,11 @@ configuration storage, compatibility assessment and isolated local bundle prepar
 It is opt-in and does not activate candidates. The guide includes an executable
 example, API routes, settings and the explicitly supported runtime profiles.
 
+[Iteration 4 message adaptation and execution](docs/message-execution.md) adds
+explicit channel bindings for the provisional Percepta format, candidate proposal
+evaluation, input evidence and ONNX failure/rounding fixes. It includes a runnable
+example and the required container mounts. Controlled activation remains pending.
+
 ## Bundle Format
 A bundle is a directory with three groups of files:
 

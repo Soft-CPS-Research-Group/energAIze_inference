@@ -14,6 +14,10 @@ is explicitly **`preparation.v2-draft`**, because the earlier request lacked a
 local bundle reference. Its [schema](../contracts/v2/preparation.schema.json)
 does not replace the original v1 schema.
 
+[Iteration 4](message-execution.md) extends this foundation with the explicit
+`channels-1` adapter and an authenticated proposal-evaluation endpoint. The
+`legacy-1` profile and the original demo below remain available unchanged.
+
 ## Enable the mode
 
 | Setting | Meaning |
@@ -127,8 +131,7 @@ the physical meaning of a model from tensor dimensions or a sidecar declaration.
 
 ## Supported preparation profiles and limits
 
-The initial profile supports fixed flat interfaces with `legacy-1` message
-adaptation. A bound input's message path must resolve through the existing
+The initial `legacy-1` profile supports fixed flat interfaces. A bound input's message path must resolve through the existing
 flattening/envelope/alias behavior. Literal dots inside path components and
 vector inputs need a future adapter. With the observations envelope enabled,
 only observations and the existing forwarded community/forecast fields can be
@@ -137,8 +140,8 @@ channel-to-action routing belongs to iteration 4.
 
 - **ONNX:** one float32 input and output, rank two, fixed feature/action width,
   batch dimension 1 or an accepted dynamic batch marker; supported scalar encoders;
-  complete finite bounds within installation limits. Bounds must align to tenths
-  until the legacy post-processing rounding fix in iteration 4.
+  complete finite bounds within installation limits. Iteration 4 corrected legacy
+  post-processing, so non-decimal bounds are now supported too.
 - **Simple rules:** JSON `default_actions` and equality `rules`, with explicit
   finite scalar values for every action in every branch. Conditions use declared
   input names; encoded rule conditions are not supported. Values must fit the
@@ -195,8 +198,8 @@ Any future activation must revalidate/reload; every candidate records
 
 ## Next integration boundaries
 
-Iteration 4 implements explicit Percepta/channel adaptation and execution error
-handling. Iteration 5 implements supported safety correction profiles. Iteration 6
+Iteration 4 now implements explicit Percepta/channel adaptation and execution error
+handling as described in its guide. Iteration 5 implements supported safety correction profiles. Iteration 6
 adds bounded scheduling, activation preconditions, atomic local publication and
 recovery of an active combination. This iteration has per-candidate size limits,
 but no total storage quota, retention policy or deployment-wide job scheduler.

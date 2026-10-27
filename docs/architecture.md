@@ -1,5 +1,10 @@
 # Inference architecture — iteration 1
 
+This document records the iteration 1 boundary and baseline. Subsequent work added
+[configuration/candidate preparation](candidate-preparation.md) and
+[bound Percepta execution](message-execution.md). The ONNX zero-on-failure and
+rounding issues listed in the original audit below were corrected in iteration 4.
+
 This iteration separates loading, active state, message preparation and execution.
 It preserves the existing HTTP contract and algorithm calculations. It does not
 introduce the future installation contract or safety layer.

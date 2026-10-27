@@ -128,6 +128,13 @@ required inputs produce a named technical error; unsupported fields do not creat
 equipment. A site-like field inside `features` never chooses the installation.
 The currently deployed route's permissive handling is unchanged in this iteration.
 
+The [iteration 4 `channels-1` adapter](../../docs/message-execution.md) now implements
+this selected-input path through candidate evaluation. It also supports canonical
+array-index components when traversing arrays, while object components remain
+literal keys. The original `legacy-1` profile is not silently migrated. Proposals
+use the additive `evaluation.v1-draft` response, without pretending to have an
+activation identity or delivered safety-corrected actions.
+
 ## Safety result independent of Percepta
 
 The result describes one agent's `proposed_actions` and final `actions`. The

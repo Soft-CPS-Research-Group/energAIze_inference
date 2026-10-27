@@ -53,6 +53,9 @@ class RuleBasedRuntime:
             rh1_cfg = Rh1HouseConfig.from_dict(dict(config))
             self._rh1_runtime = Rh1HouseRuntime(rh1_cfg)
 
+    def propose(self, payload: Dict[str, float]) -> Dict[str, float]:
+        return self.infer(payload)
+
     def infer(self, payload: Dict[str, float]) -> Dict[str, float]:
         payload = _apply_aliases(payload, self.feature_aliases)
         raw_payload = payload

@@ -8,6 +8,12 @@ implements opt-in `/admin/v1` configuration, candidate, operation and status rou
 Its preparation request uses `preparation.v2-draft`; activation and safety execution
 remain future work. The inference response below is unchanged.
 
+[Iteration 4](message-execution.md) adds authenticated
+`POST /admin/v1/candidates/{candidate_id}/evaluations` for proposal-only evaluation
+using adapter `channels-1`. ONNX native execution failures now return `500` with
+a structured error instead of successful zero actions; invalid encoded inputs
+return `400`. Successful legacy inference responses keep their shape.
+
 ## API Surface
 
 - `POST /admin/load`

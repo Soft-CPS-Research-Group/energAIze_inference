@@ -7,6 +7,7 @@ from app.core.contracts import (
     Actions, ActivePipelines, BundleLoader, Features, ObserveActions,
     PipelineRecord, PrepareInput,
 )
+from app.core.state import PipelineNotConfigured
 
 
 class InferenceService:
@@ -38,7 +39,15 @@ class InferenceService:
         self.store.unload()
 
     def infer(self, features: Features, agent_index: int | None = None) -> Actions:
-        pipeline = self.store.get_pipeline(agent_index)
+        # Capture once: an overlapping activation cannot mix this request's
+        # selection, adapter and runtime with a later record.
+        record = self.store.get_record()
+        if record is None:
+            raise PipelineNotConfigured("Model pipeline not configured")
+        target = record.agent_index if agent_index is None else agent_index
+        pipeline = record.pipelines.get(target)
+        if pipeline is None:
+            raise PipelineNotConfigured(f"Agent index {target} not configured")
         prepared = self.prepare_input(features, pipeline)
         actions = pipeline.inference(prepared)
         if self.observe_actions is not None:

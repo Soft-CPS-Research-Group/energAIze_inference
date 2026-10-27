@@ -7,6 +7,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.contracts.v1.execution import ConfigurationDraft
 from app.contracts.v1.lifecycle import OperationReceipt
+from app.contracts.v1.evaluation import EvaluationRequest, EvaluationResult
+from app.core.errors import ExecutionError, InputError
 from app.dependencies import get_settings
 from app.preparation.models import PrepareCandidate
 from app.preparation.storage import PreparationError
@@ -69,6 +71,18 @@ def get_operation(operation_id: str, service=Depends(manager)):
 @router.get("/candidates/{candidate_id}")
 def get_candidate(candidate_id: str, service=Depends(manager)):
     return translate(lambda: service.candidate(candidate_id))
+
+
+@router.post("/candidates/{candidate_id}/evaluations", response_model=EvaluationResult)
+def evaluate_candidate(candidate_id: str, body: EvaluationRequest, request: Request, service=Depends(manager)):
+    try:
+        result = translate(lambda: service.evaluate(candidate_id, body.features))
+    except InputError as exc:
+        raise HTTPException(400, detail=exc.document()) from exc
+    except ExecutionError as exc:
+        raise HTTPException(500, detail=exc.document()) from exc
+    result["request_id"] = getattr(request.state, "request_id", None)
+    return result
 
 
 @router.get("/status")

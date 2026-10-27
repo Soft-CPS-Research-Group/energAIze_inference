@@ -1,0 +1,358 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluationResult",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "evaluation.v1-draft"
+      ],
+      "type": "string"
+    },
+    "proposal_only": {
+      "title": "Proposal Only",
+      "enum": [
+        true
+      ],
+      "type": "boolean"
+    },
+    "context": {
+      "$ref": "#/definitions/ExecutionReference"
+    },
+    "proposed_actions": {
+      "title": "Proposed Actions",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProposedAction"
+      }
+    },
+    "input_evidence": {
+      "$ref": "#/definitions/InputEvidence"
+    },
+    "providers": {
+      "title": "Providers",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      }
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "title": "Request Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "proposal_only",
+    "context",
+    "proposed_actions",
+    "input_evidence",
+    "providers"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ExecutionReference": {
+      "title": "ExecutionReference",
+      "type": "object",
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "site_id": {
+          "title": "Site Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "configuration_revision": {
+          "title": "Configuration Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "installation_revision": {
+          "title": "Installation Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bindings_revision": {
+          "title": "Bindings Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_id": {
+          "title": "Bundle Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_revision": {
+          "title": "Bundle Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "title": "Manifest Sha256",
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "agent_index": {
+          "title": "Agent Index",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message_profile": {
+          "title": "Message Profile",
+          "enum": [
+            "percepta.mongo-message.v0"
+          ],
+          "type": "string"
+        },
+        "adapter_revision": {
+          "title": "Adapter Revision",
+          "enum": [
+            "channels-1"
+          ],
+          "type": "string"
+        },
+        "producer_revision": {
+          "anyOf": [
+            {
+              "title": "Producer Revision",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "safety_policy_revision": {
+          "title": "Safety Policy Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "service_version": {
+          "title": "Service Version",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "site_id",
+        "configuration_revision",
+        "installation_revision",
+        "bindings_revision",
+        "bundle_id",
+        "bundle_revision",
+        "manifest_sha256",
+        "agent_index",
+        "message_profile",
+        "adapter_revision",
+        "producer_revision",
+        "safety_policy_revision",
+        "service_version"
+      ],
+      "additionalProperties": false
+    },
+    "ProposedAction": {
+      "title": "ProposedAction",
+      "type": "object",
+      "properties": {
+        "action_name": {
+          "title": "Action Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "proposed_value": {
+          "title": "Proposed Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action_name",
+        "channel_id",
+        "equipment_id",
+        "unit",
+        "proposed_value"
+      ],
+      "additionalProperties": false
+    },
+    "SignalEvidence": {
+      "title": "SignalEvidence",
+      "type": "object",
+      "properties": {
+        "signal_name": {
+          "title": "Signal Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "source_unit": {
+          "title": "Source Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit_source": {
+          "title": "Unit Source",
+          "enum": [
+            "configuration",
+            "message"
+          ],
+          "type": "string"
+        },
+        "interval_seconds": {
+          "anyOf": [
+            {
+              "title": "Interval Seconds",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interval_source": {
+          "title": "Interval Source",
+          "enum": [
+            "configuration",
+            "message",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "converted": {
+          "title": "Converted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "signal_name",
+        "channel_id",
+        "source_unit",
+        "unit",
+        "unit_source",
+        "interval_seconds",
+        "interval_source",
+        "converted"
+      ],
+      "additionalProperties": false
+    },
+    "InputEvidence": {
+      "title": "InputEvidence",
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "anyOf": [
+            {
+              "title": "Timestamp",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "freshness": {
+          "title": "Freshness",
+          "enum": [
+            "unknown",
+            "not_assessed"
+          ],
+          "type": "string"
+        },
+        "inputs": {
+          "title": "Inputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignalEvidence"
+          }
+        }
+      },
+      "required": [
+        "timestamp",
+        "freshness",
+        "inputs"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

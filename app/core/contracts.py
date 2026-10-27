@@ -30,6 +30,7 @@ class AgentRuntime(Protocol):
     providers: list[str]
 
     def infer(self, payload: Features) -> dict[str, float]: ...
+    def propose(self, payload: Features) -> dict[str, float]: ...
 
 
 class Pipeline(Protocol):

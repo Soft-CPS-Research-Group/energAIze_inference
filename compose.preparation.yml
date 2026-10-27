@@ -1,0 +1,26 @@
+# Standalone local preparation/evaluation mode. Does not activate a model.
+services:
+  inference:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: "${INFERENCE_IMAGE:-energaize-inference:local}"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8000}:8000"
+    environment:
+      INSTALLATION_SITE_ID: "${INSTALLATION_SITE_ID:?Set the installation identity}"
+      ADMIN_API_TOKEN: "${ADMIN_API_TOKEN:?Supply an administrative secret}"
+      ALLOWED_BUNDLE_ROOT: /srv/inference/bundles
+      CONFIGURATION_STORE_DIR: /var/lib/inference
+      ONNX_EXECUTION_PROVIDERS: "${ONNX_EXECUTION_PROVIDERS:-CPUExecutionProvider}"
+      LOG_JSON: "true"
+    volumes:
+      - type: bind
+        source: "${BUNDLES_HOST_PATH:?Set the delivered bundles directory}"
+        target: /srv/inference/bundles
+        read_only: true
+      - type: bind
+        source: "${STATE_HOST_PATH:?Set a persistent private state directory}"
+        target: /var/lib/inference
+    runtime: "${DOCKER_RUNTIME:-runc}"
