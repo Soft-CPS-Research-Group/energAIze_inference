@@ -346,6 +346,7 @@ def test_nonfinite_required_scalar_is_rejected_by_bound_adapter(bound_setup):
 
 def test_legacy_http_reports_native_failure_as_500_without_actions(bound_setup):
     settings, *_ = bound_setup
+    settings.configuration_store_dir = None  # Exercise the legacy path, outside managed mode.
     service = make_service()
     record = service.load(Path("unused"))
     record.pipeline._agent = fake_onnx(fail=True)

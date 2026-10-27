@@ -1,4 +1,4 @@
-# Standalone local preparation/evaluation mode. Does not activate a model.
+# Managed local lifecycle. New candidates require explicit activation; committed activations recover on restart.
 services:
   inference:
     build:

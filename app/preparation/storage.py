@@ -39,6 +39,7 @@ class LocalStore:
     def connection(self):
         db = sqlite3.connect(self.path, timeout=30)
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA synchronous=FULL")
         try:
             with db:
                 yield db
@@ -72,7 +73,7 @@ class LocalStore:
             raise PreparationError("configuration_not_found", "Configuration revision not found", "/configuration_revision", 404)
         return json.loads(row[0])
 
-    def submit(self, key, request):
+    def submit(self, key, request, max_pending=4, max_stored=64):
         digest = hashlib.sha256(key.encode()).hexdigest()
         body = canonical(request)
         with self.connection() as db:
@@ -82,6 +83,10 @@ class LocalStore:
                 if existing["request"] != body:
                     raise PreparationError("idempotency_conflict", "Idempotency key was used for another request", "/", 409)
                 return existing["id"]
+            if db.execute("SELECT count(*) FROM operations WHERE status IN ('pending','running')").fetchone()[0] >= max_pending:
+                raise PreparationError("preparation_queue_full", "Preparation admission limit reached", "/", 429)
+            if db.execute("SELECT count(*) FROM operations").fetchone()[0] >= max_stored:
+                raise PreparationError("candidate_retention_limit", "Candidate history limit reached; provision a larger limit or a new store", "/", 507)
             operation_id = uuid.uuid4().hex
             db.execute("INSERT INTO operations(id,key_hash,request,status) VALUES (?,?,?,'pending')", (operation_id, digest, body))
             return operation_id

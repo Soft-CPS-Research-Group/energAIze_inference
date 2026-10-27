@@ -34,12 +34,17 @@ example, API routes, settings and the explicitly supported runtime profiles.
 [Iteration 4 message adaptation and execution](docs/message-execution.md) adds
 explicit channel bindings for the provisional Percepta format, candidate proposal
 evaluation, input evidence and ONNX failure/rounding fixes. It includes a runnable
-example and the required container mounts. Controlled activation remains pending.
+example and the required container mounts.
 
 [Iteration 5 safety correction](docs/safety-correction.md) adds explicit off, observe
 and intervene modes, scalar limits/precision, one aggregate upper limit with
 curtailment priorities, and an auditable final candidate result. Includes a tested
 two-charger example and versioned configuration/response schemas.
+
+[Iteration 6 activation and recovery](docs/local-lifecycle.md) adds durable local
+generations, explicit current-installation declarations, fenced active inference,
+bounded runtime construction and restart recovery. Iteration 7 integration and
+deployment remain deferred.
 
 ## Bundle Format
 A bundle is a directory with three groups of files:

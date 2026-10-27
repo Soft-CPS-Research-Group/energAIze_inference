@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     admin_api_token: SecretStr | None = Field(None, env="ADMIN_API_TOKEN")
     configuration_file: Path | None = Field(None, env="CONFIGURATION_FILE")
     preparation_request_file: Path | None = Field(None, env="PREPARATION_REQUEST_FILE")
+    max_pending_preparations: int = Field(4, ge=1, le=32, env="MAX_PENDING_PREPARATIONS")
+    max_stored_candidates: int = Field(64, ge=1, env="MAX_STORED_CANDIDATES")
+    max_snapshot_storage_bytes: int = Field(4 * 1024 ** 3, gt=0, env="MAX_SNAPSHOT_STORAGE_BYTES")
+    max_concurrent_inferences: int = Field(4, ge=1, le=64, env="MAX_CONCURRENT_INFERENCES")
     max_candidate_bytes: int = Field(512 * 1024 * 1024, gt=0, env="MAX_CANDIDATE_BYTES")
     manifest_path: Path | None = Field(
         default=None,

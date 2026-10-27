@@ -2,6 +2,10 @@
 
 import fcntl
 import json
+import os
+import threading
+import shutil
+from contextlib import contextmanager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -22,6 +26,7 @@ from app.services.pipeline import InferencePipeline
 class PreparationService:
     def __init__(self, settings):
         self.settings = settings
+        self.work_gate = threading.Lock()
         root = Path(settings.configuration_store_dir).resolve()
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.lock = (root / "owner.lock").open("a+")
@@ -30,12 +35,44 @@ class PreparationService:
             self.store = LocalStore(root)
             self.store.bind_site(settings.installation_site_id)
             self.store.recover()
+            # Interrupted evaluation copies are temporary, never recovery authority.
+            for path in root.glob("evaluation-*"):
+                if path.is_dir() and not path.is_symlink():
+                    shutil.rmtree(path)
+            from app.lifecycle.service import ActivationService
+            self.lifecycle = ActivationService(self)
         except Exception:
             self.lock.close()
             raise
 
     def close(self):
-        self.lock.close()
+        with self.work_gate:
+            self.lifecycle.close()
+            self.lock.close()
+
+    @contextmanager
+    def work(self, wait=False):
+        if not self.work_gate.acquire(blocking=wait):
+            raise PreparationError("runtime_builder_busy", "Another bounded runtime construction is in progress", "/runtime", 429)
+        try:
+            # Conservative reservation for one maximum-size snapshot. Builders
+            # are serialized, so another local operation cannot consume it.
+            used = 0
+            try:
+                for folder in ("candidates", "generations"):
+                    for directory, _, files in os.walk(self.store.root / folder):
+                        for name in files:
+                            try:
+                                used += os.stat(Path(directory) / name, follow_symlinks=False).st_size
+                            except FileNotFoundError:
+                                pass  # An in-flight retired generation just drained.
+            except OSError as exc:
+                raise PreparationError("snapshot_storage_unavailable", "Cannot inspect private snapshot storage", "/runtime", 503) from exc
+            if used + self.settings.max_candidate_bytes > self.settings.max_snapshot_storage_bytes:
+                raise PreparationError("snapshot_storage_full", "Insufficient configured snapshot budget for another candidate", "/runtime", 507)
+            yield
+        finally:
+            self.work_gate.release()
 
     def put(self, revision, config):
         if config.revision != revision:
@@ -51,9 +88,11 @@ class PreparationService:
         self.configuration(request.configuration_revision)
         if request.baseline_configuration_revision is not None:
             self.configuration(request.baseline_configuration_revision)
-        return self.store.submit(key, request.dict())
+        return self.store.submit(key, request.dict(), self.settings.max_pending_preparations, self.settings.max_stored_candidates)
 
     def receipt(self, operation_id):
+        if operation_id.startswith("act_"):
+            return self.lifecycle.receipt(operation_id)
         row = self.store.operation(operation_id)
         return dict(operation_id=operation_id, status=row["status"],
                     resource_id=operation_id if row["candidate"] else None,
@@ -67,8 +106,16 @@ class PreparationService:
                     error=json.loads(row["error"]) if row["error"] else None)
 
     def prepare(self, operation_id):
+        # Claim before waiting: duplicate HTTP retries never add more queued work.
         if not self.store.claim(operation_id):
             return
+        try:
+            with self.work(wait=True):
+                self._prepare(operation_id)
+        except PreparationError as exc:
+            self.store.finish(operation_id, error=exc.document())
+
+    def _prepare(self, operation_id):
         try:
             request = PrepareCandidate.parse_raw(self.store.operation(operation_id)["request"])
             config = self.configuration(request.configuration_revision)
@@ -141,8 +188,8 @@ class PreparationService:
         return PipelineRecord({artifact.agent_index: pipeline}, snapshot.destination / snapshot.reference.manifest_file,
                               snapshot.destination, artifact.agent_index, [artifact.agent_index], alias_path)
 
-    def evaluate(self, candidate_id, features):
-        """Revalidate a captured candidate and evaluate a proposal without activation."""
+    def build_execution(self, candidate_id, destination, source_directory=None):
+        """Revalidate copied bytes and compile a reusable execution; caller owns admission."""
         from app.adapters.channel_message import ChannelMessageAdapter
         from app.adapters.execution_context import compile_context
         from app.application.evaluation import CandidateExecution
@@ -150,33 +197,34 @@ class PreparationService:
 
         candidate = self.candidate(candidate_id)
         if candidate["state"] != "ready":
-            raise PreparationError("candidate_not_ready", "Only ready candidates can be evaluated", "/candidate_id", 409)
+            raise PreparationError("candidate_not_ready", "Only ready candidates can be executed", "/candidate_id", 409)
         config = self.configuration(candidate["configuration_revision"])
         if config.message.adapter_revision != "channels-1":
-            raise PreparationError("evaluation_adapter_unsupported", "Evaluation requires an explicit channels-1 configuration", "/message/adapter_revision", 409)
+            raise PreparationError("evaluation_adapter_unsupported", "Execution requires an explicit channels-1 configuration", "/message/adapter_revision", 409)
         request = PrepareCandidate.parse_raw(self.store.operation(candidate_id)["request"])
-        reference = LocalBundle(directory=f"candidates/{candidate_id}/files",
+        reference = LocalBundle(directory=source_directory or f"candidates/{candidate_id}/files",
                                 manifest_file=request.bundle.manifest_file, alias_file=request.bundle.alias_file,
                                 file_hashes=candidate["file_hashes"])
-        # Recopy from the private snapshot, not the mutable delivery directory.
-        # This validates persisted bytes before any native engine is constructed.
-        with TemporaryDirectory(prefix="evaluation-", dir=self.store.root) as temp:
-            snapshot = BundleSnapshot(self.store.root, reference, Path(temp) / "files", self.settings.max_candidate_bytes)
-            manifest = snapshot.collect(config.bundle.manifest_sha256)
-            problems = context_issues(config)
-            if problems:
-                raise PreparationError("candidate_incompatible", "Candidate no longer meets current capabilities", "/candidate_id", 409)
-            artifact, width, names = check_manifest(config, manifest, snapshot)
-            try:
-                record = self._construct(config, manifest, artifact, width, names, snapshot)
-            except PreparationError:
-                raise
-            except Exception as exc:
-                raise ExecutionError("runtime_construction_failed", "Candidate runtime could not be constructed", "/runtime") from exc
-            context = compile_context(config, manifest, candidate_id)
-            execution = CandidateExecution(context, ChannelMessageAdapter(context), record.pipeline.agent)
+        snapshot = BundleSnapshot(self.store.root, reference, destination, self.settings.max_candidate_bytes)
+        manifest = snapshot.collect(config.bundle.manifest_sha256)
+        if context_issues(config):
+            raise PreparationError("candidate_incompatible", "Candidate no longer meets current capabilities", "/candidate_id", 409)
+        artifact, width, names = check_manifest(config, manifest, snapshot)
+        try:
+            record = self._construct(config, manifest, artifact, width, names, snapshot)
+        except PreparationError:
+            raise
+        except Exception as exc:
+            raise ExecutionError("runtime_construction_failed", "Candidate runtime could not be constructed", "/runtime") from exc
+        context = compile_context(config, manifest, candidate_id)
+        return CandidateExecution(context, ChannelMessageAdapter(context), record.pipeline.agent)
+
+    def evaluate(self, candidate_id, features):
+        """Evaluate independently under the bounded builder admission gate."""
+        with self.work(), TemporaryDirectory(prefix="evaluation-", dir=self.store.root) as temp:
+            execution = self.build_execution(candidate_id, Path(temp) / "files")
             result = execution.evaluate(features)
-            result["providers"] = list(record.pipeline.agent.providers)
+            result["providers"] = list(execution.runtime.providers)
             return result
 
     def initialize_files(self):

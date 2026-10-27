@@ -1,0 +1,10 @@
+{
+  "expected_context_id": "CONTEXT_ID",
+  "expected_activation_id": "ACTIVATION_ID",
+  "cycle_id": "cycle-10",
+  "features": {
+    "observations": {
+      "non_shiftable_load": 3
+    }
+  }
+}

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Callable
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.adapters.hardware import _cuda_available
@@ -32,12 +33,12 @@ async def lifespan(app: FastAPI):
         if settings.manifest_path is not None:
             raise ValueError("MODEL_MANIFEST_PATH cannot bypass candidate preparation; use CONFIGURATION_FILE and PREPARATION_REQUEST_FILE")
         from app.preparation.service import PreparationService
-        candidate_service = PreparationService(settings)
+        candidate_service = await run_in_threadpool(PreparationService, settings)
         app.state.preparation = candidate_service
         try:
             await run_in_threadpool(candidate_service.initialize_files)
         except Exception:
-            candidate_service.close()
+            await run_in_threadpool(candidate_service.close)
             app.state.preparation = None
             raise
     elif settings.configuration_file or settings.preparation_request_file:
@@ -50,7 +51,7 @@ async def lifespan(app: FastAPI):
             settings.alias_mapping_path,
         )
     elif candidate_service is not None:
-        get_logger().info("Candidate preparation enabled; no automatic activation")
+        get_logger().info("Managed lifecycle enabled; recovering only a previously committed activation")
     else:
         get_logger().info("Service started without configured model. Awaiting /admin/load to configure.")
 
@@ -58,14 +59,20 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         if candidate_service is not None:
-            candidate_service.close()
+            await run_in_threadpool(candidate_service.close)
             app.state.preparation = None
         if service.store.is_configured():
             get_logger().info("Lifespan shutdown unloading pipeline")
             service.unload()
 
 
-async def health_check(request: Request, service: InferenceService = Depends(get_service)):
+def health_check(request: Request, service: InferenceService = Depends(get_service)):
+    managed = getattr(request.app.state, "preparation", None)
+    if managed is not None:
+        state = managed.lifecycle.status()
+        identity = state["activation"]["execution"] if state["ready"] else None
+        return {"status": "ok", "configured": state["ready"], "lifecycle": state,
+                "agent_index": identity["agent_index"] if identity else None}
     record = service.store.get_record()
     gpu_available = request.app.state.gpu_probe()
     providers = []
@@ -109,6 +116,15 @@ def create_app(
     application.include_router(admin.router)
     application.include_router(preparation.router)
     application.get("/health", tags=["info"])(health_check)
+
+    @application.get("/ready", tags=["info"])
+    def readiness(request: Request):
+        managed = request.app.state.preparation
+        if managed is None:
+            ready = request.app.state.inference_service.store.is_configured()
+            return JSONResponse({"ready": ready}, status_code=200 if ready else 503)
+        state = managed.lifecycle.status()
+        return JSONResponse(state, status_code=200 if state["ready"] else 503)
     return application
 
 

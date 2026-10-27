@@ -1,4 +1,4 @@
-"""Export/check the explicit iteration-5 boundaries without changing v1 schemas."""
+"""Export/check v2 safety and lifecycle boundaries without changing v1 schemas."""
 
 import argparse
 import json
@@ -8,8 +8,11 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.export_contract_schemas import schema_for
 from app.contracts.v2.safety import ConfigurationV2, SafetyPolicyV2, EvaluationResultV2
+from app.contracts.v2.lifecycle import Activate, InstallationUpdate, CycleRequest, Decision
 
-MODELS = {"configuration": ConfigurationV2, "safety-policy": SafetyPolicyV2, "evaluation": EvaluationResultV2}
+MODELS = {"configuration": ConfigurationV2, "safety-policy": SafetyPolicyV2, "evaluation": EvaluationResultV2,
+          "activation": Activate, "installation-update": InstallationUpdate,
+          "inference-request": CycleRequest, "decision": Decision}
 
 
 def main():

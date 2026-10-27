@@ -1,5 +1,9 @@
 # Provisional Percepta adaptation and candidate evaluation
 
+[Iteration 6](local-lifecycle.md) now adds a reusable active-generation execution
+path with explicit activation/context references and restart recovery. Candidate
+evaluation described here remains separate.
+
 Iteration 4 uses the existing Percepta/Mongo message as a provisional input
 format. It introduces `channels-1`, an explicit adapter for
 `percepta.mongo-message.v0`. The producer does not need to add a version field:

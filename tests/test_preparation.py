@@ -92,7 +92,7 @@ def test_authentication_and_legacy_bypass_are_enforced(setup):
         assert client.post("/admin/load", json={"manifest_path": "/irrelevant"}, headers=AUTH).status_code == 409
         assert client.post("/admin/unload", headers=AUTH).status_code == 409
         assert not client.get("/health").json()["configured"]
-        assert client.get("/admin/v1/status", headers=AUTH).json()["activation_supported"] is False
+        assert client.get("/admin/v1/status", headers=AUTH).json()["activation_supported"] is True
 
 
 def test_revision_conflict_and_site_scope_are_immutable(setup):

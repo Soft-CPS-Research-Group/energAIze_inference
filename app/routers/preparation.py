@@ -1,4 +1,4 @@
-"""Authenticated local configuration and candidate API; no activation operation."""
+"""Authenticated configuration, candidates and durable local lifecycle."""
 
 import hmac
 from typing import Union
@@ -6,6 +6,7 @@ from typing import Union
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.contracts.v2.lifecycle import Activate, InstallationUpdate
 from app.contracts.v2.safety import Configuration, EvaluationResultV2
 from app.contracts.v1.lifecycle import OperationReceipt
 from app.contracts.v1.evaluation import EvaluationRequest, EvaluationResult
@@ -88,4 +89,31 @@ def evaluate_candidate(candidate_id: str, body: EvaluationRequest, request: Requ
 
 @router.get("/status")
 def get_status(service=Depends(manager)):
-    return {"site_id": service.settings.installation_site_id, **service.store.counts(), "activation_supported": False}
+    return {"site_id": service.settings.installation_site_id, **service.store.counts(), "activation_supported": True, "lifecycle": service.lifecycle.status()}
+
+
+@router.put("/installation")
+def declare_installation(body: InstallationUpdate, idempotency_key: str = Header(..., min_length=1, max_length=200), service=Depends(manager)):
+    return translate(lambda: service.lifecycle.declare(idempotency_key, body))
+
+
+@router.get("/installation")
+def get_installation(service=Depends(manager)):
+    context_id = service.lifecycle.store.heads()["context_id"]
+    return {"context_id": context_id, "installation": service.lifecycle.store.context(context_id) if context_id else None}
+
+
+@router.post("/activations", status_code=202, response_model=OperationReceipt)
+def activate_candidate(body: Activate, tasks: BackgroundTasks,
+                       idempotency_key: str = Header(..., min_length=1, max_length=200), service=Depends(manager)):
+    operation_id = translate(lambda: service.lifecycle.submit(idempotency_key, body))
+    tasks.add_task(service.lifecycle.activate, operation_id)
+    return service.lifecycle.receipt(operation_id)
+
+
+@router.get("/activations/{activation_id}")
+def get_activation(activation_id: str, service=Depends(manager)):
+    document = translate(lambda: service.lifecycle.store.activation(activation_id))
+    state = service.lifecycle.status()
+    return {**document, "state": "active" if state["activation_id"] == activation_id else "superseded",
+            "usable": state["ready"] and state["activation_id"] == activation_id}

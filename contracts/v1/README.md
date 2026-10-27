@@ -11,7 +11,8 @@ installation revision is invented on behalf of the producer. The original iterat
 uses configuration and compatibility documents in an opt-in administrative API;
 it does not fetch backend data or activate a configuration. [Iteration 5](../../docs/safety-correction.md)
 adds safety correction using explicit v2 configuration and evaluation documents;
-these v1 schemas remain unchanged.
+these v1 schemas remain unchanged. [Iteration 6](../../docs/local-lifecycle.md) now
+implements local activation and active decisions with explicit v2 lifecycle contracts.
 
 ## Ownership and separation
 

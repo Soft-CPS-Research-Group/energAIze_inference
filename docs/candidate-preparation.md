@@ -1,5 +1,9 @@
 # Local configuration and candidate preparation
 
+[Iteration 6](local-lifecycle.md) now extends this foundation with bounded admission,
+durable activation, current-context fencing and recovery. The preparation behavior
+described here still never auto-activates a new candidate.
+
 Iteration 3 adds an opt-in administrative path for one installation. Runtime
 delivers a reduced installation context and a reference to a local algorithm
 bundle. Inference stores the configuration, assesses compatibility, snapshots
@@ -195,23 +199,24 @@ bytes does not silently trigger re-preparation.
 On restart, unfinished operations become `uncertain` with
 `preparation_interrupted`; they are not automatically retried. Inspect the receipt
 and use a new key to revalidate. Completed evidence and snapshots remain readable.
-Any future activation must revalidate/reload; every candidate records
+Activation revalidates/reloads through [the lifecycle service](local-lifecycle.md); every candidate records
 `requires_revalidation_before_activation: true`.
 
 ## Next integration boundaries
 
 Iteration 4 now implements explicit Percepta/channel adaptation and execution error
-handling as described in its guide. [Iteration 5](safety-correction.md) implements the supported physical correction profile. Iteration 6
-adds bounded scheduling, activation preconditions, atomic local publication and
-recovery of an active combination. This iteration has per-candidate size limits,
-but no total storage quota, retention policy or deployment-wide job scheduler.
+handling as described in its guide. [Iteration 5](safety-correction.md) implements
+the supported physical correction profile. [Iteration 6](local-lifecycle.md) now
+adds bounded admission, activation preconditions, atomic local publication,
+recovery, snapshot byte budgets and candidate-history limits. There is no
+deployment-wide job scheduler.
 The Runtime context compiler, Algorithms exports, Percepta audit persistence and
 real deployment remain external integration work.
 
 Code is separated into HTTP translation (`app/routers/preparation.py`), preparation
 orchestration, compatibility assessment, filesystem capture and transactional
-storage (`app/preparation/`). The active application service and inference route
-do not depend on this preparation service.
+storage (`app/preparation/`). The legacy application service remains independently composed. The managed
+inference route uses the lifecycle service and its captured generation.
 
 Validate schemas and the local feature with:
 

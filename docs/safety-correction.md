@@ -9,8 +9,8 @@ Missing data, invalid outputs and engine failures remain technical errors.
 
 This is local candidate evaluation, not activation or physical dispatch. The
 response says `evaluation_only: true`; it does not invent an activation ID. The
-legacy `/inference` path retains its existing response. Controlled publication of
-the complete configuration/bundle/safety combination is iteration 6. Delivery and
+legacy `/inference` path retains its existing response. [Iteration 6](local-lifecycle.md) now publishes and recovers the complete
+configuration/bundle/safety combination through a separate active route. Delivery and
 persistence through Percepta/Mongo are iteration 7.
 
 ## Separation of responsibilities
@@ -214,7 +214,8 @@ Independent Draft 7 validation also covers all three policy modes and six real
 API responses (ordinary and residual cases). JSON Schema validates structure;
 Pydantic and preparation additionally enforce cross-field and physical invariants.
 
-Activation/recovery and reuse of a loaded runtime are still iteration 6. The
+[Iteration 6](local-lifecycle.md) now implements activation/recovery and reuse of
+a loaded runtime. The
 specialized RH1/iCharging strategies still need preparation capability adapters.
 The current Percepta consumer does not yet preserve this safety envelope in Mongo;
 that consumer integration remains explicit iteration 7 work.

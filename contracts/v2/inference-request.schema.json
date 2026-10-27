@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CycleRequest",
+  "type": "object",
+  "properties": {
+    "features": {
+      "title": "Features",
+      "type": "object"
+    },
+    "expected_activation_id": {
+      "title": "Expected Activation Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "expected_context_id": {
+      "title": "Expected Context Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "cycle_id": {
+      "title": "Cycle Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "features",
+    "expected_activation_id",
+    "expected_context_id",
+    "cycle_id"
+  ],
+  "additionalProperties": false
+}

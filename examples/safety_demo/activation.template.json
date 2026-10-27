@@ -1,0 +1,7 @@
+{
+  "schema_version": "activation.v2-draft",
+  "candidate_id": "CANDIDATE_ID",
+  "expected_context_id": "CONTEXT_ID",
+  "expected_activation_id": null,
+  "timeout_seconds": 120
+}

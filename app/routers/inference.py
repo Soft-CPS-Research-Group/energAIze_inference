@@ -7,6 +7,8 @@ from app.logging import get_logger
 from app.application.service import InferenceService
 from app.dependencies import get_service
 from app.core.errors import ExecutionError, InputError
+from app.contracts.v2.lifecycle import CycleRequest, Decision
+from app.routers.preparation import manager, translate
 from app.core.state import PipelineNotConfigured
 
 router = APIRouter(prefix="/inference", tags=["inference"])
@@ -19,6 +21,8 @@ async def run_inference(
     service: InferenceService = Depends(get_service),
 ):
     """Run inference for the configured agent using the supplied feature dict."""
+    if getattr(request.app.state, "preparation", None) is not None:
+        raise HTTPException(409, detail="Managed lifecycle requires /inference/v2 with explicit activation and context fences")
     log = get_logger()
     request_id = None
     if request is not None:
@@ -44,3 +48,16 @@ async def run_inference(
         raise HTTPException(status_code=500, detail="Inference execution failed") from exc
 
     return InferenceResponse(actions=actions, request_id=request_id)
+
+
+@router.post("/v2", response_model=Decision)
+def run_managed_inference(body: CycleRequest, request: Request, service=Depends(manager)):
+    """Capture one generation for the whole cycle; this route runs off the event loop."""
+    try:
+        result = translate(lambda: service.lifecycle.infer(body))
+    except InputError as exc:
+        raise HTTPException(400, detail=exc.document()) from exc
+    except ExecutionError as exc:
+        raise HTTPException(500, detail=exc.document()) from exc
+    result["request_id"] = getattr(request.state, "request_id", None)
+    return result

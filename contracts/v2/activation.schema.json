@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Activate",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "activation.v2-draft"
+      ],
+      "type": "string"
+    },
+    "candidate_id": {
+      "title": "Candidate Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "timeout_seconds": {
+      "title": "Timeout Seconds",
+      "default": 120,
+      "minimum": 1,
+      "maximum": 3600,
+      "type": "integer"
+    },
+    "expected_activation_id": {
+      "anyOf": [
+        {
+          "title": "Expected Activation Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "expected_context_id": {
+      "title": "Expected Context Id",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "expected_activation_id",
+    "expected_context_id"
+  ],
+  "additionalProperties": false
+}
