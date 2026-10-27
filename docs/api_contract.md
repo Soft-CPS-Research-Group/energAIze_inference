@@ -2,8 +2,11 @@
 
 This document is the source of truth for runtime HTTP contracts and payload routing behavior.
 
-The [iteration 2 draft contracts](../contracts/v1/README.md) describe the planned
-versioned configuration and safety audit boundary. They do not change these routes.
+The [iteration 2 draft contracts](../contracts/v1/README.md) define versioned
+configuration and safety audit documents. [Iteration 3 preparation](candidate-preparation.md)
+implements opt-in `/admin/v1` configuration, candidate, operation and status routes.
+Its preparation request uses `preparation.v2-draft`; activation and safety execution
+remain future work. The inference response below is unchanged.
 
 ## API Surface
 
@@ -372,7 +375,12 @@ See strategy-specific bundle docs for full field semantics. Core fields in activ
 
 ## Operational Note: Admin Endpoint Security
 
-Current service implementation does not enforce built-in authentication or authorization on `/admin/*`.
+Setting `ADMIN_API_TOKEN` protects all `/admin/*` routes with bearer authentication.
+It is required (at least 32 characters) when `CONFIGURATION_STORE_DIR` enables
+candidate preparation. That mode disables legacy `/admin/load` and `/admin/unload`
+with `409`; new candidates cannot bypass the future activation workflow. Missing
+or wrong credentials return `401`. Legacy mode without a token preserves its
+previous unauthenticated behavior. There is no per-user role system.
 
 For production deployments:
 

@@ -24,7 +24,12 @@ extension points, regression evidence and known limitations.
 
 [Iteration 2 draft contracts](contracts/v1/README.md) define installation context,
 explicit algorithm/channel bindings and safety audit records, with schemas,
-examples and validation tools. They are separate from the currently served API.
+examples and validation tools.
+
+[Iteration 3 candidate preparation](docs/candidate-preparation.md) adds authenticated
+configuration storage, compatibility assessment and isolated local bundle preparation.
+It is opt-in and does not activate candidates. The guide includes an executable
+example, API routes, settings and the explicitly supported runtime profiles.
 
 ## Bundle Format
 A bundle is a directory with three groups of files:

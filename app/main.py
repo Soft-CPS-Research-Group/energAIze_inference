@@ -4,12 +4,13 @@ from contextlib import asynccontextmanager
 from typing import Callable
 
 from fastapi import Depends, FastAPI, Request
+from starlette.concurrency import run_in_threadpool
 
 from app.adapters.hardware import _cuda_available
 from app.application.service import InferenceService
 from app.bootstrap import build_service
 from app.dependencies import get_service
-from app.routers import admin, inference, info
+from app.routers import admin, inference, info, preparation
 from app.logging import RequestContextMiddleware, get_logger, init_logging
 from app.settings import Settings, settings
 from app.state import store
@@ -24,6 +25,23 @@ async def lifespan(app: FastAPI):
 
     settings = app.state.settings
     service = app.state.inference_service
+    candidate_service = None
+    if settings.configuration_store_dir is not None:
+        if not settings.installation_site_id or not settings.allowed_bundle_root or not settings.allowed_bundle_root.is_dir() or not settings.admin_api_token or len(settings.admin_api_token.get_secret_value()) < 32:
+            raise ValueError("Preparation requires INSTALLATION_SITE_ID, an existing ALLOWED_BUNDLE_ROOT and ADMIN_API_TOKEN of at least 32 characters")
+        if settings.manifest_path is not None:
+            raise ValueError("MODEL_MANIFEST_PATH cannot bypass candidate preparation; use CONFIGURATION_FILE and PREPARATION_REQUEST_FILE")
+        from app.preparation.service import PreparationService
+        candidate_service = PreparationService(settings)
+        app.state.preparation = candidate_service
+        try:
+            await run_in_threadpool(candidate_service.initialize_files)
+        except Exception:
+            candidate_service.close()
+            app.state.preparation = None
+            raise
+    elif settings.configuration_file or settings.preparation_request_file:
+        raise ValueError("Configuration/preparation files require CONFIGURATION_STORE_DIR")
     if settings.manifest_path is not None:
         service.load(
             settings.manifest_path,
@@ -31,12 +49,17 @@ async def lifespan(app: FastAPI):
             settings.agent_index,
             settings.alias_mapping_path,
         )
+    elif candidate_service is not None:
+        get_logger().info("Candidate preparation enabled; no automatic activation")
     else:
         get_logger().info("Service started without configured model. Awaiting /admin/load to configure.")
 
     try:
         yield
     finally:
+        if candidate_service is not None:
+            candidate_service.close()
+            app.state.preparation = None
         if service.store.is_configured():
             get_logger().info("Lifespan shutdown unloading pipeline")
             service.unload()
@@ -77,12 +100,14 @@ def create_app(
         title="Energy Flexibility Inference API", version=__version__, lifespan=lifespan
     )
     application.state.settings = config
+    application.state.preparation = None
     application.state.inference_service = service if service is not None else build_service(config)
     application.state.gpu_probe = gpu_probe if gpu_probe is not None else _cuda_available
     application.add_middleware(RequestContextMiddleware)
     application.include_router(info.router)
     application.include_router(inference.router)
     application.include_router(admin.router)
+    application.include_router(preparation.router)
     application.get("/health", tags=["info"])(health_check)
     return application
 

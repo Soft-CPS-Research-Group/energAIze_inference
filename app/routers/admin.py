@@ -7,8 +7,9 @@ from app.application.service import InferenceService
 from app.dependencies import get_service, get_settings
 from app.logging import get_logger
 from app.settings import Settings
+from app.routers.preparation import require_admin
 
-router = APIRouter(prefix="/admin", tags=["admin"], responses={401: {"description": "Unauthorized"}})
+router = APIRouter(prefix="/admin", tags=["admin"], responses={401: {"description": "Unauthorized"}}, dependencies=[Depends(require_admin)])
 
 
 def _validate_path_within_allowed_root(path: Path, *, field_name: str, config: Settings) -> None:
@@ -41,6 +42,8 @@ async def admin_load(
     config: Settings = Depends(get_settings),
 ):
     """Load a model pipeline from disk, replacing any currently active pipeline."""
+    if config.configuration_store_dir is not None:
+        raise HTTPException(409, "Direct activation is disabled in candidate preparation mode")
     _validate_path_within_allowed_root(manifest_path, field_name="manifest_path", config=config)
     if artifacts_dir is not None:
         _validate_path_within_allowed_root(artifacts_dir, field_name="artifacts_dir", config=config)
@@ -65,8 +68,10 @@ async def admin_load(
 
 
 @router.post("/unload")
-async def admin_unload(service: InferenceService = Depends(get_service)):
+async def admin_unload(service: InferenceService = Depends(get_service), config: Settings = Depends(get_settings)):
     """Unload the active pipeline, returning the service to an unconfigured state."""
+    if config.configuration_store_dir is not None:
+        raise HTTPException(409, "Direct activation changes are disabled in candidate preparation mode")
     if not service.store.is_configured():
         raise HTTPException(status_code=409, detail="No model configured")
     service.unload()

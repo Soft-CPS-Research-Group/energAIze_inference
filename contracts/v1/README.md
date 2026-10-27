@@ -1,15 +1,15 @@
 # Draft contracts for inference configuration and decisions
 
-These contracts define the next integration boundary while keeping the running
-API unchanged. Installation context and safety audit have concrete schemas and
+These contracts define the integration boundary. Installation context and safety audit have concrete schemas and
 semantic validation. The algorithm interface is a **provisional sidecar**, not a
 replacement for `artifact_manifest.json` or an agreed Algorithms export format.
 Each document explicitly carries its draft version so later changes are visible.
 
 The current Percepta/Mongo message remains the input. No schema revision or
-installation revision is invented on behalf of the producer. This iteration
-does not enable new routes, fetch backend data, activate a configuration or
-implement safety corrections.
+installation revision is invented on behalf of the producer. The original iteration
+2 introduced documents only. [Iteration 3](../../docs/candidate-preparation.md) now
+uses configuration and compatibility documents in an opt-in administrative API;
+it does not fetch backend data, activate a configuration or implement safety corrections.
 
 ## Ownership and separation
 
@@ -20,11 +20,11 @@ implement safety corrections.
 | `configuration.v1-draft` | Runtime | Installation, bundle interface, explicit bindings, input profile and safety policy selected together |
 | `safety-policy.v1-draft` | Runtime configuration | Mode, profile and rule identifiers supported by the inference implementation |
 | `decision.v1-draft` | Inference | Proposal, delivered actions, activation identity and explanation of safety changes |
-| `compatibility.v1-draft` | Future preparation/evaluation use case | What was checked, unresolved issues and required changes |
+| `compatibility.v1-draft` | Candidate preparation/evaluation use case | What was checked, unresolved issues and required changes |
 
 Source schemas are in `app/contracts/v1`. JSON Schemas are in `schemas/` and
 examples in `examples/`. The core application does not import these boundary
-models. Integration into the application is a separate step.
+models. The preparation service uses them at its own boundary.
 
 ## Installation context
 
@@ -165,8 +165,13 @@ the old response nor the producer was changed here.
 
 ## Planned administrative API
 
-These names and semantics are the draft target for iterations 3 and 6. They are
-not registered routes in the current application. Admin calls require a trusted
+These names and semantics were the draft target for iterations 3 and 6. Configuration,
+candidate and operation routes are now implemented; activation and active-state
+routes remain planned. The executable preparation request uses the separate
+`preparation.v2-draft` schema to include local bundle addressing; the v1 request
+below is retained as the original draft, not accepted by the candidate route.
+See the [implemented API and exact states](../../docs/candidate-preparation.md).
+Admin calls require a trusted
 authenticated Runtime caller; the inference data path does not receive backend
 credentials or fetch backend APIs for every decision.
 
@@ -190,9 +195,9 @@ record. A timeout is not proof of failure: retry/query using the same idempotenc
 key/operation ID. `expected_activation_id` is required; explicit null means the
 caller expects no active configuration.
 
-Existing `/admin/load`, `/admin/unload`, `/inference`, `/info` and `/health` retain
-their current contract. The rollout, legacy administrative-route policy and
-authenticated access are implementation work, not capabilities introduced here.
+Existing inference/info/health payloads retain their contract. Iteration 3 adds
+optional bearer authentication to legacy admin routes and disables direct loading
+and unloading when candidate preparation is enabled.
 
 ## Composition change matrix
 
@@ -211,7 +216,7 @@ The one/two-charger examples retain old IDs. The second installation alone is
 structurally valid, while the old bundle still has only one output. The example
 impact report requires a new bundle/binding for that scenario. It is an expected
 assessment fixture, **not output of an implemented compatibility evaluator**.
-The evaluator is iteration 3; automatic retraining or coordinated deployment of
+The implemented evaluator is described in the iteration 3 guide; automatic retraining or coordinated deployment of
 Percepta and Algorithms is outside the inference service.
 
 ## Validation and evolution

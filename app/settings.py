@@ -3,10 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import List
 
-from pydantic import BaseSettings, Field, validator
+from pydantic import BaseSettings, Field, SecretStr, validator
 
 
 class Settings(BaseSettings):
+    configuration_store_dir: Path | None = Field(None, env="CONFIGURATION_STORE_DIR")
+    installation_site_id: str | None = Field(None, env="INSTALLATION_SITE_ID")
+    admin_api_token: SecretStr | None = Field(None, env="ADMIN_API_TOKEN")
+    configuration_file: Path | None = Field(None, env="CONFIGURATION_FILE")
+    preparation_request_file: Path | None = Field(None, env="PREPARATION_REQUEST_FILE")
+    max_candidate_bytes: int = Field(512 * 1024 * 1024, gt=0, env="MAX_CANDIDATE_BYTES")
     manifest_path: Path | None = Field(
         default=None,
         env="MODEL_MANIFEST_PATH",

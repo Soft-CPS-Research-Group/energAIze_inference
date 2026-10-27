@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PrepareCandidate",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "preparation.v2-draft"
+      ],
+      "type": "string"
+    },
+    "configuration_revision": {
+      "title": "Configuration Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "bundle": {
+      "$ref": "#/definitions/LocalBundle"
+    },
+    "baseline_configuration_revision": {
+      "anyOf": [
+        {
+          "title": "Baseline Configuration Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "configuration_revision",
+    "bundle"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "LocalBundle": {
+      "title": "LocalBundle",
+      "type": "object",
+      "properties": {
+        "directory": {
+          "title": "Directory",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "manifest_file": {
+          "title": "Manifest File",
+          "default": "artifact_manifest.json",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "alias_file": {
+          "anyOf": [
+            {
+              "title": "Alias File",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "file_hashes": {
+          "title": "File Hashes",
+          "type": "object",
+          "patternProperties": {
+            "^\\S(?:[\\s\\S]*\\S)?$": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "required": [
+        "directory"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
