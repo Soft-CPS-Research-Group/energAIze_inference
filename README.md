@@ -36,6 +36,11 @@ explicit channel bindings for the provisional Percepta format, candidate proposa
 evaluation, input evidence and ONNX failure/rounding fixes. It includes a runnable
 example and the required container mounts. Controlled activation remains pending.
 
+[Iteration 5 safety correction](docs/safety-correction.md) adds explicit off, observe
+and intervene modes, scalar limits/precision, one aggregate upper limit with
+curtailment priorities, and an auditable final candidate result. Includes a tested
+two-charger example and versioned configuration/response schemas.
+
 ## Bundle Format
 A bundle is a directory with three groups of files:
 

@@ -1,0 +1,61 @@
+{
+  "manifest_version": 1,
+  "metadata": {
+    "site_id": "example-house"
+  },
+  "simulator": {},
+  "training": {},
+  "topology": {
+    "num_agents": 1
+  },
+  "algorithm": {
+    "name": "RuleBasedPolicy"
+  },
+  "environment": {
+    "observation_names": [
+      [
+        "load_kw"
+      ]
+    ],
+    "encoders": [
+      [
+        {
+          "type": "NoNormalization",
+          "params": {}
+        }
+      ]
+    ],
+    "action_names": [
+      "dispatch_1",
+      "dispatch_2"
+    ],
+    "action_bounds": [
+      {
+        "low": [
+          1,
+          1
+        ],
+        "high": [
+          7.4,
+          7.4
+        ]
+      }
+    ],
+    "reward_function": {
+      "name": "example",
+      "params": {}
+    }
+  },
+  "agent": {
+    "artifacts": [
+      {
+        "agent_index": 0,
+        "format": "rule_based",
+        "path": "policy.json",
+        "config": {
+          "require_observations_envelope": true
+        }
+      }
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 """Immutable execution bindings compiled before evaluating a request."""
 
 from dataclasses import dataclass
+from .safety import SafetyPlan
 
 
 @dataclass(frozen=True)
@@ -45,3 +46,4 @@ class ExecutionContext:
     identity: ExecutionIdentity
     inputs: tuple[InputBinding, ...]
     outputs: tuple[OutputBinding, ...]
+    safety: SafetyPlan | None = None

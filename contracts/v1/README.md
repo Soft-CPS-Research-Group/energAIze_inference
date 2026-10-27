@@ -9,7 +9,9 @@ The current Percepta/Mongo message remains the input. No schema revision or
 installation revision is invented on behalf of the producer. The original iteration
 2 introduced documents only. [Iteration 3](../../docs/candidate-preparation.md) now
 uses configuration and compatibility documents in an opt-in administrative API;
-it does not fetch backend data, activate a configuration or implement safety corrections.
+it does not fetch backend data or activate a configuration. [Iteration 5](../../docs/safety-correction.md)
+adds safety correction using explicit v2 configuration and evaluation documents;
+these v1 schemas remain unchanged.
 
 ## Ownership and separation
 
@@ -161,7 +163,8 @@ A physical-limit violation triggers correction and explanation, not a safety
 veto. Original measurements are preserved. Malformed data, nonfinite outputs or
 runtime failures are technical errors, not successful decisions containing zeros
 or fabricated safety reports. The correction engine, fallback policy and handling
-of jointly infeasible constraints are implemented and tested in iteration 5.
+of the supported aggregate constraint are implemented and tested in [iteration 5](../../docs/safety-correction.md),
+using a new evaluation envelope without an invented activation identity.
 
 `DecisionResult.legacy_response()` explicitly projects final actions to the
 existing `actions[agent_index]` shape. It loses the audit. The inspected Percepta

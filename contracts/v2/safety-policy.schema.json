@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SafetyPolicyV2",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "safety-policy.v2-draft"
+      ],
+      "type": "string"
+    },
+    "revision": {
+      "title": "Revision",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "type": "string"
+    },
+    "mode": {
+      "title": "Mode",
+      "enum": [
+        "off",
+        "observe",
+        "intervene"
+      ],
+      "type": "string"
+    },
+    "profile_id": {
+      "title": "Profile Id",
+      "enum": [
+        "physical-limits.v1"
+      ],
+      "type": "string"
+    },
+    "action_rules": {
+      "title": "Action Rules",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ActionRule"
+      }
+    },
+    "aggregate_rule": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AggregateRule"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "revision",
+    "mode",
+    "profile_id",
+    "action_rules"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ActionRule": {
+      "title": "ActionRule",
+      "type": "object",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "decimal_places": {
+          "title": "Decimal Places",
+          "minimum": 0,
+          "maximum": 6,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rule_id",
+        "channel_id",
+        "decimal_places"
+      ],
+      "additionalProperties": false
+    },
+    "AggregateRule": {
+      "title": "AggregateRule",
+      "type": "object",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "constraint_id": {
+          "title": "Constraint Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "curtailment_order": {
+          "title": "Curtailment Order",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          }
+        },
+        "infeasible_behavior": {
+          "title": "Infeasible Behavior",
+          "enum": [
+            "minimum_actions_with_report"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "constraint_id",
+        "curtailment_order",
+        "infeasible_behavior"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

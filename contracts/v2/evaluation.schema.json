@@ -1,0 +1,682 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EvaluationResultV2",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "title": "Schema Version",
+      "enum": [
+        "evaluation.v2-draft"
+      ],
+      "type": "string"
+    },
+    "evaluation_only": {
+      "title": "Evaluation Only",
+      "enum": [
+        true
+      ],
+      "type": "boolean"
+    },
+    "context": {
+      "$ref": "#/definitions/ExecutionReference"
+    },
+    "proposed_actions": {
+      "title": "Proposed Actions",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ProposedAction"
+      }
+    },
+    "actions": {
+      "title": "Actions",
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/FinalAction"
+      }
+    },
+    "safety": {
+      "$ref": "#/definitions/SafetyAudit"
+    },
+    "input_evidence": {
+      "$ref": "#/definitions/InputEvidence"
+    },
+    "providers": {
+      "title": "Providers",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+      }
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "title": "Request Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "evaluation_only",
+    "context",
+    "proposed_actions",
+    "actions",
+    "safety",
+    "input_evidence",
+    "providers"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ExecutionReference": {
+      "title": "ExecutionReference",
+      "type": "object",
+      "properties": {
+        "candidate_id": {
+          "title": "Candidate Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "site_id": {
+          "title": "Site Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "configuration_revision": {
+          "title": "Configuration Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "installation_revision": {
+          "title": "Installation Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bindings_revision": {
+          "title": "Bindings Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_id": {
+          "title": "Bundle Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "bundle_revision": {
+          "title": "Bundle Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "manifest_sha256": {
+          "title": "Manifest Sha256",
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "agent_index": {
+          "title": "Agent Index",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message_profile": {
+          "title": "Message Profile",
+          "enum": [
+            "percepta.mongo-message.v0"
+          ],
+          "type": "string"
+        },
+        "adapter_revision": {
+          "title": "Adapter Revision",
+          "enum": [
+            "channels-1"
+          ],
+          "type": "string"
+        },
+        "producer_revision": {
+          "anyOf": [
+            {
+              "title": "Producer Revision",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "safety_policy_revision": {
+          "title": "Safety Policy Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "service_version": {
+          "title": "Service Version",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "site_id",
+        "configuration_revision",
+        "installation_revision",
+        "bindings_revision",
+        "bundle_id",
+        "bundle_revision",
+        "manifest_sha256",
+        "agent_index",
+        "message_profile",
+        "adapter_revision",
+        "producer_revision",
+        "safety_policy_revision",
+        "service_version"
+      ],
+      "additionalProperties": false
+    },
+    "ProposedAction": {
+      "title": "ProposedAction",
+      "type": "object",
+      "properties": {
+        "action_name": {
+          "title": "Action Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "proposed_value": {
+          "title": "Proposed Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action_name",
+        "channel_id",
+        "equipment_id",
+        "unit",
+        "proposed_value"
+      ],
+      "additionalProperties": false
+    },
+    "FinalAction": {
+      "title": "FinalAction",
+      "type": "object",
+      "properties": {
+        "action_name": {
+          "title": "Action Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        }
+      },
+      "required": [
+        "action_name",
+        "channel_id",
+        "equipment_id",
+        "unit",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "SafetyChange": {
+      "title": "SafetyChange",
+      "type": "object",
+      "properties": {
+        "action_name": {
+          "title": "Action Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "equipment_id": {
+          "anyOf": [
+            {
+              "title": "Equipment Id",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "proposed_value": {
+          "title": "Proposed Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "corrected_value": {
+          "title": "Corrected Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "applied": {
+          "title": "Applied",
+          "type": "boolean"
+        },
+        "rule_ids": {
+          "title": "Rule Ids",
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S(?:[\\s\\S]*\\S)?$"
+          }
+        },
+        "reason": {
+          "title": "Reason",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action_name",
+        "channel_id",
+        "equipment_id",
+        "unit",
+        "proposed_value",
+        "corrected_value",
+        "applied",
+        "rule_ids",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "ResidualConstraint": {
+      "title": "ResidualConstraint",
+      "type": "object",
+      "properties": {
+        "rule_id": {
+          "title": "Rule Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "constraint_id": {
+          "title": "Constraint Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "upper": {
+          "title": "Upper",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "excess": {
+          "title": "Excess",
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "reason": {
+          "title": "Reason",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "constraint_id",
+        "unit",
+        "value",
+        "upper",
+        "excess",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "SafetyAudit": {
+      "title": "SafetyAudit",
+      "type": "object",
+      "properties": {
+        "mode": {
+          "title": "Mode",
+          "enum": [
+            "off",
+            "observe",
+            "intervene"
+          ],
+          "type": "string"
+        },
+        "policy_revision": {
+          "title": "Policy Revision",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "profile_id": {
+          "title": "Profile Id",
+          "enum": [
+            "physical-limits.v1"
+          ],
+          "type": "string"
+        },
+        "checked": {
+          "title": "Checked",
+          "type": "boolean"
+        },
+        "proposed_feasible": {
+          "anyOf": [
+            {
+              "title": "Proposed Feasible",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "suggested_feasible": {
+          "anyOf": [
+            {
+              "title": "Suggested Feasible",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "final_feasible": {
+          "anyOf": [
+            {
+              "title": "Final Feasible",
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changes": {
+          "title": "Changes",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SafetyChange"
+          }
+        },
+        "unresolved_constraints": {
+          "title": "Unresolved Constraints",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ResidualConstraint"
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "policy_revision",
+        "profile_id",
+        "checked",
+        "proposed_feasible",
+        "suggested_feasible",
+        "final_feasible",
+        "changes",
+        "unresolved_constraints"
+      ],
+      "additionalProperties": false
+    },
+    "SignalEvidence": {
+      "title": "SignalEvidence",
+      "type": "object",
+      "properties": {
+        "signal_name": {
+          "title": "Signal Name",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "channel_id": {
+          "title": "Channel Id",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "source_unit": {
+          "title": "Source Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "minLength": 1,
+          "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+          "type": "string"
+        },
+        "unit_source": {
+          "title": "Unit Source",
+          "enum": [
+            "configuration",
+            "message"
+          ],
+          "type": "string"
+        },
+        "interval_seconds": {
+          "anyOf": [
+            {
+              "title": "Interval Seconds",
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "interval_source": {
+          "title": "Interval Source",
+          "enum": [
+            "configuration",
+            "message",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "converted": {
+          "title": "Converted",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "signal_name",
+        "channel_id",
+        "source_unit",
+        "unit",
+        "unit_source",
+        "interval_seconds",
+        "interval_source",
+        "converted"
+      ],
+      "additionalProperties": false
+    },
+    "InputEvidence": {
+      "title": "InputEvidence",
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "anyOf": [
+            {
+              "title": "Timestamp",
+              "minLength": 1,
+              "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "freshness": {
+          "title": "Freshness",
+          "enum": [
+            "unknown",
+            "not_assessed"
+          ],
+          "type": "string"
+        },
+        "inputs": {
+          "title": "Inputs",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SignalEvidence"
+          }
+        }
+      },
+      "required": [
+        "timestamp",
+        "freshness",
+        "inputs"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

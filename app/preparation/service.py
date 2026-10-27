@@ -8,7 +8,8 @@ from tempfile import TemporaryDirectory
 from pydantic import ValidationError
 
 from app.adapters.runtime_factory import ArtifactRuntimeFactory
-from app.contracts.v1.execution import CompatibilityReport, ConfigurationDraft
+from app.contracts.v1.execution import CompatibilityReport
+from app.contracts.v2.safety import parse_configuration
 from app.core.contracts import PipelineRecord
 from app.logging import get_logger
 from app.preparation.assessment import check_manifest, context_issues, impact, issue
@@ -44,7 +45,7 @@ class PreparationService:
         return self.store.put(revision, config.dict())
 
     def configuration(self, revision):
-        return ConfigurationDraft.parse_obj(self.store.configuration(revision))
+        return parse_configuration(self.store.configuration(revision))
 
     def submit(self, key, request):
         self.configuration(request.configuration_revision)
@@ -181,7 +182,7 @@ class PreparationService:
     def initialize_files(self):
         if self.settings.configuration_file:
             value = read_json(self.settings.configuration_file.read_bytes(), "/configuration_file")
-            config = ConfigurationDraft.parse_obj(value)
+            config = parse_configuration(value)
             self.put(config.revision, config)
         if self.settings.preparation_request_file:
             value = read_json(self.settings.preparation_request_file.read_bytes(), "/preparation_request_file")

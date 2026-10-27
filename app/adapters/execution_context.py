@@ -1,5 +1,6 @@
 """Compile boundary contracts into immutable, framework-free execution context."""
 
+from .safety_policy import compile_safety
 from app.version import __version__
 from app.core.execution import ExecutionContext, ExecutionIdentity, InputBinding, OutputBinding
 
@@ -23,4 +24,4 @@ def compile_context(config, manifest, candidate_id):
     ), tuple(
         OutputBinding(r.name, outputs[r.name].channel_id, outputs[r.name].equipment_id, r.meaning.unit)
         for r in config.bundle.outputs
-    ))
+    ), compile_safety(config))

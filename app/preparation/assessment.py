@@ -2,6 +2,8 @@
 
 import math
 
+from app.adapters.safety_policy import compile_safety, SafetyConfigurationError
+from app.contracts.v2.safety import ConfigurationV2
 from app.preparation.bundle import read_json
 from app.preparation.storage import PreparationError
 from app.services.preprocessor import build_encoder
@@ -43,8 +45,10 @@ def context_issues(config):
         issues.append(issue("topology_unsupported", "/bundle/topology_support", "Current preparation supports fixed interfaces only", "service"))
     if config.message.adapter_revision not in ("legacy-1", "channels-1"):
         issues.append(issue("adapter_unsupported", "/message/adapter_revision", "Supported adapter revisions are legacy-1 and channels-1", "adapter"))
-    if config.safety.mode != "off" or config.safety.profile_id != "off.v1" or config.safety.rule_ids:
-        issues.append(issue("safety_profile_unsupported", "/safety", "Only explicit off.v1 without rules is implemented; observation/intervention require iteration 5", "service"))
+    try:
+        compile_safety(config)
+    except SafetyConfigurationError as exc:
+        issues.append(issue(exc.code, exc.path, exc.detail))
     return issues
 
 
@@ -169,6 +173,9 @@ def check_manifest(config, manifest, snapshot):
     physical = {b.signal_name: channels[b.channel_id].physical_bounds for b in config.bindings.outputs}
 
     def within_physical(name, low, high):
+        # V2 exposes both raw and assessed actions, including explicit off mode.
+        if isinstance(config, ConfigurationV2):
+            return True
         bounds = physical[name]
         return bounds is None or ((bounds.lower is None or low >= bounds.lower) and (bounds.upper is None or high <= bounds.upper))
     if runtime == "rule_based":
@@ -187,7 +194,7 @@ def check_manifest(config, manifest, snapshot):
         for values in [defaults] + [r.get("actions", {}) for r in rules]:
             require(isinstance(values, dict) and set(values) == set(actions), "policy_outputs_invalid", "/bundle/policy", "Every rule/default must explicitly provide every action")
             require(all(type(v) in (int, float) and math.isfinite(v) for v in values.values()), "policy_outputs_invalid", "/bundle/policy", "Action values must be finite numbers")
-            require(all(within_physical(k, v, v) for k, v in values.items()), "physical_output_mismatch", "/bundle/policy", "Policy output exceeds installation bounds and no intervention profile is implemented")
+            require(all(within_physical(k, v, v) for k, v in values.items()), "physical_output_mismatch", "/bundle/policy", "Policy output exceeds installation bounds under the legacy off-only configuration")
     else:
         require(set(cfg) <= {"config_path", "require_observations_envelope"}, "runtime_config_unsupported", "/bundle/config", "Unknown ONNX configuration fields require an adapter")
         bounds = manifest.get_action_bounds(artifact.agent_index)

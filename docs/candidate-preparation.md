@@ -135,19 +135,20 @@ The initial `legacy-1` profile supports fixed flat interfaces. A bound input's m
 flattening/envelope/alias behavior. Literal dots inside path components and
 vector inputs need a future adapter. With the observations envelope enabled,
 only observations and the existing forwarded community/forecast fields can be
-bound by the current channel schema. Output names must currently equal the bound equipment IDs; general
-channel-to-action routing belongs to iteration 4.
+bound by the current channel schema. For `legacy-1`, output names must equal the bound equipment IDs.
+[Iteration 4](message-execution.md) adds general channel-to-action routing via `channels-1`.
 
 - **ONNX:** one float32 input and output, rank two, fixed feature/action width,
   batch dimension 1 or an accepted dynamic batch marker; supported scalar encoders;
-  complete finite bounds within installation limits. Iteration 4 corrected legacy
+  complete finite bounds (within installation limits for legacy v1 configuration). Iteration 4 corrected legacy
   post-processing, so non-decimal bounds are now supported too.
 - **Simple rules:** JSON `default_actions` and equality `rules`, with explicit
   finite scalar values for every action in every branch. Conditions use declared
-  input names; encoded rule conditions are not supported. Values must fit the
-  installation bounds.
-- **Safety:** only explicit mode `off`, profile `off.v1`, empty rules. Observation
-  and intervention are rejected as unsupported until iteration 5 implements them.
+  input names; encoded rule conditions are not supported. Legacy v1 values must
+  fit installation bounds; v2 preserves raw proposals for explicit safety assessment.
+- **Safety:** v1 retains explicit `off.v1` with empty rules. [Iteration 5](safety-correction.md)
+  adds v2 `physical-limits.v1`, all three modes, scalar bounds/precision and one
+  aggregate upper constraint with explicit priority and residual reporting.
 
 Specialized RH1/iCharging strategies, dynamic/entity interfaces and unknown runtime
 configuration fields are rejected by this new path until their capability adapters
@@ -156,8 +157,9 @@ does not certify model accuracy, real device access, semantic truth, joint physi
 feasibility or successful inference for every possible message. Aggregate limits
 have structural/reference checks only; they are not enforced by `off.v1`.
 
-This configuration rejection is separate from the future safety layer's operational
-behavior: that layer will correct and report physical violations, not veto decisions.
+Configuration rejection is separate from operational safety correction. The v2
+profile corrects and reports supported physical violations, including unresolved
+excess when its configured minima cannot meet the aggregate.
 
 ## Reproducible local example
 
@@ -199,7 +201,7 @@ Any future activation must revalidate/reload; every candidate records
 ## Next integration boundaries
 
 Iteration 4 now implements explicit Percepta/channel adaptation and execution error
-handling as described in its guide. Iteration 5 implements supported safety correction profiles. Iteration 6
+handling as described in its guide. [Iteration 5](safety-correction.md) implements the supported physical correction profile. Iteration 6
 adds bounded scheduling, activation preconditions, atomic local publication and
 recovery of an active combination. This iteration has per-candidate size limits,
 but no total storage quota, retention policy or deployment-wide job scheduler.

@@ -1,11 +1,12 @@
 """Authenticated local configuration and candidate API; no activation operation."""
 
 import hmac
+from typing import Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.contracts.v1.execution import ConfigurationDraft
+from app.contracts.v2.safety import Configuration, EvaluationResultV2
 from app.contracts.v1.lifecycle import OperationReceipt
 from app.contracts.v1.evaluation import EvaluationRequest, EvaluationResult
 from app.core.errors import ExecutionError, InputError
@@ -44,13 +45,13 @@ router = APIRouter(prefix="/admin/v1", tags=["configuration"])
 
 
 @router.put("/configurations/{revision}")
-def put_configuration(revision: str, body: ConfigurationDraft, response: Response, service=Depends(manager)):
+def put_configuration(revision: str, body: Configuration, response: Response, service=Depends(manager)):
     created = translate(lambda: service.put(revision, body))
     response.status_code = 201 if created else 200
     return {"revision": revision, "stored": True, "activated": False}
 
 
-@router.get("/configurations/{revision}", response_model=ConfigurationDraft)
+@router.get("/configurations/{revision}", response_model=Configuration)
 def get_configuration(revision: str, service=Depends(manager)):
     return translate(lambda: service.configuration(revision))
 
@@ -73,7 +74,7 @@ def get_candidate(candidate_id: str, service=Depends(manager)):
     return translate(lambda: service.candidate(candidate_id))
 
 
-@router.post("/candidates/{candidate_id}/evaluations", response_model=EvaluationResult)
+@router.post("/candidates/{candidate_id}/evaluations", response_model=Union[EvaluationResult, EvaluationResultV2])
 def evaluate_candidate(candidate_id: str, body: EvaluationRequest, request: Request, service=Depends(manager)):
     try:
         result = translate(lambda: service.evaluate(candidate_id, body.features))

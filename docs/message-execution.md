@@ -89,7 +89,9 @@ Rule engines expose their own proposed actions. Common evaluation checks require
 exact output names and finite numeric values. A physical limit violation in a
 proposal does **not** trigger a safety veto: the proposal is returned unchanged
 for inspection and the future safety stage. It is not a delivered command or a
-claim that the value is safe to actuate. Safety intervention remains iteration 5.
+claim that the value is safe to actuate. [Iteration 5](safety-correction.md) adds
+explicit v2 configuration and evaluation with corrections; the v1 proposal-only
+response described here remains unchanged.
 
 The legacy ONNX `/inference` path still applies its configured clamp and decimal
 flooring, now followed by a final clamp. Thus narrow, negative or non-decimal
