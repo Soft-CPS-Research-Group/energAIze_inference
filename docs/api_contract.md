@@ -1,29 +1,6 @@
-# API Contract Reference
+# Legacy HTTP API
 
-This document is the source of truth for runtime HTTP contracts and payload routing behavior.
-
-The [iteration 2 draft contracts](../contracts/v1/README.md) define versioned
-configuration and safety audit documents. [Iteration 3 preparation](candidate-preparation.md)
-implements opt-in `/admin/v1` configuration, candidate, operation and status routes.
-Its preparation request uses `preparation.v2-draft`; [iteration 6](local-lifecycle.md) now implements controlled local activation. The legacy inference response below is unchanged.
-
-[Iteration 4](message-execution.md) adds authenticated
-`POST /admin/v1/candidates/{candidate_id}/evaluations` for proposal-only evaluation
-using adapter `channels-1`. ONNX native execution failures now return `500` with
-a structured error instead of successful zero actions; invalid encoded inputs
-return `400`. Successful legacy inference responses keep their shape.
-
-[Iteration 5](safety-correction.md) extends the same administrative routes with
-`configuration.v2-draft` and `evaluation.v2-draft`: off/observe/intervene policy,
-raw proposals, final evaluated actions and safety audit. V1 configuration still
-returns the original proposal-only response. V2 responses remain evaluation-only,
-with no activation identity or physical delivery.
-
-[Iteration 6](local-lifecycle.md) adds current-installation declaration,
-`POST /admin/v1/activations`, activation records, `/ready` and authenticated
-`POST /inference/v2`. Managed mode requires activation/context preconditions and
-returns `decision.v2-draft`; its unfenced `/inference` is disabled with 409. The
-legacy routes documented below retain their behavior outside managed mode.
+Reference for deployments without `CONFIGURATION_STORE_DIR`. For versioned configuration, safety, activation and recovery, use the [managed operation guide](operacao.md).
 
 ## API Surface
 
@@ -299,8 +276,9 @@ Example:
 
 `POST /admin/load`:
 
+- `400`: manifest or artifact directory outside the configured allowed root.
 - `404`: path not found.
-- `500`: any other load exception.
+- `500`: bundle construction failed.
 
 `POST /admin/unload`:
 
@@ -395,7 +373,7 @@ See strategy-specific bundle docs for full field semantics. Core fields in activ
 Setting `ADMIN_API_TOKEN` protects all `/admin/*` routes with bearer authentication.
 It is required (at least 32 characters) when `CONFIGURATION_STORE_DIR` enables
 candidate preparation. That mode disables legacy `/admin/load` and `/admin/unload`
-with `409`; new candidates cannot bypass the future activation workflow. Missing
+with `409`; new candidates cannot bypass the managed activation workflow. Missing
 or wrong credentials return `401`. Legacy mode without a token preserves its
 previous unauthenticated behavior. There is no per-user role system.
 
