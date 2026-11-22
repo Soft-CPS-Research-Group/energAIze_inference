@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish_pilot:
+        description: Publish the tested commit as a separate SoftCPS pilot image
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -26,7 +31,7 @@ jobs:
 
   docker:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.publish_pilot)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +47,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: calof/energaize_inference:latest
+          tags: calof/energaize_inference:${{ github.event_name == 'workflow_dispatch' && format('pilot-{0}', github.sha) || 'latest' }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
           cache-from: type=registry,ref=calof/energaize_inference:buildcache
-          cache-to: type=registry,ref=calof/energaize_inference:buildcache,mode=max
+          cache-to: type=registry,ref=calof/energaize_inference:${{ github.event_name == 'workflow_dispatch' && 'pilot-buildcache' || 'buildcache' }},mode=max
