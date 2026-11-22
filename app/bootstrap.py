@@ -15,7 +15,7 @@ def build_service(config: Settings, store: ActivePipelines | None = None) -> Inf
     def build_pipeline(**kwargs):
         return InferencePipeline(
             **kwargs,
-            runtime_factory=ArtifactRuntimeFactory(config.onnx_execution_providers),
+            runtime_factory=ArtifactRuntimeFactory(config.onnx_execution_providers, config.tensorrt_enabled),
         )
 
     return InferenceService(

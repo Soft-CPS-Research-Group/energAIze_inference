@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict
 
 from app.core.contracts import AgentRuntime
+from app.adapters.onnx_backend import TENSORRT_PROVIDER, requested_providers, ensure_available
 from app.logging import get_logger
 from app.services.preprocessor import AgentPreprocessor, build_encoder
 from app.services.runtimes.onnx import OnnxAgentRuntime
@@ -12,8 +13,9 @@ from app.utils.manifest import Manifest
 
 
 class ArtifactRuntimeFactory:
-    def __init__(self, providers: list[str]) -> None:
+    def __init__(self, providers: list[str], tensorrt_enabled: bool = False) -> None:
         self.providers = list(providers)
+        self.tensorrt_enabled = tensorrt_enabled
 
     def build(
         self, manifest: Manifest, artifacts_root: Path, agent_index: int,
@@ -26,7 +28,7 @@ class ArtifactRuntimeFactory:
             "Loading agent",
             agent_index=artifact.agent_index,
             format=artifact.format or "onnx",
-            providers=self.providers,
+            execution_device=(artifact.config or {}).get("execution_device", "deployment_default"),
         )
 
         encoder_specs = manifest.get_encoder_specs(artifact.agent_index)
@@ -42,12 +44,18 @@ class ArtifactRuntimeFactory:
         feature_aliases = dict(alias_overrides)
 
         if artifact.format in (None, "onnx"):
-            import onnxruntime as ort
-
-            session = ort.InferenceSession(
-                path_or_bytes=artifact_path.as_posix(),
-                providers=self.providers,
-            )
+            providers = requested_providers(artifact_config, self.providers)
+            ensure_available(providers, self.tensorrt_enabled)
+            if providers == [TENSORRT_PROVIDER]:
+                from app.adapters.tensorrt_session import TensorRTSession
+                session = TensorRTSession(artifact_path)
+            else:
+                import onnxruntime as ort
+                session = ort.InferenceSession(
+                    path_or_bytes=artifact_path.as_posix(), providers=providers)
+            if session.get_providers()[0] != providers[0] or any(
+                    p not in session.get_providers() for p in providers):
+                raise ValueError("Runtime silently fell back from the requested providers")
             bounds = manifest.get_action_bounds(artifact.agent_index)
             return OnnxAgentRuntime(
                 index=artifact.agent_index,

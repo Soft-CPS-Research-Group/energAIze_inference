@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, TYPE_CHECKING
+from typing import Dict, List
 import math
 
 import numpy as np
 
 from app.core.errors import ExecutionError, InputError
+from app.core.contracts import TensorSession
 from app.logging import get_logger
 from app.services.preprocessor import AgentPreprocessor
 from app.services.runtimes.common import _apply_aliases
-
-if TYPE_CHECKING:
-    import onnxruntime as ort
-
 
 def _round_down_one_decimal(value: float) -> float:
     import math
@@ -28,7 +25,7 @@ class OnnxAgentRuntime:
     def __init__(
         self,
         index: int,
-        session: ort.InferenceSession,
+        session: TensorSession,
         preprocessor: AgentPreprocessor,
         action_names: List[str],
         feature_aliases: Dict[str, str] | None = None,

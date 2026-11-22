@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
-from app.adapters.hardware import _cuda_available
+from app.adapters.hardware import _cuda_available, _tensorrt_available
 from app.application.service import InferenceService
 from app.bootstrap import build_service
 from app.dependencies import get_service
@@ -114,7 +114,8 @@ def create_app(
     application.state.settings = config
     application.state.preparation = None
     application.state.inference_service = service if service is not None else build_service(config)
-    application.state.gpu_probe = gpu_probe if gpu_probe is not None else _cuda_available
+    application.state.gpu_probe = gpu_probe if gpu_probe is not None else (
+        _tensorrt_available if config.tensorrt_enabled else _cuda_available)
     application.add_middleware(RequestContextMiddleware)
     application.include_router(info.router)
     application.include_router(inference.router)

@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from pydantic import ValidationError
 
 from app.adapters.runtime_factory import ArtifactRuntimeFactory
+from app.adapters.onnx_backend import requested_providers, ensure_available
 from app.contracts.v1.execution import CompatibilityReport
 from app.contracts.v2.safety import parse_configuration
 from app.core.contracts import PipelineRecord
@@ -125,6 +126,7 @@ class PreparationService:
                 problems.append(issue("interface_changed_without_bundle_evidence", "/bundle", "Changed algorithm semantics/order with the same manifest hash requires reviewed bundle evidence", "bundle"))
             snapshot = None
             validated_providers = []
+            requested = list(self.settings.onnx_execution_providers)
             checks = ["site_and_bindings", "signal_meanings_and_access", "controlled_channel_coverage", "adapter_and_safety_capabilities"]
             try:
                 snapshot = BundleSnapshot(self.settings.allowed_bundle_root, request.bundle,
@@ -133,6 +135,8 @@ class PreparationService:
                 manifest = snapshot.collect(config.bundle.manifest_sha256)
                 checks.append("bundle_paths_and_hashes")
                 artifact, width, names = check_manifest(config, manifest, snapshot)
+                if (artifact.format or "onnx") == "onnx":
+                    requested = requested_providers(artifact.config, requested)
                 checks.append("manifest_interface_and_encoders")
                 if not problems:
                     try:
@@ -156,7 +160,7 @@ class PreparationService:
             candidate = dict(candidate_id=operation_id, configuration_revision=config.revision,
                              state="ready" if status == "compatible" else "rejected", compatibility=report.dict(),
                              impact=impact(baseline, config), file_hashes=snapshot.hashes if snapshot else {},
-                             requested_onnx_providers=list(self.settings.onnx_execution_providers),
+                             requested_onnx_providers=requested,
                              validated_providers=validated_providers,
                              requires_revalidation_before_activation=True)
             self.store.finish(operation_id, candidate=candidate)
@@ -166,17 +170,18 @@ class PreparationService:
 
     def _construct(self, config, manifest, artifact, width, names, snapshot):
         if (artifact.format or "onnx") == "onnx":
-            import onnxruntime as ort
-            if not self.settings.onnx_execution_providers or any(p not in ort.get_available_providers() for p in self.settings.onnx_execution_providers):
-                raise PreparationError("provider_unavailable", "A requested ONNX provider is unavailable", "/runtime/providers")
+            requested = requested_providers(artifact.config, self.settings.onnx_execution_providers)
+            try:
+                ensure_available(requested, self.settings.tensorrt_enabled)
+            except Exception as exc:
+                raise PreparationError("provider_unavailable", "A requested ONNX backend is unavailable or disabled", "/runtime/providers") from exc
         alias_path = snapshot.destination / snapshot.alias if snapshot.alias else None
         from app.adapters.bundles import _load_alias_overrides
         pipeline = InferencePipeline(manifest, snapshot.destination, artifact.agent_index,
                                      _load_alias_overrides(alias_path, artifact.agent_index) if config.message.adapter_revision == "legacy-1" else {},
-                                     runtime_factory=ArtifactRuntimeFactory(self.settings.onnx_execution_providers))
+                                     runtime_factory=ArtifactRuntimeFactory(self.settings.onnx_execution_providers, self.settings.tensorrt_enabled))
         if (artifact.format or "onnx") == "onnx":
             session = pipeline.agent.session
-            requested = self.settings.onnx_execution_providers
             if any(p not in session.get_providers() for p in requested) or session.get_providers()[0] != requested[0]:
                 raise PreparationError("provider_fallback", "ONNX silently fell back from the requested providers", "/runtime/providers")
             inputs, outputs = session.get_inputs(), session.get_outputs()

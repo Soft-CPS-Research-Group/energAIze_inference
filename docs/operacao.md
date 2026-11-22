@@ -111,6 +111,61 @@ O perfil suporta limites individuais, precisão decimal e **um limite superior a
 
 Os [schemas v2](../contracts/v2) definem os documentos do modo gerido. Configurações v1 continuam disponíveis para preparação e avaliação, sem migração implícita: consultar os [schemas v1](../contracts/v1/schemas) e [exemplos](../contracts/v1/examples). Para ativar, usar configuração v2 e o adaptador `channels-1`.
 
+## CPU e GPU na mesma Jetson
+
+A imagem de `Dockerfile.jetson` destina-se à Jetson ARM64 com JetPack 5.1.1
+(L4T 35.3.1, CUDA 11.4 e TensorRT 8.5.2.2). Inclui ONNX Runtime CPU e o
+adaptador GPU nativo TensorRT. As bases e as fontes dos bindings Python estão
+fixadas por digest/commit. Não instala drivers no host. A imagem CUDA da cloud
+não substitui este perfil. Uma Jetson com outra versão requer nova validação.
+
+Em `agent.artifacts[].config`, um ONNX pode declarar:
+
+```json
+{"execution_device": "gpu"}
+```
+
+Usar `"cpu"` para ONNX Runtime CPU. Sem o campo, mantém-se a lista
+`ONNX_EXECUTION_PROVIDERS` do deployment (CPU por omissão). A seleção pertence
+ao manifesto verificado por hash; não vem na mensagem Percepta nem num ficheiro
+que possa sobrepor o manifesto. Políticas `rule_based` continuam em CPU.
+
+`gpu` requer `TENSORRT_ENABLED=true`, Docker com `runtime: nvidia` e um modelo
+aceite pelo TensorRT 8.5: uma entrada e uma saída float32, formas fixas
+`[1, largura]`. O serviço constrói o motor no destino e executa um ciclo de
+verificação durante a preparação. Usa FP32, sem FP16/TF32 implícitos, plugins
+fornecidos pelo bundle ou motores TensorRT pré-compilados. O limite de workspace
+do construtor é 256 MiB; não limita toda a memória da aplicação. Não existe
+fallback silencioso para CPU. Um modelo incompatível é rejeitado e o ativo
+continua a servir; uma falha durante inferência devolve erro técnico.
+
+Para construir no destino e usar o modo gerido, preencher as variáveis do
+Compose base e ainda `DEPLOYMENT_MODEL_ID` e `PERCEPTA_CYCLE_TOKEN`:
+
+```sh
+docker build -f Dockerfile.jetson -t energaize-inference:jetson-jp5 .
+docker compose -f compose.preparation.yml -f compose.jetson.yml up -d
+```
+
+A pasta de bundles fica só de leitura; a pasta de estado tem de ser persistente
+e exclusiva desta instância. Um bundle CPU também funciona dentro desta imagem.
+A imagem CPU separada, sem runtime NVIDIA, continua disponível.
+
+Para mudar CPU/GPU, entregar um novo manifesto, preparar, avaliar e ativar pela
+mesma API. O endpoint e a mensagem Percepta mantêm-se. A resposta e o candidato
+identificam `CPUExecutionProvider` ou `TensorRTNative` em `providers`; este último
+é o motor NVIDIA nativo, não o TensorRT Execution Provider do ONNX Runtime.
+Pedidos simultâneos partilham o contexto GPU com exclusão mútua. Após reinício,
+o motor ativo é reconstruído a partir do snapshot verificado. A escolha do
+motor deve considerar precisão e latência do modelo real, não apenas haver GPU.
+
+O ensaio HTTP reproduzível é `scripts/smoke_release.py`, montado em
+`/smoke_release.py` na imagem. Usar `EXPECTED_ARCH=aarch64` e
+`SMOKE_DEVICES=gpu,cpu,gpu` para verificar troca, decisões, safety, concorrência
+e reinício. Com `SMOKE_DEVICES=cpu` e `EXPECT_GPU_UNAVAILABLE=1`, executar sem
+runtime NVIDIA para comprovar a rejeição GPU e a continuidade CPU. São mensagens
+Percepta sintéticas; não envia comandos a equipamentos nem configura o produtor.
+
 ## Troca, reinício e diagnóstico
 
 - **Mesmo contexto, novo algoritmo:** preparar e avaliar o candidato. Ativar com uma nova chave de idempotência e os IDs atuais. A execução anterior continua até à publicação integral da nova versão. Repetir o mesmo pedido com a mesma chave devolve o recibo original, sem reativar.

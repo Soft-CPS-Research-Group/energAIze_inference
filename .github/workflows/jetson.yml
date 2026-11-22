@@ -1,0 +1,41 @@
+name: Jetson JetPack 5 image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build ARM64 JetPack image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.jetson
+          platforms: linux/arm64
+          load: true
+          tags: calof/energaize_inference:jetson-jp5-${{ github.sha }}
+          labels: org.opencontainers.image.revision=${{ github.sha }}
+      - name: Verify CPU path and unavailable GPU rejection
+        run: |
+          docker run --rm --network=none --runtime=runc \
+            -e EXPECTED_ARCH=aarch64 -e SMOKE_DEVICES=cpu -e EXPECT_GPU_UNAVAILABLE=1 \
+            -v "$PWD/scripts/smoke_release.py:/smoke_release.py:ro" \
+            --entrypoint python calof/energaize_inference:jetson-jp5-${{ github.sha }} /smoke_release.py
+      - name: Publish commit image
+        run: |
+          image=calof/energaize_inference:jetson-jp5-${{ github.sha }}
+          docker push "$image"
+          docker inspect "$image" --format '{{index .RepoDigests 0}}' >> "$GITHUB_STEP_SUMMARY"
+          echo 'ARM64 CPU HTTP smoke passed. Native GPU acceptance requires a JetPack 5.1.1 Jetson; this runner has no Jetson GPU.' >> "$GITHUB_STEP_SUMMARY"

@@ -6,6 +6,16 @@ from app.logging import get_logger
 
 
 @lru_cache(maxsize=1)
+def _tensorrt_available() -> bool:
+    try:
+        from app.adapters.tensorrt_session import TensorRTSession
+        TensorRTSession.probe()
+        return True
+    except Exception:
+        return False
+
+
+@lru_cache(maxsize=1)
 def _cuda_available() -> bool:
     import onnxruntime as ort
 

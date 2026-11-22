@@ -3,6 +3,9 @@
 Run inside the target image, mounted read-only at /smoke_release.py. All model,
 state and server logs are temporary. A nonzero exit prevents release promotion.
 """
+import copy
+from concurrent.futures import ThreadPoolExecutor
+import math
 import hashlib
 import json
 import os
@@ -23,6 +26,9 @@ import onnxruntime
 
 
 def main():
+    devices = os.environ.get("SMOKE_DEVICES", "default").split(",")
+    assert all(d in ("default", "cpu", "gpu") for d in devices)
+    device = devices[0]
     expected_arch = os.environ["EXPECTED_ARCH"]
     assert platform.machine() == expected_arch, platform.machine()
     assert "CPUExecutionProvider" in onnxruntime.get_available_providers()
@@ -36,6 +42,8 @@ def main():
     manifest["algorithm"]["name"] = "ReleaseSmokeONNX"
     manifest["agent"]["artifacts"] = [
         {"agent_index": 0, "format": "onnx", "path": "model.onnx"}]
+    if device != "default":
+        manifest["agent"]["artifacts"][0]["config"] = {"execution_device": device}
     token, cycle_token = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
     base = "http://127.0.0.1:8000"
     proc = None
@@ -125,7 +133,8 @@ def main():
                 "configuration_revision": config["revision"],
                 "bundle": {"directory": "bundle", "file_hashes": hashes}},
                 key="prepare", status=202))
-            assert api("/admin/v1/candidates/" + candidate)["state"] == "ready"
+            initial = api("/admin/v1/candidates/" + candidate)
+            assert initial["state"] == "ready", initial
             context = api("/admin/v1/installation", {
                 "schema_version": "installation-update.v1-draft",
                 "expected_context_id": None, "expected_activation_id": None,
@@ -150,7 +159,7 @@ def main():
                 decision = result["decision"]
                 assert decision["activation"]["activation_id"] == activation
                 assert decision["activation"]["context_id"] == context
-                assert decision["providers"] == ["CPUExecutionProvider"]
+                assert decision["providers"] == ["TensorRTNative" if device == "gpu" else "CPUExecutionProvider"]
                 assert [a["proposed_value"] for a in decision["proposed_actions"]] == [6, 6]
                 assert [a["value"] for a in decision["actions"]] == [6, 2]
                 assert decision["safety"]["final_feasible"] is True
@@ -161,13 +170,86 @@ def main():
                 api("/admin/v1/status", credential=cycle_token, status=401)
 
             observe()
+            def prepare_device(next_device, index):
+                next_bundle = bundle.parent / ("bundle-" + str(index))
+                next_bundle.mkdir()
+                (next_bundle / "model.onnx").write_bytes((bundle / "model.onnx").read_bytes())
+                manifest["agent"]["artifacts"][0]["config"] = {"execution_device": next_device}
+                (next_bundle / "artifact_manifest.json").write_text(json.dumps(manifest))
+                next_hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in next_bundle.iterdir()}
+                next_config = copy.deepcopy(config)
+                next_config["revision"] = "device-" + str(index)
+                next_config["bundle"]["revision"] = "bundle-" + str(index)
+                next_config["bundle"]["manifest_sha256"] = next_hashes["artifact_manifest.json"]
+                api("/admin/v1/configurations/" + next_config["revision"], next_config, method="PUT", status=201)
+                next_candidate = resource(api("/admin/v1/candidates", {
+                    "schema_version": "preparation.v2-draft",
+                    "configuration_revision": next_config["revision"],
+                    "bundle": {"directory": next_bundle.name, "file_hashes": next_hashes}},
+                    key="prepare-" + str(index), status=202))
+                return api("/admin/v1/candidates/" + next_candidate)
+
+            for index, next_device in enumerate(devices[1:], 1):
+                candidate = prepare_device(next_device, index)
+                assert candidate["state"] == "ready", candidate
+                # Candidate preparation must leave the previous engine serving.
+                observe()
+                previous = activation
+                activation = resource(api("/admin/v1/activations", {
+                    "schema_version": "activation.v2-draft", "candidate_id": candidate["candidate_id"],
+                    "expected_context_id": context, "expected_activation_id": previous,
+                    "timeout_seconds": 180}, key="activate-" + str(index), status=202))
+                assert activation != previous
+                device = next_device
+                observe()
+
+            if os.environ.get("EXPECT_GPU_UNAVAILABLE") == "1":
+                rejected = prepare_device("gpu", len(devices))
+                assert rejected["state"] == "rejected", rejected
+                assert "provider_unavailable" in {i["code"] for i in rejected["compatibility"]["issues"]}
+                observe()
+
+            # Vary simultaneous inputs to detect shared GPU-buffer races.
+            def concurrent_observe(index):
+                sample = copy.deepcopy(message)
+                value = 1000 + index * 100
+                sample["entities"]["meter"]["parameters"]["load"]["final_values"][0]["value"] = value
+                decision = api(path, sample, credential=cycle_token, extra=headers)["decision"]
+                assert decision["providers"] == ["TensorRTNative" if device == "gpu" else "CPUExecutionProvider"]
+                assert decision["activation"]["activation_id"] == activation
+                assert all(math.isclose(a["proposed_value"], value / 500, abs_tol=1e-5)
+                           for a in decision["proposed_actions"])
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                list(pool.map(concurrent_observe, range(16)))
+            if os.environ.get("PERCEPTA_SMOKE_HANDOFF"):
+                handoff = Path(os.environ["PERCEPTA_SMOKE_HANDOFF"])
+                spec = dict(base=base, path=path, credential=cycle_token, context=context,
+                            activation=activation, message=message,
+                            provider="TensorRTNative" if device == "gpu" else "CPUExecutionProvider")
+                (handoff / "request.tmp").write_text(json.dumps(spec))
+                (handoff / "request.tmp").chmod(0o600)
+                (handoff / "request.tmp").replace(handoff / "request.json")
+                for _ in range(180):
+                    if (handoff / "result.json").exists():
+                        result = json.loads((handoff / "result.json").read_text())
+                        assert result["percepta_service"] == "passed"
+                        assert result["providers"] == [spec["provider"]]
+                        break
+                    time.sleep(1)
+                else:
+                    raise AssertionError("Native Percepta client did not complete")
             stop()
             proc = start()
             wait_server()
             observe()
             print(json.dumps({
                 "architecture": platform.machine(), "onnxruntime": onnxruntime.__version__,
-                "provider": "CPUExecutionProvider", "startup": "passed",
+                "provider": "TensorRTNative" if device == "gpu" else "CPUExecutionProvider",
+                "devices": devices, "runtime_switches": len(devices) - 1,
+                "concurrent_observations": 16,
+                "gpu_unavailable_rejected": os.environ.get("EXPECT_GPU_UNAVAILABLE") == "1",
+                "native_percepta_client": bool(os.environ.get("PERCEPTA_SMOKE_HANDOFF")),
+                "startup": "passed",
                 "activation": "passed", "native_percepta_observation": "passed",
                 "proposed_kw": [6, 6], "final_kw": [6, 2], "restart_recovery": "passed",
                 "timezone": "Europe/Lisbon", "input_conversion": "3000 W -> 3 kW"

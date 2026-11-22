@@ -7,6 +7,7 @@ from pydantic import BaseSettings, Field, SecretStr, validator
 
 
 class Settings(BaseSettings):
+    tensorrt_enabled: bool = Field(False, env="TENSORRT_ENABLED")
     configuration_store_dir: Path | None = Field(None, env="CONFIGURATION_STORE_DIR")
     installation_site_id: str | None = Field(None, env="INSTALLATION_SITE_ID")
     admin_api_token: SecretStr | None = Field(None, env="ADMIN_API_TOKEN")

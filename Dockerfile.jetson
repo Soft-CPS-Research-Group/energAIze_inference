@@ -1,0 +1,42 @@
+# Native ARM64 JetPack 5.1.1 / L4T 35.3.1; not the server CUDA image.
+FROM python:3.10-slim-bullseye@sha256:f1fb49e4d5501ac93d0ca519fb7ee6250842245aba8612926a46a0832a1ed089 AS python
+FROM nvcr.io/nvidia/l4t-tensorrt:r8.5.2.2-devel@sha256:8dc63c3ce42b233ad5de1d4ce6d7e59cd9b899b83c92ce50c832efba9e3ef394 AS bindings
+COPY --from=python /usr/local /usr/local
+ENV PATH=/usr/local/bin:$PATH
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git cmake build-essential libssl1.1 libffi7 libsqlite3-0 libbz2-1.0 liblzma5 \
+    && rm -rf /var/lib/apt/lists/* && ldconfig
+# Build only the Python 3.10 bindings, against the image's TensorRT libraries.
+# NVIDIA's stock JetPack 5 Python bindings target Python 3.8.
+RUN git init /build/TensorRT && cd /build/TensorRT \
+    && git fetch --depth=1 https://github.com/NVIDIA/TensorRT.git ad932f72126f875392a4336d9ee45b2756d934a0 && git checkout FETCH_HEAD \
+    && git submodule update --init --depth=1 parsers/onnx \
+    && git init /build/external/pybind11 && cd /build/external/pybind11 \
+    && git fetch --depth=1 https://github.com/pybind/pybind11.git 95ddd6b61bbecd06d00eef8a0e72fa9ffd46631e && git checkout FETCH_HEAD \
+    && mkdir -p /build/external/python3.10 \
+    && ln -s /usr/local/include/python3.10 /build/external/python3.10/include \
+    && sed -i 's/make -j12/make -j2/' /build/TensorRT/python/build.sh \
+    && cd /build/TensorRT/python \
+    && TRT_OSSPATH=/build/TensorRT EXT_PATH=/build/external \
+       PYTHON_MAJOR_VERSION=3 PYTHON_MINOR_VERSION=10 TARGET_ARCHITECTURE=aarch64 bash build.sh \
+    && python -m pip install --no-cache-dir build/dist/tensorrt-*.whl
+
+FROM nvcr.io/nvidia/l4t-tensorrt:r8.5.2.2-devel@sha256:8dc63c3ce42b233ad5de1d4ce6d7e59cd9b899b83c92ce50c832efba9e3ef394
+COPY --from=python /usr/local /usr/local
+COPY --from=bindings /build/TensorRT/python/build/dist /tmp/tensorrt-wheels
+ENV PATH=/usr/local/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    ONNX_EXECUTION_PROVIDERS=CPUExecutionProvider TENSORRT_ENABLED=true
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl1.1 libffi7 libsqlite3-0 libbz2-1.0 liblzma5 libgomp1 \
+    && rm -rf /var/lib/apt/lists/* && ldconfig
+WORKDIR /app
+COPY requirements-common.txt requirements-cpu.txt ./
+RUN python -m pip install --no-cache-dir /tmp/tensorrt-wheels/*.whl -r requirements-cpu.txt \
+    && rm -rf /tmp/tensorrt-wheels \
+    && python -c "import importlib.metadata, onnxruntime; assert importlib.metadata.version('tensorrt') == '8.5.2.2'"
+COPY app ./app
+COPY examples ./examples
+EXPOSE 8000
+ENTRYPOINT []
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -66,12 +66,27 @@ este ensaio não certifica a precisão de um algoritmo real. A rede maior ganhou
 aproximadamente 1,7×; as pequenas não justificaram a GPU. É uma comparação
 exploratória de dois motores e precisões, não uma garantia de desempenho geral.
 
-Também passou a execução ONNX/TensorRT dentro do container NVIDIA já existente
-`nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3`, usando `--runtime=nvidia`,
-com paridade numérica. A imagem da aplicação não foi substituída. Falta preparar
-um perfil de inferência GPU específico para JetPack 5, compatível com Python e
-CUDA/TensorRT, e validar nele o percurso HTTP/Percepta e os modelos reais.
-Não selecionar a imagem CUDA AMD64 da cloud para a Xavier.
+O [Dockerfile.jetson](Dockerfile.jetson) integra agora o serviço com TensorRT
+8.5.2.2/Python 3.10 e mantém ONNX Runtime CPU. O bundle escolhe
+`config.execution_device: "cpu"` ou `"gpu"`; a resposta identifica o motor.
+Ver [configuração, limites e troca](docs/operacao.md#cpu-e-gpu-na-mesma-jetson)
+e [Compose Jetson](compose.jetson.yml). Não selecionar a imagem CUDA AMD64 da
+cloud para a Xavier.
+
+Na Jetson real passou o ensaio HTTP GPU → CPU → GPU, com 16 pedidos simultâneos
+variados, recuperação após reinício e safety: entrada 3000 W, propostas 6 + 6 kW,
+saída corrigida 6 + 2 kW. O cliente AsyncHTTP e o serviço de inferência do Percepta
+na imagem `clar1ssesousa/data-provider@sha256:77e0d36b2ba5dc6ac9405822a93747c155603f7e01012786ab19a05323153b5b`
+também enviaram o ciclo e receberam a decisão GPU. O armazenamento desse ensaio
+foi um destino em memória, sem MongoDB ou comandos físicos. Um segundo ensaio,
+sem runtime NVIDIA, comprovou CPU funcional e recusa de um bundle GPU sem
+alterar a versão ativa. Os modelos continuam sintéticos; validar precisão,
+operadores e latência dos bundles reais antes de os colocar em serviço.
+
+O workflow manual `Jetson JetPack 5 image` publica
+`calof/energaize_inference:jetson-jp5-<commit>` após construção ARM64 e ensaio
+HTTP CPU. A validação GPU é feita separadamente no equipamento real, nunca
+inferida de uma construção CI sem GPU. A release CPU `v0.2.0` é preservada.
 
 O ensaio reproduzível está em [benchmark_jetson_gpu.py](scripts/benchmark_jetson_gpu.py).
 Gerar os ficheiros com `--prepare DIR`; executar `--cpu DIR` dentro da imagem

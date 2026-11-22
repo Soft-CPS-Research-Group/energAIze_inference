@@ -196,7 +196,9 @@ def check_manifest(config, manifest, snapshot):
             require(all(type(v) in (int, float) and math.isfinite(v) for v in values.values()), "policy_outputs_invalid", "/bundle/policy", "Action values must be finite numbers")
             require(all(within_physical(k, v, v) for k, v in values.items()), "physical_output_mismatch", "/bundle/policy", "Policy output exceeds installation bounds under the legacy off-only configuration")
     else:
-        require(set(cfg) <= {"config_path", "require_observations_envelope"}, "runtime_config_unsupported", "/bundle/config", "Unknown ONNX configuration fields require an adapter")
+        require(set(cfg) <= {"config_path", "require_observations_envelope", "execution_device"}, "runtime_config_unsupported", "/bundle/config", "Unknown ONNX configuration fields require an adapter")
+        require("execution_device" not in cfg or cfg["execution_device"] in ("cpu", "gpu"), "execution_device_unsupported", "/bundle/config/execution_device", "Execution device must be cpu or gpu")
+        require(cfg.get("execution_device") == artifact.config.get("execution_device"), "device_override_unsupported", "/bundle/config/execution_device", "Device selection must be declared directly on the artifact")
         bounds = manifest.get_action_bounds(artifact.agent_index)
         require(bool(bounds) and all(len(bounds.get(key, [])) == len(actions) for key in ("low", "high")), "bounds_invalid", "/manifest/environment/action_bounds", "ONNX needs complete output bounds")
         for low, high in zip(bounds["low"], bounds["high"]):
