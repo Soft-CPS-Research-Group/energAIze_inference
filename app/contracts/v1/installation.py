@@ -84,8 +84,8 @@ class Channel(Contract):
     @root_validator(skip_on_failure=True)
     def shape(cls, values):
         path = values["message_path"]
-        if path is not None and (not path or path[0] not in ("observations", "forecasts", "community")):
-            raise ValueError("message_path must start at observations, forecasts or community")
+        if path is not None and (not path or path[0] not in ("observations", "forecasts", "community", "entities", "derived_data")):
+            raise ValueError("message_path must start at observations, forecasts, community, entities or derived_data")
         if values["role"] == "action" and path is not None:
             raise ValueError("Actions do not read a message_path")
         if values["physical_bounds"] is not None and values["meaning"].value_type not in ("number", "number_vector"):

@@ -525,8 +525,10 @@ def test_native_percepta_observes_one_installation_over_its_own_credential(manag
     url = f"/inference/sites/{site}/models/energy/observe"
     headers = {"Authorization": "Bearer " + settings.percepta_cycle_token.get_secret_value(),
                "X-Installation-Context": "pending"}
+    channel = next(c for c in config["installation"]["channels"] if c.get("message_path"))
+    channel["message_path"] = ["entities", "meter", "parameters", "load", "final_values", "0", "value"]
     message = {"period_start": "2026-11-22 03:45:00 +0000", "period_end": "2026-11-22 04:00:00 +0000",
-               "observations": {"non_shiftable_load": 5}}
+               "entities": {"meter": {"parameters": {"load": {"measurement_unit": "kW", "final_values": [{"value": 5}]}}}}}
     with TestClient(create_app(config=settings)) as client:
         assert client.get(url, headers=headers).status_code == 503
         _, context, activation_id = ready(client, config, request)
@@ -544,12 +546,17 @@ def test_native_percepta_observes_one_installation_over_its_own_credential(manag
         decision = observed.json()["decision"]
         assert decision["activation"]["activation_id"] == activation_id
         assert decision["context"]["site_id"] == site and decision["cycle_id"].startswith(site + "/")
-        assert decision["actions"] == cycle(client, activation_id, context).json()["actions"]
+        def reference(active_id):
+            response = client.post("/inference/v2", headers=AUTH, json=dict(
+                expected_activation_id=active_id, expected_context_id=context, cycle_id="reference", features=message))
+            assert response.status_code == 200, response.text
+            return response.json()["actions"]
+        assert decision["actions"] == reference(activation_id)
         candidate, _ = new_candidate(client, managed)
         updated = activate(client, candidate, context, activation_id, key="new-version")
         assert updated["status"] == "succeeded"
         second = client.post(url, headers=headers, json=message).json()["decision"]
         assert second["activation"]["activation_id"] == updated["resource_id"]
         assert second["cycle_id"] == decision["cycle_id"]
-        assert second["actions"] == cycle(client, updated["resource_id"], context).json()["actions"]
+        assert second["actions"] == reference(updated["resource_id"])
         assert second["actions"] != decision["actions"]

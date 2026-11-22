@@ -33,10 +33,10 @@ def read_path(features, path):
     value = features
     descriptor = None
     for index, key in enumerate(path):
-        if isinstance(value, dict) and "values" in value and key == "values":
-            if not isinstance(value["values"], list):
+        if isinstance(value, dict) and key in ("values", "final_values") and key in value:
+            if not isinstance(value[key], list):
                 raise InputError("forecast_invalid", "Forecast values must be an array", pointer(path[:index + 1]))
-            descriptor = value
+            descriptor = value if key == "values" else {**value, "values": value[key]}
         if isinstance(value, dict) and key in value:
             value = value[key]
         elif isinstance(value, list) and key.isascii() and key.isdecimal() and len(key) <= len(str(len(value))) and str(int(key)) == key and int(key) < len(value):
