@@ -46,6 +46,39 @@ a correção de safety e a recuperação após reinício. O resultado fica no re
 do workflow; a tag final só é publicada se ambos os ensaios passarem.
 Este workflow não faz deployment nem acede às casas.
 
+## GPU na Jetson Xavier — ensaio de 22/11/2026
+
+A release CPU `v0.2.0` não utiliza a GPU. Na Xavier da Régua (L4T 35.3.1,
+CUDA 11.4, TensorRT 8.5.2.2), três ONNX sintéticos foram comparados nativamente:
+CPU na imagem publicada, com dois threads; GPU no TensorRT instalado, sem
+fallback CPU. Cem ciclos após aquecimento, batch 1, transferências GPU incluídas;
+sem HTTP/rede, sem alterar clocks ou modo de energia.
+
+| Rede (larguras) | CPU mediana | GPU FP32 | GPU com FP16 permitido |
+| --- | --- | --- | --- |
+| 64–32–2 | 0,049 ms | 0,325 ms | 0,322 ms |
+| 64–1024–1024–1024–2 | 0,428 ms | 0,473 ms | 0,563 ms |
+| 64–2048–2048–2048–2 | 1,253 ms | 1,183 ms | 0,734 ms |
+
+O erro absoluto máximo foi 2,99e-7 em FP32 e 0,00108 com FP16 permitido,
+nos oito vetores de referência. A construção FP16 avisou sobre pesos subnormais:
+este ensaio não certifica a precisão de um algoritmo real. A rede maior ganhou
+aproximadamente 1,7×; as pequenas não justificaram a GPU. É uma comparação
+exploratória de dois motores e precisões, não uma garantia de desempenho geral.
+
+Também passou a execução ONNX/TensorRT dentro do container NVIDIA já existente
+`nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3`, usando `--runtime=nvidia`,
+com paridade numérica. A imagem da aplicação não foi substituída. Falta preparar
+um perfil de inferência GPU específico para JetPack 5, compatível com Python e
+CUDA/TensorRT, e validar nele o percurso HTTP/Percepta e os modelos reais.
+Não selecionar a imagem CUDA AMD64 da cloud para a Xavier.
+
+O ensaio reproduzível está em [benchmark_jetson_gpu.py](scripts/benchmark_jetson_gpu.py).
+Gerar os ficheiros com `--prepare DIR`; executar `--cpu DIR` dentro da imagem
+CPU na Jetson e `--gpu DIR` no ambiente TensorRT 8 (opcional `--fp16`).
+A pasta deve ser temporária e removida depois. Os modelos, referências e
+containers deste ensaio foram removidos; VPN, drivers, worker e piloto preservados.
+
 ## Alterar e verificar o código
 
 | Alteração | Começar em |
