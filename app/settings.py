@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     configuration_store_dir: Path | None = Field(None, env="CONFIGURATION_STORE_DIR")
     installation_site_id: str | None = Field(None, env="INSTALLATION_SITE_ID")
     admin_api_token: SecretStr | None = Field(None, env="ADMIN_API_TOKEN")
+    percepta_cycle_token: SecretStr | None = Field(None, env="PERCEPTA_CYCLE_TOKEN", min_length=32)
+    deployment_model_id: str | None = Field(None, env="DEPLOYMENT_MODEL_ID")
     configuration_file: Path | None = Field(None, env="CONFIGURATION_FILE")
     preparation_request_file: Path | None = Field(None, env="PREPARATION_REQUEST_FILE")
     max_pending_preparations: int = Field(4, ge=1, le=32, env="MAX_PENDING_PREPARATIONS")

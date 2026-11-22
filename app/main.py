@@ -27,6 +27,11 @@ async def lifespan(app: FastAPI):
     settings = app.state.settings
     service = app.state.inference_service
     candidate_service = None
+    if settings.percepta_cycle_token and (
+        not settings.configuration_store_dir or not settings.deployment_model_id
+        or settings.percepta_cycle_token == settings.admin_api_token
+    ):
+        raise ValueError("Percepta requires a managed model and a dedicated cycle credential")
     if settings.configuration_store_dir is not None:
         if not settings.installation_site_id or not settings.allowed_bundle_root or not settings.allowed_bundle_root.is_dir() or not settings.admin_api_token or len(settings.admin_api_token.get_secret_value()) < 32:
             raise ValueError("Preparation requires INSTALLATION_SITE_ID, an existing ALLOWED_BUNDLE_ROOT and ADMIN_API_TOKEN of at least 32 characters")

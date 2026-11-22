@@ -514,3 +514,42 @@ def test_rollback_same_installation_is_a_new_validated_activation(managed):
         result = cycle(client, rollback['resource_id'], context).json()
         assert result['actions'][0]['value'] == 2
         assert result['activation']['previous_activation_id'] == new
+
+
+def test_native_percepta_observes_one_installation_over_its_own_credential(managed):
+    from pydantic import SecretStr
+    settings, config, request, *_ = managed
+    settings.deployment_model_id = "energy"
+    settings.percepta_cycle_token = SecretStr("cycle-only-key-for-local-test-123456789")
+    site = settings.installation_site_id
+    url = f"/inference/sites/{site}/models/energy/observe"
+    headers = {"Authorization": "Bearer " + settings.percepta_cycle_token.get_secret_value(),
+               "X-Installation-Context": "pending"}
+    message = {"period_start": "2026-11-22 03:45:00 +0000", "period_end": "2026-11-22 04:00:00 +0000",
+               "observations": {"non_shiftable_load": 5}}
+    with TestClient(create_app(config=settings)) as client:
+        assert client.get(url, headers=headers).status_code == 503
+        _, context, activation_id = ready(client, config, request)
+        assert client.post(url, headers=headers, json=message).status_code == 409
+        headers["X-Installation-Context"] = context
+        assert client.get(url, headers=headers).json() == dict(site_id=site, model_id="energy", ready=True, context_id=context)
+        assert client.get(url.replace("/energy/", "/other/"), headers=headers).status_code == 404
+        assert client.get(url.replace(f"/{site}/", "/other-house/"), headers=headers).status_code == 404
+        assert client.get("/admin/v1/status", headers=headers).status_code == 401
+        assert client.post(url, headers={**headers, **AUTH}, json=message).status_code == 401
+        assert client.post(url, headers=headers, json={**message, "period_end": message["period_start"]}).status_code == 422
+        observed = client.post(url, headers=headers, json=message)
+        assert observed.status_code == 200, observed.text
+        assert set(observed.json()) == {"decision"}
+        decision = observed.json()["decision"]
+        assert decision["activation"]["activation_id"] == activation_id
+        assert decision["context"]["site_id"] == site and decision["cycle_id"].startswith(site + "/")
+        assert decision["actions"] == cycle(client, activation_id, context).json()["actions"]
+        candidate, _ = new_candidate(client, managed)
+        updated = activate(client, candidate, context, activation_id, key="new-version")
+        assert updated["status"] == "succeeded"
+        second = client.post(url, headers=headers, json=message).json()["decision"]
+        assert second["activation"]["activation_id"] == updated["resource_id"]
+        assert second["cycle_id"] == decision["cycle_id"]
+        assert second["actions"] == cycle(client, updated["resource_id"], context).json()["actions"]
+        assert second["actions"] != decision["actions"]

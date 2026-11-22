@@ -12,6 +12,8 @@ Usar um processo Uvicorn por pasta de estado. A identidade da instalação fica 
 | `ALLOWED_BUNDLE_ROOT` | Diretório de entrada dos bundles; montar só de leitura |
 | `CONFIGURATION_STORE_DIR` | Diretório privado, persistente e gravável para SQLite, configurações e cópias validadas dos bundles |
 | `ADMIN_API_TOKEN` | Segredo local de pelo menos 32 caracteres; usado nas rotas administrativas e em `/inference/v2` |
+| `DEPLOYMENT_MODEL_ID` | Identificador estável do modelo escolhido em Deployment para esta instalação |
+| `PERCEPTA_CYCLE_TOKEN` | Credencial dedicada de pelo menos 32 caracteres para a ligação do Percepta. O Runtime gera-a ao preparar a instância. |
 | `ONNX_EXECUTION_PROVIDERS` | Provider disponível no destino, por exemplo `CPUExecutionProvider` |
 | `CONFIGURATION_FILE`, `PREPARATION_REQUEST_FILE` | Opcionais: guardar configuração e preparar um candidato no arranque. Não o ativam. |
 
@@ -86,6 +88,12 @@ jq --arg a "$activation" --arg x "$context" '.expected_activation_id=$a | .expec
 ```
 
 A resposta inclui IDs de contexto, ativação e ciclo, proposta original, ações finais e auditoria. Não confirma entrega a um equipamento. Terminar o processo de demonstração com `kill "$service_pid"`; reiniciar com a mesma pasta e as mesmas definições recupera a ativação confirmada.
+
+## Ligação direta do Percepta
+
+O Runtime configura o destino, a credencial de ciclo e o cabeçalho `X-Installation-Context`. A rota `/inference/sites/{site_id}/models/{model_id}/observe` aceita GET para verificar a instalação e POST para receber a mensagem nativa do ciclo. O início e o fim do período têm de incluir o fuso horário. A resposta contém `decision` com as ações, a ativação, o contexto e o identificador do ciclo. O Percepta usa esta ligação em observação.
+
+Uma nova versão ativada no mesmo contexto passa a responder na mesma rota. Se mudar o contexto da instalação, usar **Connect active model** em Deployment e aplicar a revisão do Percepta. Uma instância sem versão ativa responde 503. Um pedido com um contexto desatualizado responde 409.
 
 ## Mensagem, algoritmos e limites físicos
 
