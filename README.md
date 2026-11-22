@@ -25,6 +25,27 @@ Sem configuração nem manifesto de arranque, o processo responde em [health](ht
 
 Para Docker, [compose.preparation.yml](compose.preparation.yml) descreve o modo gerido com uma pasta de bundles só de leitura e outra de estado persistente. O [Compose clássico](docker-compose.yml) usa os bundles de exemplo, publica a porta configurada e monta uma pasta de logs. O [perfil GPU](docker-compose.gpu.yml) requer um runtime NVIDIA compatível. Estes ficheiros descrevem como lançar o serviço; não identificam o que está instalado numa casa.
 
+## Imagens e releases
+
+`calof/energaize_inference:v0.2.0` é a release CPU para `linux/amd64` e
+`linux/arm64`, publicada como um único manifesto. Selecionar
+`CPUExecutionProvider` e runtime Docker `runc`; não requer CUDA ou JetPack.
+A imagem usa as mesmas rotas e contratos nas duas arquiteturas. A compatibilidade
+do host e os recursos de uma instalação continuam a exigir ensaio no destino.
+
+O `Dockerfile` e as tags `latest`/`pilot-<commit>` mantêm o perfil CUDA da cloud.
+O `Dockerfile.cpu` usa ONNX Runtime CPU e as restantes dependências partilhadas.
+Para reproduzir a instalação CPU fora de Docker, usar `requirements-cpu.txt`.
+
+Uma tag Git `vX.Y.Z` cujo commit pertença a `main` inicia o workflow
+`CPU multi-architecture release`: testes, publicação de um candidato por digest,
+validação HTTP das duas arquiteturas e promoção da tag versionada. AMD64 é testado
+nativamente; ARM64 usa QEMU num runner AMD64. O ensaio gera um pequeno modelo ONNX,
+ativa-o, envia uma mensagem nativa Percepta com unidades e verifica a decisão,
+a correção de safety e a recuperação após reinício. O resultado fica no resumo
+do workflow; a tag final só é publicada se ambos os ensaios passarem.
+Este workflow não faz deployment nem acede às casas.
+
 ## Alterar e verificar o código
 
 | Alteração | Começar em |

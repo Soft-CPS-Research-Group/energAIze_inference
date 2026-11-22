@@ -1,0 +1,135 @@
+name: CPU multi-architecture release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing version tag to rebuild and validate (e.g. v0.2.0)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpu-release-${{ github.event.inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: calof/energaize_inference
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
+      version: ${{ steps.version.outputs.version }}
+      revision: ${{ steps.version.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.version || github.ref }}
+          fetch-depth: 0
+      - name: Verify release tag and main ancestry
+        id: version
+        env:
+          VERSION: ${{ github.event.inputs.version || github.ref_name }}
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "$VERSION^{commit}")"
+          git merge-base --is-ancestor HEAD origin/main
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Test CPU dependencies and application
+        run: |
+          python -m pip install -r requirements-cpu.txt
+          python -m pip check
+          python -m compileall -q app scripts
+          python -m pytest -q
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish immutable candidate for both architectures
+        uses: docker/build-push-action@v6
+        id: image
+        with:
+          context: .
+          file: Dockerfile.cpu
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:cpu-${{ steps.version.outputs.revision }}
+          labels: |
+            org.opencontainers.image.revision=${{ steps.version.outputs.revision }}
+            org.opencontainers.image.version=${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=inference-cpu
+          cache-to: type=gha,mode=max,scope=inference-cpu
+
+  verify:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            machine: x86_64
+            execution: native AMD64
+          - platform: linux/arm64
+            machine: aarch64
+            execution: QEMU ARM64 on AMD64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.revision }}
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Pull and exercise published image by manifest digest
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+          PLATFORM: ${{ matrix.platform }}
+          MACHINE: ${{ matrix.machine }}
+          EXECUTION: ${{ matrix.execution }}
+        run: |
+          docker pull --platform "$PLATFORM" "$IMAGE@$DIGEST"
+          docker run --rm --runtime=runc --platform "$PLATFORM" \
+            -e EXPECTED_ARCH="$MACHINE" \
+            -v "$PWD/scripts/smoke_release.py:/smoke_release.py:ro" \
+            "$IMAGE@$DIGEST" python /smoke_release.py | tee smoke.json
+          echo "### $PLATFORM — $EXECUTION" >> "$GITHUB_STEP_SUMMARY"
+          cat smoke.json >> "$GITHUB_STEP_SUMMARY"
+
+  promote:
+    needs: [build, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Promote verified manifest without changing CUDA latest
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+          echo "Release: $IMAGE:$VERSION — tested manifest $DIGEST" >> "$GITHUB_STEP_SUMMARY"

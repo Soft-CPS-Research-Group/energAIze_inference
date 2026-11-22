@@ -10,7 +10,7 @@ RUN apt-get update && \
 RUN ln -sf python3 /usr/bin/python && ln -sf pip3 /usr/bin/pip
 
 WORKDIR /app
-COPY requirements.txt ./
+COPY requirements.txt requirements-common.txt ./
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
