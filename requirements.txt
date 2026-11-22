@@ -6,3 +6,4 @@ onnxruntime-gpu==1.23.0
 onnx==1.17.0
 loguru==0.7.3
 pytest==8.3.2
+tzdata==2025.2
